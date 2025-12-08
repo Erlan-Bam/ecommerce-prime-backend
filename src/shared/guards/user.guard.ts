@@ -1,31 +1,45 @@
 import {
   Injectable,
-  CanActivate,
   ExecutionContext,
   ForbiddenException,
-  UnauthorizedException,
 } from '@nestjs/common';
-
-type JwtUser = {
-  id: string;
-  role: 'USER' | 'ADMIN';
-  isBanned: boolean;
-};
+import { AuthGuard } from '@nestjs/passport';
+import { Reflector } from '@nestjs/core';
+import { IS_PUBLIC_KEY } from '../decorator/public.decorator';
 
 @Injectable()
-export class UserGuard implements CanActivate {
-  canActivate(context: ExecutionContext): boolean {
-    const req = context.switchToHttp().getRequest<{ user?: JwtUser }>();
-    const user = req.user;
+export class UserGuard extends AuthGuard('jwt') {
+  constructor(private reflector: Reflector) {
+    super();
+  }
 
-    if (!user) {
-      throw new UnauthorizedException('User not authenticated');
+  canActivate(context: ExecutionContext) {
+    const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+    if (isPublic) {
+      return true;
+    }
+
+    return super.canActivate(context);
+  }
+
+  handleRequest(
+    error: any,
+    user: any,
+    info: any,
+    context: ExecutionContext,
+    status?: any,
+  ) {
+    if (error || !user) {
+      throw error || new ForbiddenException('Access denied');
     }
 
     if (user.isBanned) {
       throw new ForbiddenException('Access denied: User is banned');
     }
 
-    return true;
+    return user;
   }
 }

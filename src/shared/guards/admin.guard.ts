@@ -1,24 +1,20 @@
-// admin.guard.ts
 import {
   Injectable,
-  CanActivate,
   ExecutionContext,
   ForbiddenException,
-  UnauthorizedException,
 } from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
 import { Reflector } from '@nestjs/core';
 import { IS_PUBLIC_KEY } from '../decorator/public.decorator';
-
-type JwtUser = {
-  id: string;
-  role: 'USER' | 'ADMIN';
-};
+import { Role } from '@prisma/client';
 
 @Injectable()
-export class AdminGuard implements CanActivate {
-  constructor(private reflector: Reflector) {}
+export class AdminGuard extends AuthGuard('jwt') {
+  constructor(private reflector: Reflector) {
+    super();
+  }
 
-  canActivate(context: ExecutionContext): boolean {
+  canActivate(context: ExecutionContext) {
     const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
       context.getHandler(),
       context.getClass(),
@@ -27,15 +23,24 @@ export class AdminGuard implements CanActivate {
       return true;
     }
 
-    const req = context.switchToHttp().getRequest<{ user?: JwtUser }>();
-    const user = req.user;
+    return super.canActivate(context);
+  }
 
-    if (!user) {
-      throw new UnauthorizedException('User not authenticated');
+  handleRequest(
+    err: any,
+    user: any,
+    info: any,
+    context: ExecutionContext,
+    status?: any,
+  ) {
+    if (err || !user) {
+      throw err || new ForbiddenException('Access denied');
     }
-    if (user.role !== 'ADMIN') {
+
+    if (user.role !== Role.ADMIN) {
       throw new ForbiddenException('Access denied: Admins only');
     }
-    return true;
+
+    return user;
   }
 }

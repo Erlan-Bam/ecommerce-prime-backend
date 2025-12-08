@@ -1,8 +1,4 @@
-import {
-  HttpException,
-  Injectable,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { HttpException, Injectable } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { PrismaService } from '../services/prisma.service';
@@ -23,7 +19,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
   async validate(payload: any) {
     try {
-      // Проверяем существование пользователя в базе данных
       const user = await this.prisma.account.findUnique({
         where: { id: payload.id },
         select: {
@@ -35,28 +30,23 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         },
       });
 
-      // Если пользователь не найден, выбрасываем ошибку
       if (!user) {
-        throw new UnauthorizedException('User not found');
+        throw new HttpException('User not found', 404);
       }
 
-      // Если пользователь заблокирован, выбрасываем ошибку
       if (user.isBanned) {
-        throw new UnauthorizedException('User is banned');
+        throw new HttpException('User is banned', 403);
       }
 
       return {
         id: user.id,
-        telegramId: user.telegramId.toString(), // Конвертируем BigInt в строку
         role: user.role,
       };
     } catch (error) {
-      // Если ошибка уже UnauthorizedException, пробрасываем её
-      if (error instanceof UnauthorizedException) {
+      if (error instanceof HttpException) {
         throw error;
       }
-      // Для любых других ошибок (например, проблемы с БД)
-      throw new UnauthorizedException('Invalid token');
+      throw new HttpException('Invalid token', 401);
     }
   }
 }

@@ -3,11 +3,6 @@ import { Transform } from 'class-transformer';
 import { IsInt, IsOptional, Min, Max } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
-const toNumber = (v: any, fallback: number) => {
-  const n = Number(v);
-  return Number.isFinite(n) ? n : fallback;
-};
-
 export class PaginationDto {
   @ApiPropertyOptional({
     description: 'Page number (1-based)',
@@ -19,7 +14,7 @@ export class PaginationDto {
   @IsOptional()
   @IsInt()
   @Min(1)
-  @Transform(({ value }) => toNumber(value, 1))
+  @Transform(({ value }) => Number(value))
   page?: number = 1;
 
   @ApiPropertyOptional({
@@ -34,6 +29,6 @@ export class PaginationDto {
   @IsInt()
   @Min(1)
   @Max(100)
-  @Transform(({ value }) => toNumber(value, 20))
+  @Transform(({ value }) => Number(value))
   limit?: number = 20;
 }
