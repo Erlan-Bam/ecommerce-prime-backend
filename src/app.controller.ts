@@ -1,12 +1,37 @@
-import { Controller, Get } from '@nestjs/common';
-import { AppService } from './app.service';
+import {
+  Controller,
+  Get,
+  HttpException,
+  HttpStatus,
+  Logger,
+} from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
+import { PrismaService } from './shared/services/prisma.service';
+import { Prisma } from '@prisma/client';
 
-@Controller()
+@ApiTags('App')
+@Controller('')
 export class AppController {
-  constructor(private readonly appService: AppService) {}
+  private readonly logger = new Logger(AppController.name);
+  constructor(private readonly prisma: PrismaService) {}
 
-  @Get()
-  getHello(): string {
-    return this.appService.getHello();
+  @Get('healthz')
+  async healthCheck() {
+    try {
+      await this.prisma.$queryRaw`SELECT 1`;
+
+      return {
+        status: 'ok',
+        database: 'connected',
+      };
+    } catch (error) {
+      throw new HttpException(
+        {
+          status: 'error',
+          error: 'Database connection failed',
+        },
+        HttpStatus.SERVICE_UNAVAILABLE,
+      );
+    }
   }
 }
