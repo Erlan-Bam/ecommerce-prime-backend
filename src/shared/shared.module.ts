@@ -5,6 +5,7 @@ import { CronService } from './services/cron.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { JwtModule, JwtService } from '@nestjs/jwt';
 import { MaintenanceService } from './services/maintenance.service';
+import { RedisService } from './services/redis.service';
 
 @Global()
 @Module({
@@ -15,6 +16,7 @@ import { MaintenanceService } from './services/maintenance.service';
     JwtStrategy,
     JwtService,
     MaintenanceService,
+    RedisService,
   ],
   exports: [
     PrismaService,
@@ -22,6 +24,7 @@ import { MaintenanceService } from './services/maintenance.service';
     JwtStrategy,
     JwtService,
     MaintenanceService,
+    RedisService,
   ],
 })
 export class SharedModule {}
