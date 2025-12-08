@@ -24,7 +24,7 @@ enum BonusType {
 }
 
 model User {
-  id        String   @id @default(cuid())
+  id        String   @id @default(uuid())
   email     String   @unique
   phone     String   @unique
   password  String
@@ -36,6 +36,38 @@ model User {
 
   bonuses   Bonus[]
 }
+
+model Category {
+  id        String       @id @default(uuid())
+  parentId  String?
+  title     String
+
+  parent    Category?  @relation("CategoryChildren", fields: [parentId], references: [id])
+  children  Category[] @relation("CategoryChildren")
+
+  products  Product[]
+}
+
+// model Product {  
+//   id           Int       @id @default(autoincrement())
+//   title        String
+//   sku          String    @unique
+//   price        Decimal   @db.Decimal(10,2)
+//   description  String?
+//   images       Json
+//   attributes   Json?
+//   stockTotal   Int
+
+//   categoryId   Int
+//   category     Category  @relation(fields: [categoryId], references: [id])
+
+//   orderItems   OrderItem[]
+//   stocks       ProductStock[]
+//   reviews      Review[]
+
+//   createdAt    DateTime @default(now())
+//   updatedAt    DateTime @updatedAt
+// }
 
 model Bonus {
   id        Int      @id @default(autoincrement())
