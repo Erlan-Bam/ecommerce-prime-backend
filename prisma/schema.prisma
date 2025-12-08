@@ -45,7 +45,7 @@ model Category {
   parent    Category?  @relation("CategoryChildren", fields: [parentId], references: [id])
   children  Category[] @relation("CategoryChildren")
 
-  products  Product[]
+  // products  Product[]
 }
 
 // model Product {  
