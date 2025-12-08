@@ -4,6 +4,7 @@ import { SharedModule } from './shared/shared.module';
 import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
 import { BullModule } from '@nestjs/bull';
+import { CategoryModule } from './category/category.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { BullModule } from '@nestjs/bull';
       },
     }),
     SharedModule,
+    CategoryModule,
   ],
   controllers: [AppController],
   providers: [],
