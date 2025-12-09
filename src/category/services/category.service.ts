@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  Logger,
+  ConflictException,
+} from '@nestjs/common';
 import { PrismaService } from '../../shared/services/prisma.service';
 import { CreateCategoryDto } from '../dto/create-category.dto';
 import { UpdateCategoryDto } from '../dto/update-category.dto';
@@ -14,9 +19,23 @@ export class CategoryService {
     private cacheService: CategoryCacheService,
   ) {}
 
+  private generateSlug(title: string): string {
+    return title
+      .toLowerCase()
+      .replace(/[^a-z0-9а-яё\s-]/gi, '')
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-')
+      .trim();
+  }
+
   async create(createCategoryDto: CreateCategoryDto) {
+    const slug = this.generateSlug(createCategoryDto.title);
+
     const category = await this.prisma.category.create({
-      data: createCategoryDto,
+      data: {
+        ...createCategoryDto,
+        slug,
+      },
       include: {
         parent: true,
         children: true,
@@ -43,17 +62,21 @@ export class CategoryService {
 
     const [data, total] = await Promise.all([
       this.prisma.category.findMany({
+        where: { isActive: true },
         skip,
         take: limit,
         include: {
-          parent: true,
-          children: true,
+          parent: { select: { id: true, title: true, slug: true } },
+          children: {
+            where: { isActive: true },
+            select: { id: true, title: true, slug: true, image: true },
+            orderBy: { sortOrder: 'asc' },
+          },
+          _count: { select: { products: true } },
         },
-        orderBy: {
-          title: 'asc',
-        },
+        orderBy: [{ sortOrder: 'asc' }, { title: 'asc' }],
       }),
-      this.prisma.category.count(),
+      this.prisma.category.count({ where: { isActive: true } }),
     ]);
 
     const result = {
@@ -72,6 +95,55 @@ export class CategoryService {
     return result;
   }
 
+  async findTree() {
+    const cacheKey = 'category:tree';
+    const cached = await this.cacheService.getCachedCategories(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
+    const categories = await this.prisma.category.findMany({
+      where: { isActive: true, parentId: null },
+      include: {
+        children: {
+          where: { isActive: true },
+          include: {
+            children: {
+              where: { isActive: true },
+              orderBy: { sortOrder: 'asc' },
+            },
+          },
+          orderBy: { sortOrder: 'asc' },
+        },
+        _count: { select: { products: true } },
+      },
+      orderBy: { sortOrder: 'asc' },
+    });
+
+    await this.cacheService.cacheCategories(cacheKey, categories);
+    return categories;
+  }
+
+  async findBySlug(slug: string) {
+    const category = await this.prisma.category.findUnique({
+      where: { slug },
+      include: {
+        parent: { select: { id: true, title: true, slug: true } },
+        children: {
+          where: { isActive: true },
+          orderBy: { sortOrder: 'asc' },
+        },
+        _count: { select: { products: true } },
+      },
+    });
+
+    if (!category) {
+      throw new NotFoundException(`Category not found`);
+    }
+
+    return category;
+  }
+
   async findOne(id: string) {
     const cached = await this.cacheService.getCachedCategory(id);
     if (cached) {
@@ -83,7 +155,11 @@ export class CategoryService {
       where: { id },
       include: {
         parent: true,
-        children: true,
+        children: {
+          where: { isActive: true },
+          orderBy: { sortOrder: 'asc' },
+        },
+        _count: { select: { products: true } },
       },
     });
 
@@ -100,9 +176,14 @@ export class CategoryService {
   async update(id: string, updateCategoryDto: UpdateCategoryDto) {
     await this.findOne(id);
 
+    const updateData: any = { ...updateCategoryDto };
+    if (updateCategoryDto.title) {
+      updateData.slug = this.generateSlug(updateCategoryDto.title);
+    }
+
     const category = await this.prisma.category.update({
       where: { id },
-      data: updateCategoryDto,
+      data: updateData,
       include: {
         parent: true,
         children: true,
@@ -117,6 +198,26 @@ export class CategoryService {
 
   async remove(id: string) {
     await this.findOne(id);
+
+    const productsCount = await this.prisma.product.count({
+      where: { categoryId: id },
+    });
+
+    if (productsCount > 0) {
+      throw new ConflictException(
+        `Cannot delete category with ${productsCount} associated products`,
+      );
+    }
+
+    const childrenCount = await this.prisma.category.count({
+      where: { parentId: id },
+    });
+
+    if (childrenCount > 0) {
+      throw new ConflictException(
+        `Cannot delete category with ${childrenCount} subcategories`,
+      );
+    }
 
     const category = await this.prisma.category.delete({
       where: { id },

@@ -6,6 +6,10 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { BullModule } from '@nestjs/bull';
 import { CategoryModule } from './category/category.module';
 import { AuthModule } from './auth/auth.module';
+import { ProductModule } from './product/product.module';
+import { BrandModule } from './brand/brand.module';
+import { SearchModule } from './search/search.module';
+import { UploadModule } from './upload/upload.module';
 
 @Module({
   imports: [
@@ -25,8 +29,12 @@ import { AuthModule } from './auth/auth.module';
       },
     }),
     SharedModule,
-    CategoryModule,
     AuthModule,
+    CategoryModule,
+    BrandModule,
+    ProductModule,
+    SearchModule,
+    UploadModule,
   ],
   controllers: [AppController],
   providers: [],
