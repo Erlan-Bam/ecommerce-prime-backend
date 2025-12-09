@@ -35,7 +35,10 @@ export class PickupPointController {
   @UseGuards(AdminGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Create a new pickup point (Admin)' })
-  @ApiResponse({ status: 201, description: 'Pickup point created successfully' })
+  @ApiResponse({
+    status: 201,
+    description: 'Pickup point created successfully',
+  })
   create(@Body() dto: CreatePickupPointDto) {
     return this.pickupPointService.create(dto);
   }
@@ -43,7 +46,10 @@ export class PickupPointController {
   @Public()
   @Get()
   @ApiOperation({ summary: 'Get all pickup points' })
-  @ApiResponse({ status: 200, description: 'Pickup points retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Pickup points retrieved successfully',
+  })
   findAll(@Query() paginationDto: PaginationDto) {
     return this.pickupPointService.findAll(paginationDto);
   }
@@ -51,7 +57,10 @@ export class PickupPointController {
   @Public()
   @Get(':id')
   @ApiOperation({ summary: 'Get pickup point by ID' })
-  @ApiResponse({ status: 200, description: 'Pickup point retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Pickup point retrieved successfully',
+  })
   @ApiResponse({ status: 404, description: 'Pickup point not found' })
   findOne(@Param('id') id: string) {
     return this.pickupPointService.findOne(id);
@@ -61,7 +70,10 @@ export class PickupPointController {
   @UseGuards(AdminGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update pickup point (Admin)' })
-  @ApiResponse({ status: 200, description: 'Pickup point updated successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Pickup point updated successfully',
+  })
   update(@Param('id') id: string, @Body() dto: UpdatePickupPointDto) {
     return this.pickupPointService.update(id, dto);
   }
@@ -70,7 +82,10 @@ export class PickupPointController {
   @UseGuards(AdminGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Delete pickup point (Admin)' })
-  @ApiResponse({ status: 200, description: 'Pickup point deleted successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Pickup point deleted successfully',
+  })
   remove(@Param('id') id: string) {
     return this.pickupPointService.remove(id);
   }
@@ -80,7 +95,10 @@ export class PickupPointController {
   @UseGuards(AdminGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Create product stock entry (Admin)' })
-  @ApiResponse({ status: 201, description: 'Product stock created successfully' })
+  @ApiResponse({
+    status: 201,
+    description: 'Product stock created successfully',
+  })
   createProductStock(@Body() dto: CreateProductStockDto) {
     return this.pickupPointService.createProductStock(dto);
   }
@@ -89,7 +107,10 @@ export class PickupPointController {
   @UseGuards(AdminGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update product stock entry (Admin)' })
-  @ApiResponse({ status: 200, description: 'Product stock updated successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Product stock updated successfully',
+  })
   updateProductStock(
     @Param('productId') productId: string,
     @Param('pointId') pointId: string,
@@ -102,7 +123,10 @@ export class PickupPointController {
   @UseGuards(AdminGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Delete product stock entry (Admin)' })
-  @ApiResponse({ status: 200, description: 'Product stock deleted successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Product stock deleted successfully',
+  })
   removeProductStock(
     @Param('productId') productId: string,
     @Param('pointId') pointId: string,
@@ -113,7 +137,10 @@ export class PickupPointController {
   @Public()
   @Get('stock/product/:productId')
   @ApiOperation({ summary: 'Get stock for a product across all pickup points' })
-  @ApiResponse({ status: 200, description: 'Product stock retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Product stock retrieved successfully',
+  })
   getProductStockByProduct(@Param('productId') productId: string) {
     return this.pickupPointService.getProductStockByProduct(productId);
   }
@@ -121,7 +148,10 @@ export class PickupPointController {
   @Public()
   @Get(':pointId/stock')
   @ApiOperation({ summary: 'Get all stock entries for a pickup point' })
-  @ApiResponse({ status: 200, description: 'Stock entries retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Stock entries retrieved successfully',
+  })
   getProductStockByPoint(@Param('pointId') pointId: string) {
     return this.pickupPointService.getProductStockByPoint(pointId);
   }

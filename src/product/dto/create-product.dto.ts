@@ -84,14 +84,20 @@ export class CreateProductDto {
   @IsBoolean()
   isOnSale?: boolean;
 
-  @ApiPropertyOptional({ description: 'Product images', type: [ProductImageDto] })
+  @ApiPropertyOptional({
+    description: 'Product images',
+    type: [ProductImageDto],
+  })
   @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => ProductImageDto)
   images?: ProductImageDto[];
 
-  @ApiPropertyOptional({ description: 'Product attributes', type: [ProductAttributeDto] })
+  @ApiPropertyOptional({
+    description: 'Product attributes',
+    type: [ProductAttributeDto],
+  })
   @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })

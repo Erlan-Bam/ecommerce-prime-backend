@@ -35,7 +35,9 @@ export class PickupPointService {
     });
 
     await this.cacheService.invalidateAllCaches();
-    this.logger.log(`Created pickup point ${pickupPoint.id}, cache invalidated`);
+    this.logger.log(
+      `Created pickup point ${pickupPoint.id}, cache invalidated`,
+    );
 
     return pickupPoint;
   }
