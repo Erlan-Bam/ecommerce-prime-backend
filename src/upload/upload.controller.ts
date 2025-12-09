@@ -17,11 +17,6 @@ export class UploadController {
   constructor(private readonly uploadService: UploadService) {}
 
   @Post('image')
-  @ApiOperation({
-    summary: 'Upload a single image file',
-    description:
-      'Upload image files. Supports WEBP, JPEG, PNG, and SVG formats.',
-  })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
     schema: {
@@ -77,11 +72,6 @@ export class UploadController {
   }
 
   @Post('images')
-  @ApiOperation({
-    summary: 'Upload multiple image files',
-    description:
-      'Upload multiple image files. Supports WEBP, JPEG, PNG, and SVG formats. Max 10 files.',
-  })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
     schema: {

@@ -38,11 +38,6 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     this.logger.log('Redis client disconnected');
   }
 
-  /**
-   * Get a value from Redis cache
-   * @param key - The cache key
-   * @returns The cached value or null if not found
-   */
   async get<T>(key: string): Promise<T | null> {
     try {
       const value = await this.client.get(key);
@@ -57,12 +52,6 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  /**
-   * Set a value in Redis cache
-   * @param key - The cache key
-   * @param value - The value to cache
-   * @param ttl - Time to live in seconds (optional)
-   */
   async set(key: string, value: any, ttl?: number): Promise<void> {
     try {
       const serialized = JSON.stringify(value);
@@ -77,11 +66,6 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  /**
-   * Remove a value from Redis cache
-   * @param key - The cache key to remove
-   * @returns Number of keys removed (0 or 1)
-   */
   async remove(key: string): Promise<number> {
     try {
       return await this.client.del(key);
@@ -91,11 +75,6 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  /**
-   * Remove multiple keys from Redis cache
-   * @param keys - Array of cache keys to remove
-   * @returns Number of keys removed
-   */
   async removeMultiple(keys: string[]): Promise<number> {
     try {
       if (keys.length === 0) return 0;
@@ -106,11 +85,6 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  /**
-   * Check if a key exists in Redis cache
-   * @param key - The cache key to check
-   * @returns True if key exists, false otherwise
-   */
   async exists(key: string): Promise<boolean> {
     try {
       const result = await this.client.exists(key);
@@ -121,11 +95,6 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  /**
-   * Clear all keys matching a pattern
-   * @param pattern - Pattern to match (e.g., 'user:*')
-   * @returns Number of keys removed
-   */
   async clearByPattern(pattern: string): Promise<number> {
     try {
       const keys = await this.client.keys(pattern);
@@ -137,10 +106,6 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  /**
-   * Get the Redis client instance for advanced operations
-   * @returns Redis client instance
-   */
   getClient(): Redis {
     return this.client;
   }
