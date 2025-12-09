@@ -74,18 +74,6 @@ export class CreateProductDto {
   @Min(0)
   oldPrice?: number;
 
-  @ApiProperty({ description: 'SKU (Stock Keeping Unit)' })
-  @IsString()
-  @IsNotEmpty()
-  sku: string;
-
-  @ApiPropertyOptional({ description: 'Stock quantity', default: 0 })
-  @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  @Min(0)
-  stock?: number;
-
   @ApiPropertyOptional({ description: 'Is product active', default: true })
   @IsOptional()
   @IsBoolean()

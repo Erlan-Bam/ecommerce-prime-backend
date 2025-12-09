@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { PrismaService } from '../shared/services/prisma.service';
-import { RedisService } from '../shared/services/redis.service';
+import { ProductCacheService } from './services/cache.service';
 import {
   CreateProductDto,
   UpdateProductDto,
@@ -11,11 +11,10 @@ import {
 @Injectable()
 export class ProductService {
   private readonly logger = new Logger(ProductService.name);
-  private readonly CACHE_TTL = 300; // 5 minutes
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly redis: RedisService,
+    private readonly cacheService: ProductCacheService,
   ) {}
 
   private generateSlug(name: string): string {
@@ -39,8 +38,6 @@ export class ProductService {
         description: dto.description,
         price: dto.price,
         oldPrice: dto.oldPrice,
-        sku: dto.sku,
-        stock: dto.stock ?? 0,
         isActive: dto.isActive ?? true,
         isOnSale: dto.isOnSale ?? false,
         images: dto.images
@@ -66,6 +63,11 @@ export class ProductService {
         brand: true,
         images: { orderBy: { sortOrder: 'asc' } },
         attributes: true,
+        productStock: {
+          include: {
+            pickupPoint: { select: { id: true, address: true } },
+          },
+        },
       },
     });
 
@@ -75,10 +77,10 @@ export class ProductService {
 
   async findAll(filter: ProductFilterDto) {
     const cacheKey = `products:${JSON.stringify(filter)}`;
-    const cached = await this.redis.get<string>(cacheKey);
+    const cached = await this.cacheService.getCachedProducts(cacheKey);
     if (cached) {
       this.logger.log(`Cache hit: ${cacheKey}`);
-      return JSON.parse(cached as string);
+      return cached;
     }
 
     const { page = 1, limit = 20 } = filter;
@@ -98,6 +100,7 @@ export class ProductService {
           brand: { select: { id: true, name: true, slug: true } },
           images: { orderBy: { sortOrder: 'asc' }, take: 1 },
           reviews: { select: { rating: true } },
+          productStock: { select: { stockCount: true } },
         },
       }),
       this.prisma.product.count({ where }),
@@ -109,11 +112,16 @@ export class ProductService {
         ratings.length > 0
           ? ratings.reduce((sum, r) => sum + r.rating, 0) / ratings.length
           : 0;
-      const { reviews, ...rest } = product;
+      const totalStock = product.productStock.reduce(
+        (sum, s) => sum + s.stockCount,
+        0,
+      );
+      const { reviews, productStock, ...rest } = product;
       return {
         ...rest,
         rating: Math.round(avgRating * 10) / 10,
         reviewCount: ratings.length,
+        totalStock,
       };
     });
 
@@ -129,15 +137,15 @@ export class ProductService {
       },
     };
 
-    await this.redis.set(cacheKey, JSON.stringify(result), this.CACHE_TTL);
+    await this.cacheService.cacheProducts(cacheKey, result);
     return result;
   }
 
   async findOne(id: string) {
-    const cacheKey = `product:${id}`;
-    const cached = await this.redis.get<string>(cacheKey);
+    const cached = await this.cacheService.getCachedProduct(id);
     if (cached) {
-      return JSON.parse(cached as string);
+      this.logger.log(`Cache hit for product ${id}`);
+      return cached;
     }
 
     const product = await this.prisma.product.findUnique({
@@ -152,6 +160,19 @@ export class ProductService {
           include: { user: { select: { id: true, name: true } } },
           orderBy: { createdAt: 'desc' },
           take: 10,
+        },
+        productStock: {
+          include: {
+            pickupPoint: {
+              select: {
+                id: true,
+                address: true,
+                coords: true,
+                workingSchedule: true,
+                url: true,
+              },
+            },
+          },
         },
       },
     });
@@ -172,13 +193,19 @@ export class ProductService {
         ? ratings.reduce((sum, r) => sum + r.rating, 0) / ratings.length
         : 0;
 
+    const totalStock = product.productStock.reduce(
+      (sum, s) => sum + s.stockCount,
+      0,
+    );
+
     const result = {
       ...product,
       rating: Math.round(avgRating * 10) / 10,
       reviewCount: ratings.length,
+      totalStock,
     };
 
-    await this.redis.set(cacheKey, JSON.stringify(result), this.CACHE_TTL);
+    await this.cacheService.cacheProduct(id, result);
     return result;
   }
 
@@ -195,6 +222,19 @@ export class ProductService {
           include: { user: { select: { id: true, name: true } } },
           orderBy: { createdAt: 'desc' },
           take: 10,
+        },
+        productStock: {
+          include: {
+            pickupPoint: {
+              select: {
+                id: true,
+                address: true,
+                coords: true,
+                workingSchedule: true,
+                url: true,
+              },
+            },
+          },
         },
       },
     });
@@ -214,10 +254,16 @@ export class ProductService {
         ? ratings.reduce((sum, r) => sum + r.rating, 0) / ratings.length
         : 0;
 
+    const totalStock = product.productStock.reduce(
+      (sum, s) => sum + s.stockCount,
+      0,
+    );
+
     return {
       ...product,
       rating: Math.round(avgRating * 10) / 10,
       reviewCount: ratings.length,
+      totalStock,
     };
   }
 
@@ -231,8 +277,6 @@ export class ProductService {
       ...(dto.description !== undefined && { description: dto.description }),
       ...(dto.price !== undefined && { price: dto.price }),
       ...(dto.oldPrice !== undefined && { oldPrice: dto.oldPrice }),
-      ...(dto.sku && { sku: dto.sku }),
-      ...(dto.stock !== undefined && { stock: dto.stock }),
       ...(dto.isActive !== undefined && { isActive: dto.isActive }),
       ...(dto.isOnSale !== undefined && { isOnSale: dto.isOnSale }),
     };
@@ -272,11 +316,16 @@ export class ProductService {
         brand: true,
         images: { orderBy: { sortOrder: 'asc' } },
         attributes: true,
+        productStock: {
+          include: {
+            pickupPoint: { select: { id: true, address: true } },
+          },
+        },
       },
     });
 
     await this.invalidateProductCaches();
-    await this.redis.remove(`product:${id}`);
+    await this.cacheService.invalidateProduct(id);
 
     return product;
   }
@@ -285,7 +334,7 @@ export class ProductService {
     await this.findOne(id);
     await this.prisma.product.delete({ where: { id } });
     await this.invalidateProductCaches();
-    await this.redis.remove(`product:${id}`);
+    await this.cacheService.invalidateProduct(id);
     return { message: 'Product deleted successfully' };
   }
 
@@ -360,7 +409,11 @@ export class ProductService {
     }
 
     if (filter.inStock) {
-      where.stock = { gt: 0 };
+      where.productStock = {
+        some: {
+          stockCount: { gt: 0 },
+        },
+      };
     }
 
     if (filter.onSale) {
@@ -371,7 +424,11 @@ export class ProductService {
       where.OR = [
         { name: { contains: filter.search, mode: 'insensitive' } },
         { description: { contains: filter.search, mode: 'insensitive' } },
-        { sku: { contains: filter.search, mode: 'insensitive' } },
+        {
+          productStock: {
+            some: { sku: { contains: filter.search, mode: 'insensitive' } },
+          },
+        },
       ];
     }
 
@@ -411,6 +468,6 @@ export class ProductService {
   }
 
   private async invalidateProductCaches() {
-    await this.redis.clearByPattern('products:*');
+    await this.cacheService.invalidateAllCaches();
   }
 }

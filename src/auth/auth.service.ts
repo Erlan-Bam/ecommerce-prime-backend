@@ -174,19 +174,14 @@ export class AuthService {
   private async generateTokens(userId: string, role: string) {
     const payload = { id: userId, role };
 
-    const accessExpiresIn =
-      this.configService.get<number>('JWT_ACCESS_EXPIRES_SECONDS') || 900; // 15 minutes
-    const refreshExpiresIn =
-      this.configService.get<number>('JWT_REFRESH_EXPIRES_SECONDS') || 604800; // 7 days
-
     const [accessToken, refreshToken] = await Promise.all([
       this.jwtService.signAsync(payload, {
         secret: this.configService.get<string>('JWT_ACCESS_SECRET'),
-        expiresIn: accessExpiresIn,
+        expiresIn: '15m',
       }),
       this.jwtService.signAsync(payload, {
         secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
-        expiresIn: refreshExpiresIn,
+        expiresIn: '7d',
       }),
     ]);
 

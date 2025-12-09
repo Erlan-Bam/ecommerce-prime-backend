@@ -1,15 +1,15 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../shared/services/prisma.service';
-import { RedisService } from '../shared/services/redis.service';
+import { SearchCacheService } from './services/cache.service';
 import { SearchDto } from './dto';
 
 @Injectable()
 export class SearchService {
-  private readonly CACHE_TTL = 600; // 10 minutes
+  private readonly logger = new Logger(SearchService.name);
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly redis: RedisService,
+    private readonly cacheService: SearchCacheService,
   ) {}
 
   async autocomplete(dto: SearchDto) {
@@ -19,10 +19,10 @@ export class SearchService {
       return { suggestions: [] };
     }
 
-    const cacheKey = `search:autocomplete:${q.toLowerCase()}:${limit}`;
-    const cached = await this.redis.get<string>(cacheKey);
+    const cached = await this.cacheService.getCachedAutocomplete(q, limit);
     if (cached) {
-      return JSON.parse(cached as string);
+      this.logger.log(`Cache hit for autocomplete: ${q}`);
+      return cached;
     }
 
     const [products, categories, brands] = await Promise.all([
@@ -31,7 +31,11 @@ export class SearchService {
           isActive: true,
           OR: [
             { name: { contains: q, mode: 'insensitive' } },
-            { sku: { contains: q, mode: 'insensitive' } },
+            {
+              productStock: {
+                some: { sku: { contains: q, mode: 'insensitive' } },
+              },
+            },
           ],
         },
         select: {
@@ -87,7 +91,8 @@ export class SearchService {
       },
     };
 
-    await this.redis.set(cacheKey, JSON.stringify(result), this.CACHE_TTL);
+    await this.cacheService.cacheAutocomplete(q, limit, result);
+    this.logger.log(`Cached autocomplete result for: ${q}`);
     return result;
   }
 
@@ -98,10 +103,10 @@ export class SearchService {
       return { results: [], total: 0 };
     }
 
-    const cacheKey = `search:results:${q.toLowerCase()}:${limit}`;
-    const cached = await this.redis.get<string>(cacheKey);
+    const cached = await this.cacheService.getCachedSearch(q, limit);
     if (cached) {
-      return JSON.parse(cached as string);
+      this.logger.log(`Cache hit for search: ${q}`);
+      return cached;
     }
 
     const [products, total] = await Promise.all([
@@ -111,7 +116,11 @@ export class SearchService {
           OR: [
             { name: { contains: q, mode: 'insensitive' } },
             { description: { contains: q, mode: 'insensitive' } },
-            { sku: { contains: q, mode: 'insensitive' } },
+            {
+              productStock: {
+                some: { sku: { contains: q, mode: 'insensitive' } },
+              },
+            },
             { brand: { name: { contains: q, mode: 'insensitive' } } },
             { category: { title: { contains: q, mode: 'insensitive' } } },
           ],
@@ -121,6 +130,7 @@ export class SearchService {
           brand: { select: { id: true, name: true, slug: true } },
           images: { take: 1, orderBy: { sortOrder: 'asc' } },
           reviews: { select: { rating: true } },
+          productStock: { select: { stockCount: true } },
         },
         take: limit,
         orderBy: [{ soldCount: 'desc' }, { viewCount: 'desc' }],
@@ -131,7 +141,11 @@ export class SearchService {
           OR: [
             { name: { contains: q, mode: 'insensitive' } },
             { description: { contains: q, mode: 'insensitive' } },
-            { sku: { contains: q, mode: 'insensitive' } },
+            {
+              productStock: {
+                some: { sku: { contains: q, mode: 'insensitive' } },
+              },
+            },
           ],
         },
       }),
@@ -143,25 +157,32 @@ export class SearchService {
         ratings.length > 0
           ? ratings.reduce((sum, r) => sum + r.rating, 0) / ratings.length
           : 0;
-      const { reviews, ...rest } = product;
+      const totalStock = product.productStock.reduce(
+        (sum, s) => sum + s.stockCount,
+        0,
+      );
+      const { reviews, productStock, ...rest } = product;
       return {
         ...rest,
         rating: Math.round(avgRating * 10) / 10,
         reviewCount: ratings.length,
+        totalStock,
       };
     });
 
     const result = { results, total };
 
-    await this.redis.set(cacheKey, JSON.stringify(result), this.CACHE_TTL);
+    await this.cacheService.cacheSearch(q, limit, result);
+    this.logger.log(`Cached search result for: ${q}`);
     return result;
   }
 
   async getPopularSearches() {
     const cacheKey = 'search:popular';
-    const cached = await this.redis.get<string>(cacheKey);
+    const cached = await this.cacheService.get<any>(cacheKey);
     if (cached) {
-      return JSON.parse(cached as string);
+      this.logger.log('Cache hit for popular searches');
+      return cached;
     }
 
     // Get top products by views/sales as popular searches
@@ -176,7 +197,8 @@ export class SearchService {
       popular: products.map((p) => p.name),
     };
 
-    await this.redis.set(cacheKey, JSON.stringify(result), 3600); // 1 hour
+    await this.cacheService.set(cacheKey, result, 3600); // 1 hour
+    this.logger.log('Cached popular searches');
     return result;
   }
 }

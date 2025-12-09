@@ -2,14 +2,21 @@ import {
   Injectable,
   NotFoundException,
   ConflictException,
+  Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../shared/services/prisma.service';
 import { CreateBrandDto, UpdateBrandDto } from './dto';
 import { PaginationDto } from '../shared/dto/pagination.dto';
+import { BrandCacheService } from './services/cache.service';
 
 @Injectable()
 export class BrandService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(BrandService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly cacheService: BrandCacheService,
+  ) {}
 
   private generateSlug(name: string): string {
     return name
@@ -31,7 +38,7 @@ export class BrandService {
       throw new ConflictException('Brand with this name already exists');
     }
 
-    return this.prisma.brand.create({
+    const brand = await this.prisma.brand.create({
       data: {
         name: dto.name,
         slug,
@@ -39,11 +46,24 @@ export class BrandService {
         isActive: dto.isActive ?? true,
       },
     });
+
+    await this.cacheService.invalidateAllCaches();
+    this.logger.log(`Created brand ${brand.id}, cache invalidated`);
+
+    return brand;
   }
 
   async findAll(pagination: PaginationDto) {
     const { page = 1, limit = 20 } = pagination;
     const skip = (page - 1) * limit;
+
+    const cacheKey = `brand:all:page:${page}:limit:${limit}`;
+
+    const cached = await this.cacheService.getCachedBrands(cacheKey);
+    if (cached) {
+      this.logger.log(`Cache hit for ${cacheKey}`);
+      return cached;
+    }
 
     const [data, total] = await Promise.all([
       this.prisma.brand.findMany({
@@ -55,7 +75,7 @@ export class BrandService {
       this.prisma.brand.count(),
     ]);
 
-    return {
+    const result = {
       data,
       meta: {
         total,
@@ -64,17 +84,41 @@ export class BrandService {
         totalPages: Math.ceil(total / limit),
       },
     };
+
+    await this.cacheService.cacheBrands(cacheKey, result);
+    this.logger.log(`Cached result for ${cacheKey}`);
+
+    return result;
   }
 
   async findActive() {
-    return this.prisma.brand.findMany({
+    const cacheKey = 'brand:active';
+
+    const cached = await this.cacheService.getCachedBrands(cacheKey);
+    if (cached) {
+      this.logger.log(`Cache hit for ${cacheKey}`);
+      return cached;
+    }
+
+    const brands = await this.prisma.brand.findMany({
       where: { isActive: true },
       orderBy: { name: 'asc' },
       select: { id: true, name: true, slug: true, logo: true },
     });
+
+    await this.cacheService.cacheBrands(cacheKey, brands);
+    this.logger.log(`Cached result for ${cacheKey}`);
+
+    return brands;
   }
 
   async findOne(id: string) {
+    const cached = await this.cacheService.getCachedBrand(id);
+    if (cached) {
+      this.logger.log(`Cache hit for brand ${id}`);
+      return cached;
+    }
+
     const brand = await this.prisma.brand.findUnique({
       where: { id },
       include: { _count: { select: { products: true } } },
@@ -84,6 +128,7 @@ export class BrandService {
       throw new NotFoundException(`Brand with ID ${id} not found`);
     }
 
+    await this.cacheService.cacheBrand(id, brand);
     return brand;
   }
 
@@ -95,10 +140,15 @@ export class BrandService {
       updateData.slug = this.generateSlug(dto.name);
     }
 
-    return this.prisma.brand.update({
+    const brand = await this.prisma.brand.update({
       where: { id },
       data: updateData,
     });
+
+    await this.cacheService.invalidateBrand(id);
+    this.logger.log(`Updated brand ${id}, cache invalidated`);
+
+    return brand;
   }
 
   async remove(id: string) {
@@ -115,6 +165,9 @@ export class BrandService {
     }
 
     await this.prisma.brand.delete({ where: { id } });
+    await this.cacheService.invalidateAllCaches();
+    this.logger.log(`Deleted brand ${id}, cache invalidated`);
+
     return { message: 'Brand deleted successfully' };
   }
 }

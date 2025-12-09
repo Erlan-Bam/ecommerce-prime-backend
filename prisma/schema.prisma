@@ -74,8 +74,6 @@ model Product {
   description String?
   price       Decimal  @db.Decimal(10, 2)
   oldPrice    Decimal? @db.Decimal(10, 2)
-  sku         String   @unique
-  stock       Int      @default(0)
   isActive    Boolean  @default(true)
   isOnSale    Boolean  @default(false)
   viewCount   Int      @default(0)
@@ -88,6 +86,7 @@ model Product {
   images      ProductImage[]
   attributes  ProductAttribute[]
   reviews     Review[]
+  productStock ProductStock[]
 
   @@index([categoryId])
   @@index([brandId])
@@ -147,4 +146,37 @@ model Bonus {
   amount    Decimal
   type      BonusType
   user      User      @relation(fields: [userId], references: [id])
+}
+
+model PickupPoint {
+  id               String   @id @default(uuid())
+  address          String
+  coords           String   // "lat,lng" format
+  workingSchedule  Json     // {"Пн": {"from": "09:00", "to": "18:00"}, ...}
+  url              String?
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  productStock ProductStock[]
+
+  @@index([isActive])
+}
+
+model ProductStock {
+  id          String   @id @default(uuid())
+  productId   String
+  pointId     String
+  sku         String
+  stockCount  Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  product     Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  pickupPoint PickupPoint @relation(fields: [pointId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, pointId])
+  @@index([productId])
+  @@index([pointId])
+  @@index([sku])
 }

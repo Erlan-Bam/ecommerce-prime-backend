@@ -10,6 +10,7 @@ import { ProductModule } from './product/product.module';
 import { BrandModule } from './brand/brand.module';
 import { SearchModule } from './search/search.module';
 import { UploadModule } from './upload/upload.module';
+import { PickupPointModule } from './pickup-point/pickup-point.module';
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { UploadModule } from './upload/upload.module';
     ProductModule,
     SearchModule,
     UploadModule,
+    PickupPointModule,
   ],
   controllers: [AppController],
   providers: [],
