@@ -4,6 +4,9 @@ import {
   UnauthorizedException,
   ForbiddenException,
   NotFoundException,
+  HttpException,
+  HttpStatus,
+  Logger,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../shared/services/prisma.service';
@@ -13,6 +16,8 @@ import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
@@ -20,113 +25,160 @@ export class AuthService {
   ) {}
 
   async registerUser(dto: RegisterUserDto) {
-    const existingUser = await this.prisma.user.findFirst({
-      where: {
-        OR: [{ email: dto.email }, { phone: dto.phone }],
-      },
-    });
+    try {
+      this.logger.log(`Registering user with email: ${dto.email}`);
+      
+      const existingUser = await this.prisma.user.findFirst({
+        where: {
+          OR: [{ email: dto.email }, { phone: dto.phone }],
+        },
+      });
 
-    if (existingUser) {
-      if (existingUser.email === dto.email) {
-        throw new ConflictException('Email already exists');
+      if (existingUser) {
+        if (existingUser.email === dto.email) {
+          throw new ConflictException('Email already exists');
+        }
+        throw new ConflictException('Phone already exists');
       }
-      throw new ConflictException('Phone already exists');
+
+      const hashedPassword = await bcrypt.hash(dto.password, 10);
+
+      const user = await this.prisma.user.create({
+        data: {
+          email: dto.email,
+          phone: dto.phone,
+          name: dto.name,
+          password: hashedPassword,
+          role: 'USER',
+        },
+      });
+
+      const tokens = await this.generateTokens(user.id, user.role);
+
+      this.logger.log(`User registered successfully: ${user.id}`);
+      
+      return {
+        user: {
+          id: user.id,
+          email: user.email,
+          phone: user.phone,
+          name: user.name,
+          role: user.role,
+        },
+        ...tokens,
+      };
+    } catch (error) {
+      this.logger.error(`Error registering user: ${error.message}`, error.stack);
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new HttpException(
+        error.message || 'Failed to register user',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
-
-    const hashedPassword = await bcrypt.hash(dto.password, 10);
-
-    const user = await this.prisma.user.create({
-      data: {
-        email: dto.email,
-        phone: dto.phone,
-        name: dto.name,
-        password: hashedPassword,
-        role: 'USER',
-      },
-    });
-
-    const tokens = await this.generateTokens(user.id, user.role);
-
-    return {
-      user: {
-        id: user.id,
-        email: user.email,
-        phone: user.phone,
-        name: user.name,
-        role: user.role,
-      },
-      ...tokens,
-    };
   }
 
   async loginUser(dto: LoginUserDto) {
-    const user = await this.prisma.user.findUnique({
-      where: { email: dto.email },
-    });
+    try {
+      this.logger.log(`User login attempt: ${dto.email}`);
+      
+      const user = await this.prisma.user.findUnique({
+        where: { email: dto.email },
+      });
 
-    if (!user) {
-      throw new UnauthorizedException('Invalid credentials');
+      if (!user) {
+        throw new UnauthorizedException('Invalid credentials');
+      }
+
+      if (user.isBanned) {
+        throw new ForbiddenException('User is banned');
+      }
+
+      const isPasswordValid = await bcrypt.compare(dto.password, user.password);
+
+      if (!isPasswordValid) {
+        throw new UnauthorizedException('Invalid credentials');
+      }
+
+      const tokens = await this.generateTokens(user.id, user.role);
+
+      this.logger.log(`User logged in successfully: ${user.id}`);
+      
+      return {
+        user: {
+          id: user.id,
+          email: user.email,
+          phone: user.phone,
+          name: user.name,
+          role: user.role,
+        },
+        ...tokens,
+      };
+    } catch (error) {
+      this.logger.error(`Error logging in user: ${error.message}`, error.stack);
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new HttpException(
+        error.message || 'Failed to login user',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
-
-    if (user.isBanned) {
-      throw new ForbiddenException('User is banned');
-    }
-
-    const isPasswordValid = await bcrypt.compare(dto.password, user.password);
-
-    if (!isPasswordValid) {
-      throw new UnauthorizedException('Invalid credentials');
-    }
-
-    const tokens = await this.generateTokens(user.id, user.role);
-
-    return {
-      user: {
-        id: user.id,
-        email: user.email,
-        phone: user.phone,
-        name: user.name,
-        role: user.role,
-      },
-      ...tokens,
-    };
   }
 
   async loginAdmin(dto: LoginAdminDto) {
-    const admin = await this.prisma.user.findUnique({
-      where: { email: dto.email },
-    });
+    try {
+      this.logger.log(`Admin login attempt: ${dto.email}`);
+      
+      const admin = await this.prisma.user.findUnique({
+        where: { email: dto.email },
+      });
 
-    if (!admin) {
-      throw new UnauthorizedException('Invalid credentials');
+      if (!admin) {
+        throw new UnauthorizedException('Invalid credentials');
+      }
+
+      if (admin.role !== 'ADMIN') {
+        throw new ForbiddenException('Access denied: Admins only');
+      }
+
+      const isPasswordValid = await bcrypt.compare(dto.password, admin.password);
+
+      if (!isPasswordValid) {
+        throw new UnauthorizedException('Invalid credentials');
+      }
+
+      const tokens = await this.generateTokens(admin.id, admin.role);
+
+      this.logger.log(`Admin logged in successfully: ${admin.id}`);
+      
+      return {
+        user: {
+          id: admin.id,
+          email: admin.email,
+          phone: admin.phone,
+          name: admin.name,
+          role: admin.role,
+        },
+        ...tokens,
+      };
+    } catch (error) {
+      this.logger.error(`Error logging in admin: ${error.message}`, error.stack);
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new HttpException(
+        error.message || 'Failed to login admin',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
-
-    if (admin.role !== 'ADMIN') {
-      throw new ForbiddenException('Access denied: Admins only');
-    }
-
-    const isPasswordValid = await bcrypt.compare(dto.password, admin.password);
-
-    if (!isPasswordValid) {
-      throw new UnauthorizedException('Invalid credentials');
-    }
-
-    const tokens = await this.generateTokens(admin.id, admin.role);
-
-    return {
-      user: {
-        id: admin.id,
-        email: admin.email,
-        phone: admin.phone,
-        name: admin.name,
-        role: admin.role,
-      },
-      ...tokens,
-    };
   }
 
   async refreshTokens(refreshToken: string) {
     try {
+      this.logger.log('Refreshing tokens');
+      
       const payload = await this.jwtService.verifyAsync(refreshToken, {
         secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
       });
@@ -145,30 +197,52 @@ export class AuthService {
 
       const tokens = await this.generateTokens(user.id, user.role);
 
+      this.logger.log(`Tokens refreshed for user: ${user.id}`);
+      
       return tokens;
     } catch (error) {
-      throw new UnauthorizedException('Invalid refresh token');
+      this.logger.error(`Error refreshing tokens: ${error.message}`, error.stack);
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new HttpException(
+        error.message || 'Invalid refresh token',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
   }
 
   async getProfile(userId: string) {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        id: true,
-        email: true,
-        phone: true,
-        name: true,
-        role: true,
-        createdAt: true,
-      },
-    });
+    try {
+      this.logger.log(`Getting profile for user: ${userId}`);
+      
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          id: true,
+          email: true,
+          phone: true,
+          name: true,
+          role: true,
+          createdAt: true,
+        },
+      });
 
-    if (!user) {
-      throw new NotFoundException('User not found');
+      if (!user) {
+        throw new NotFoundException('User not found');
+      }
+
+      return user;
+    } catch (error) {
+      this.logger.error(`Error getting profile: ${error.message}`, error.stack);
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new HttpException(
+        error.message || 'Failed to get user profile',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
-
-    return user;
   }
 
   private async generateTokens(userId: string, role: string) {
