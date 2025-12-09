@@ -27,7 +27,7 @@ export class AuthService {
   async registerUser(dto: RegisterUserDto) {
     try {
       this.logger.log(`Registering user with email: ${dto.email}`);
-      
+
       const existingUser = await this.prisma.user.findFirst({
         where: {
           OR: [{ email: dto.email }, { phone: dto.phone }],
@@ -56,7 +56,7 @@ export class AuthService {
       const tokens = await this.generateTokens(user.id, user.role);
 
       this.logger.log(`User registered successfully: ${user.id}`);
-      
+
       return {
         user: {
           id: user.id,
@@ -68,7 +68,10 @@ export class AuthService {
         ...tokens,
       };
     } catch (error) {
-      this.logger.error(`Error registering user: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error registering user: ${error.message}`,
+        error.stack,
+      );
       if (error instanceof HttpException) {
         throw error;
       }
@@ -82,7 +85,7 @@ export class AuthService {
   async loginUser(dto: LoginUserDto) {
     try {
       this.logger.log(`User login attempt: ${dto.email}`);
-      
+
       const user = await this.prisma.user.findUnique({
         where: { email: dto.email },
       });
@@ -104,7 +107,7 @@ export class AuthService {
       const tokens = await this.generateTokens(user.id, user.role);
 
       this.logger.log(`User logged in successfully: ${user.id}`);
-      
+
       return {
         user: {
           id: user.id,
@@ -130,7 +133,7 @@ export class AuthService {
   async loginAdmin(dto: LoginAdminDto) {
     try {
       this.logger.log(`Admin login attempt: ${dto.email}`);
-      
+
       const admin = await this.prisma.user.findUnique({
         where: { email: dto.email },
       });
@@ -143,7 +146,10 @@ export class AuthService {
         throw new ForbiddenException('Access denied: Admins only');
       }
 
-      const isPasswordValid = await bcrypt.compare(dto.password, admin.password);
+      const isPasswordValid = await bcrypt.compare(
+        dto.password,
+        admin.password,
+      );
 
       if (!isPasswordValid) {
         throw new UnauthorizedException('Invalid credentials');
@@ -152,7 +158,7 @@ export class AuthService {
       const tokens = await this.generateTokens(admin.id, admin.role);
 
       this.logger.log(`Admin logged in successfully: ${admin.id}`);
-      
+
       return {
         user: {
           id: admin.id,
@@ -164,7 +170,10 @@ export class AuthService {
         ...tokens,
       };
     } catch (error) {
-      this.logger.error(`Error logging in admin: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error logging in admin: ${error.message}`,
+        error.stack,
+      );
       if (error instanceof HttpException) {
         throw error;
       }
@@ -178,7 +187,7 @@ export class AuthService {
   async refreshTokens(refreshToken: string) {
     try {
       this.logger.log('Refreshing tokens');
-      
+
       const payload = await this.jwtService.verifyAsync(refreshToken, {
         secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
       });
@@ -198,10 +207,13 @@ export class AuthService {
       const tokens = await this.generateTokens(user.id, user.role);
 
       this.logger.log(`Tokens refreshed for user: ${user.id}`);
-      
+
       return tokens;
     } catch (error) {
-      this.logger.error(`Error refreshing tokens: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error refreshing tokens: ${error.message}`,
+        error.stack,
+      );
       if (error instanceof HttpException) {
         throw error;
       }
@@ -215,7 +227,7 @@ export class AuthService {
   async getProfile(userId: string) {
     try {
       this.logger.log(`Getting profile for user: ${userId}`);
-      
+
       const user = await this.prisma.user.findUnique({
         where: { id: userId },
         select: {

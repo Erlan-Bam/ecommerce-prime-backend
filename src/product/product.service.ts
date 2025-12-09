@@ -1,6 +1,6 @@
-import { 
-  Injectable, 
-  NotFoundException, 
+import {
+  Injectable,
+  NotFoundException,
   Logger,
   HttpException,
   HttpStatus,
@@ -35,7 +35,7 @@ export class ProductService {
   async create(dto: CreateProductDto) {
     try {
       this.logger.log(`Creating product: ${dto.name}`);
-      
+
       const slug = this.generateSlug(dto.name);
 
       const product = await this.prisma.product.create({
@@ -82,10 +82,13 @@ export class ProductService {
 
       await this.invalidateProductCaches();
       this.logger.log(`Created product ${product.id}`);
-      
+
       return product;
     } catch (error) {
-      this.logger.error(`Error creating product: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error creating product: ${error.message}`,
+        error.stack,
+      );
       if (error instanceof HttpException) {
         throw error;
       }
@@ -98,8 +101,10 @@ export class ProductService {
 
   async findAll(filter: ProductFilterDto) {
     try {
-      this.logger.log(`Finding all products with filter: ${JSON.stringify(filter)}`);
-      
+      this.logger.log(
+        `Finding all products with filter: ${JSON.stringify(filter)}`,
+      );
+
       const cacheKey = `products:${JSON.stringify(filter)}`;
       const cached = await this.cacheService.getCachedProducts(cacheKey);
       if (cached) {
@@ -163,10 +168,13 @@ export class ProductService {
 
       await this.cacheService.cacheProducts(cacheKey, result);
       this.logger.log(`Cached products result`);
-      
+
       return result;
     } catch (error) {
-      this.logger.error(`Error finding all products: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error finding all products: ${error.message}`,
+        error.stack,
+      );
       if (error instanceof HttpException) {
         throw error;
       }
@@ -180,7 +188,7 @@ export class ProductService {
   async findOne(id: string) {
     try {
       this.logger.log(`Finding product: ${id}`);
-      
+
       const cached = await this.cacheService.getCachedProduct(id);
       if (cached) {
         this.logger.log(`Cache hit for product ${id}`);
@@ -247,7 +255,10 @@ export class ProductService {
       await this.cacheService.cacheProduct(id, result);
       return result;
     } catch (error) {
-      this.logger.error(`Error finding product ${id}: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error finding product ${id}: ${error.message}`,
+        error.stack,
+      );
       if (error instanceof HttpException) {
         throw error;
       }
@@ -261,7 +272,7 @@ export class ProductService {
   async findBySlug(slug: string) {
     try {
       this.logger.log(`Finding product by slug: ${slug}`);
-      
+
       const product = await this.prisma.product.findUnique({
         where: { slug },
         include: {
@@ -318,7 +329,10 @@ export class ProductService {
         totalStock,
       };
     } catch (error) {
-      this.logger.error(`Error finding product by slug ${slug}: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error finding product by slug ${slug}: ${error.message}`,
+        error.stack,
+      );
       if (error instanceof HttpException) {
         throw error;
       }
@@ -332,11 +346,13 @@ export class ProductService {
   async update(id: string, dto: UpdateProductDto) {
     try {
       this.logger.log(`Updating product: ${id}`);
-      
+
       await this.findOne(id);
 
       const updateData: any = {
-        ...(dto.categoryId && { category: { connect: { id: dto.categoryId } } }),
+        ...(dto.categoryId && {
+          category: { connect: { id: dto.categoryId } },
+        }),
         ...(dto.brandId && { brand: { connect: { id: dto.brandId } } }),
         ...(dto.name && { name: dto.name, slug: this.generateSlug(dto.name) }),
         ...(dto.description !== undefined && { description: dto.description }),
@@ -393,10 +409,13 @@ export class ProductService {
       await this.cacheService.invalidateProduct(id);
 
       this.logger.log(`Updated product ${id}`);
-      
+
       return product;
     } catch (error) {
-      this.logger.error(`Error updating product ${id}: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error updating product ${id}: ${error.message}`,
+        error.stack,
+      );
       if (error instanceof HttpException) {
         throw error;
       }
@@ -410,17 +429,20 @@ export class ProductService {
   async remove(id: string) {
     try {
       this.logger.log(`Removing product: ${id}`);
-      
+
       await this.findOne(id);
       await this.prisma.product.delete({ where: { id } });
       await this.invalidateProductCaches();
       await this.cacheService.invalidateProduct(id);
-      
+
       this.logger.log(`Removed product ${id}`);
-      
+
       return { message: 'Product deleted successfully' };
     } catch (error) {
-      this.logger.error(`Error removing product ${id}: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error removing product ${id}: ${error.message}`,
+        error.stack,
+      );
       if (error instanceof HttpException) {
         throw error;
       }
@@ -434,7 +456,7 @@ export class ProductService {
   async getFilters(categoryId?: string) {
     try {
       this.logger.log(`Getting filters for category: ${categoryId || 'all'}`);
-      
+
       const where: any = {
         isActive: true,
         ...(categoryId && { categoryId }),

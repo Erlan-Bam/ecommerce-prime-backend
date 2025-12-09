@@ -1,5 +1,5 @@
-import { 
-  Injectable, 
+import {
+  Injectable,
   BadRequestException,
   HttpException,
   HttpStatus,
@@ -24,7 +24,7 @@ export class UploadService {
   ): Promise<string> {
     try {
       this.logger.log(`Uploading image: ${filename}`);
-      
+
       return new Promise((resolve, reject) => {
         const stream = cloudinary.uploader.upload_stream(
           {
@@ -33,12 +33,17 @@ export class UploadService {
           },
           (error, result) => {
             if (error) {
-              this.logger.error(`Cloudinary upload error: ${error.message}`, error.stack);
+              this.logger.error(
+                `Cloudinary upload error: ${error.message}`,
+                error.stack,
+              );
               reject(
                 new BadRequestException('Failed to upload image to Cloudinary'),
               );
             } else {
-              this.logger.log(`Image uploaded successfully: ${result.secure_url}`);
+              this.logger.log(
+                `Image uploaded successfully: ${result.secure_url}`,
+              );
               resolve(result.secure_url);
             }
           },

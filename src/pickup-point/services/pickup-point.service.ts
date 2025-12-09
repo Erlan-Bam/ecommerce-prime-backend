@@ -28,7 +28,7 @@ export class PickupPointService {
   async create(dto: CreatePickupPointDto) {
     try {
       this.logger.log(`Creating pickup point: ${dto.address}`);
-      
+
       const pickupPoint = await this.prisma.pickupPoint.create({
         data: {
           address: dto.address,
@@ -46,7 +46,10 @@ export class PickupPointService {
 
       return pickupPoint;
     } catch (error) {
-      this.logger.error(`Error creating pickup point: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error creating pickup point: ${error.message}`,
+        error.stack,
+      );
       if (error instanceof HttpException) {
         throw error;
       }
@@ -59,8 +62,10 @@ export class PickupPointService {
 
   async findAll(paginationDto: PaginationDto) {
     try {
-      this.logger.log(`Finding all pickup points with pagination: ${JSON.stringify(paginationDto)}`);
-      
+      this.logger.log(
+        `Finding all pickup points with pagination: ${JSON.stringify(paginationDto)}`,
+      );
+
       const { page = 1, limit = 20 } = paginationDto;
       const skip = (page - 1) * limit;
 
@@ -100,7 +105,10 @@ export class PickupPointService {
 
       return result;
     } catch (error) {
-      this.logger.error(`Error finding all pickup points: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error finding all pickup points: ${error.message}`,
+        error.stack,
+      );
       if (error instanceof HttpException) {
         throw error;
       }
@@ -114,7 +122,7 @@ export class PickupPointService {
   async findOne(id: string) {
     try {
       this.logger.log(`Finding pickup point: ${id}`);
-      
+
       const cached = await this.cacheService.getCachedPickupPoint(id);
       if (cached) {
         this.logger.log(`Cache hit for pickup point ${id}`);
@@ -141,7 +149,10 @@ export class PickupPointService {
       await this.cacheService.cachePickupPoint(id, pickupPoint);
       return pickupPoint;
     } catch (error) {
-      this.logger.error(`Error finding pickup point ${id}: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error finding pickup point ${id}: ${error.message}`,
+        error.stack,
+      );
       if (error instanceof HttpException) {
         throw error;
       }
@@ -155,7 +166,7 @@ export class PickupPointService {
   async update(id: string, dto: UpdatePickupPointDto) {
     try {
       this.logger.log(`Updating pickup point: ${id}`);
-      
+
       await this.findOne(id);
 
       const pickupPoint = await this.prisma.pickupPoint.update({
@@ -176,7 +187,10 @@ export class PickupPointService {
 
       return pickupPoint;
     } catch (error) {
-      this.logger.error(`Error updating pickup point ${id}: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error updating pickup point ${id}: ${error.message}`,
+        error.stack,
+      );
       if (error instanceof HttpException) {
         throw error;
       }
@@ -190,14 +204,17 @@ export class PickupPointService {
   async remove(id: string) {
     try {
       this.logger.log(`Removing pickup point: ${id}`);
-      
+
       await this.findOne(id);
       await this.prisma.pickupPoint.delete({ where: { id } });
       await this.cacheService.invalidateAllCaches();
       this.logger.log(`Deleted pickup point ${id}`);
       return { message: 'Pickup point deleted successfully' };
     } catch (error) {
-      this.logger.error(`Error removing pickup point ${id}: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error removing pickup point ${id}: ${error.message}`,
+        error.stack,
+      );
       if (error instanceof HttpException) {
         throw error;
       }
@@ -211,14 +228,18 @@ export class PickupPointService {
   // Product Stock management
   async createProductStock(dto: CreateProductStockDto) {
     try {
-      this.logger.log(`Creating product stock for product ${dto.productId} at point ${dto.pointId}`);
-      
+      this.logger.log(
+        `Creating product stock for product ${dto.productId} at point ${dto.pointId}`,
+      );
+
       // Check if product exists
       const product = await this.prisma.product.findUnique({
         where: { id: dto.productId },
       });
       if (!product) {
-        throw new NotFoundException(`Product with ID ${dto.productId} not found`);
+        throw new NotFoundException(
+          `Product with ID ${dto.productId} not found`,
+        );
       }
 
       // Check if pickup point exists
@@ -260,11 +281,16 @@ export class PickupPointService {
       });
 
       await this.cacheService.invalidatePickupPoint(dto.pointId);
-      this.logger.log(`Created product stock for product ${dto.productId} at point ${dto.pointId}`);
-      
+      this.logger.log(
+        `Created product stock for product ${dto.productId} at point ${dto.pointId}`,
+      );
+
       return productStock;
     } catch (error) {
-      this.logger.error(`Error creating product stock: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error creating product stock: ${error.message}`,
+        error.stack,
+      );
       if (error instanceof HttpException) {
         throw error;
       }
@@ -281,8 +307,10 @@ export class PickupPointService {
     dto: UpdateProductStockDto,
   ) {
     try {
-      this.logger.log(`Updating product stock for product ${productId} at point ${pointId}`);
-      
+      this.logger.log(
+        `Updating product stock for product ${productId} at point ${pointId}`,
+      );
+
       const existing = await this.prisma.productStock.findUnique({
         where: {
           productId_pointId: { productId, pointId },
@@ -308,11 +336,16 @@ export class PickupPointService {
       });
 
       await this.cacheService.invalidatePickupPoint(pointId);
-      this.logger.log(`Updated product stock for product ${productId} at point ${pointId}`);
-      
+      this.logger.log(
+        `Updated product stock for product ${productId} at point ${pointId}`,
+      );
+
       return productStock;
     } catch (error) {
-      this.logger.error(`Error updating product stock: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error updating product stock: ${error.message}`,
+        error.stack,
+      );
       if (error instanceof HttpException) {
         throw error;
       }
@@ -325,8 +358,10 @@ export class PickupPointService {
 
   async removeProductStock(productId: string, pointId: string) {
     try {
-      this.logger.log(`Removing product stock for product ${productId} at point ${pointId}`);
-      
+      this.logger.log(
+        `Removing product stock for product ${productId} at point ${pointId}`,
+      );
+
       const existing = await this.prisma.productStock.findUnique({
         where: {
           productId_pointId: { productId, pointId },
@@ -344,11 +379,16 @@ export class PickupPointService {
       });
 
       await this.cacheService.invalidatePickupPoint(pointId);
-      this.logger.log(`Removed product stock for product ${productId} at point ${pointId}`);
-      
+      this.logger.log(
+        `Removed product stock for product ${productId} at point ${pointId}`,
+      );
+
       return { message: 'Stock entry deleted successfully' };
     } catch (error) {
-      this.logger.error(`Error removing product stock: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error removing product stock: ${error.message}`,
+        error.stack,
+      );
       if (error instanceof HttpException) {
         throw error;
       }
@@ -362,7 +402,7 @@ export class PickupPointService {
   async getProductStockByProduct(productId: string) {
     try {
       this.logger.log(`Getting product stock for product: ${productId}`);
-      
+
       return this.prisma.productStock.findMany({
         where: { productId },
         include: {
@@ -378,7 +418,10 @@ export class PickupPointService {
         },
       });
     } catch (error) {
-      this.logger.error(`Error getting product stock by product ${productId}: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error getting product stock by product ${productId}: ${error.message}`,
+        error.stack,
+      );
       if (error instanceof HttpException) {
         throw error;
       }
@@ -392,7 +435,7 @@ export class PickupPointService {
   async getProductStockByPoint(pointId: string) {
     try {
       this.logger.log(`Getting product stock for point: ${pointId}`);
-      
+
       return this.prisma.productStock.findMany({
         where: { pointId },
         include: {
@@ -402,7 +445,10 @@ export class PickupPointService {
         },
       });
     } catch (error) {
-      this.logger.error(`Error getting product stock by point ${pointId}: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error getting product stock by point ${pointId}: ${error.message}`,
+        error.stack,
+      );
       if (error instanceof HttpException) {
         throw error;
       }
@@ -416,14 +462,17 @@ export class PickupPointService {
   async getTotalStockForProduct(productId: string): Promise<number> {
     try {
       this.logger.log(`Getting total stock for product: ${productId}`);
-      
+
       const result = await this.prisma.productStock.aggregate({
         where: { productId },
         _sum: { stockCount: true },
       });
       return result._sum.stockCount ?? 0;
     } catch (error) {
-      this.logger.error(`Error getting total stock for product ${productId}: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error getting total stock for product ${productId}: ${error.message}`,
+        error.stack,
+      );
       if (error instanceof HttpException) {
         throw error;
       }

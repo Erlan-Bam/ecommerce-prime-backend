@@ -33,7 +33,7 @@ export class CategoryService {
   async create(createCategoryDto: CreateCategoryDto) {
     try {
       this.logger.log(`Creating category: ${createCategoryDto.title}`);
-      
+
       const slug = this.generateSlug(createCategoryDto.title);
 
       const category = await this.prisma.category.create({
@@ -52,7 +52,10 @@ export class CategoryService {
 
       return category;
     } catch (error) {
-      this.logger.error(`Error creating category: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error creating category: ${error.message}`,
+        error.stack,
+      );
       if (error instanceof HttpException) {
         throw error;
       }
@@ -65,8 +68,10 @@ export class CategoryService {
 
   async findAll(paginationDto: PaginationDto) {
     try {
-      this.logger.log(`Finding all categories with pagination: ${JSON.stringify(paginationDto)}`);
-      
+      this.logger.log(
+        `Finding all categories with pagination: ${JSON.stringify(paginationDto)}`,
+      );
+
       const { page = 1, limit = 10 } = paginationDto;
       const skip = (page - 1) * limit;
 
@@ -112,7 +117,10 @@ export class CategoryService {
 
       return result;
     } catch (error) {
-      this.logger.error(`Error finding all categories: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error finding all categories: ${error.message}`,
+        error.stack,
+      );
       if (error instanceof HttpException) {
         throw error;
       }
@@ -126,7 +134,7 @@ export class CategoryService {
   async findTree() {
     try {
       this.logger.log('Finding category tree');
-      
+
       const cacheKey = 'category:tree';
       const cached = await this.cacheService.getCachedCategories(cacheKey);
       if (cached) {
@@ -154,7 +162,10 @@ export class CategoryService {
       await this.cacheService.cacheCategories(cacheKey, categories);
       return categories;
     } catch (error) {
-      this.logger.error(`Error finding category tree: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error finding category tree: ${error.message}`,
+        error.stack,
+      );
       if (error instanceof HttpException) {
         throw error;
       }
@@ -168,7 +179,7 @@ export class CategoryService {
   async findBySlug(slug: string) {
     try {
       this.logger.log(`Finding category by slug: ${slug}`);
-      
+
       const category = await this.prisma.category.findUnique({
         where: { slug },
         include: {
@@ -187,7 +198,10 @@ export class CategoryService {
 
       return category;
     } catch (error) {
-      this.logger.error(`Error finding category by slug ${slug}: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error finding category by slug ${slug}: ${error.message}`,
+        error.stack,
+      );
       if (error instanceof HttpException) {
         throw error;
       }
@@ -201,7 +215,7 @@ export class CategoryService {
   async findOne(id: string) {
     try {
       this.logger.log(`Finding category: ${id}`);
-      
+
       const cached = await this.cacheService.getCachedCategory(id);
       if (cached) {
         this.logger.log(`Cache hit for category ${id}`);
@@ -229,7 +243,10 @@ export class CategoryService {
 
       return category;
     } catch (error) {
-      this.logger.error(`Error finding category ${id}: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error finding category ${id}: ${error.message}`,
+        error.stack,
+      );
       if (error instanceof HttpException) {
         throw error;
       }
@@ -243,7 +260,7 @@ export class CategoryService {
   async update(id: string, updateCategoryDto: UpdateCategoryDto) {
     try {
       this.logger.log(`Updating category: ${id}`);
-      
+
       await this.findOne(id);
 
       const updateData: any = { ...updateCategoryDto };
@@ -265,7 +282,10 @@ export class CategoryService {
 
       return category;
     } catch (error) {
-      this.logger.error(`Error updating category ${id}: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error updating category ${id}: ${error.message}`,
+        error.stack,
+      );
       if (error instanceof HttpException) {
         throw error;
       }
@@ -279,7 +299,7 @@ export class CategoryService {
   async remove(id: string) {
     try {
       this.logger.log(`Removing category: ${id}`);
-      
+
       await this.findOne(id);
 
       const productsCount = await this.prisma.product.count({
@@ -311,7 +331,10 @@ export class CategoryService {
 
       return category;
     } catch (error) {
-      this.logger.error(`Error removing category ${id}: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error removing category ${id}: ${error.message}`,
+        error.stack,
+      );
       if (error instanceof HttpException) {
         throw error;
       }

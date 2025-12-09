@@ -32,7 +32,7 @@ export class BrandService {
   async create(dto: CreateBrandDto) {
     try {
       this.logger.log(`Creating brand: ${dto.name}`);
-      
+
       const slug = this.generateSlug(dto.name);
 
       const existing = await this.prisma.brand.findFirst({
@@ -70,8 +70,10 @@ export class BrandService {
 
   async findAll(pagination: PaginationDto) {
     try {
-      this.logger.log(`Finding all brands with pagination: ${JSON.stringify(pagination)}`);
-      
+      this.logger.log(
+        `Finding all brands with pagination: ${JSON.stringify(pagination)}`,
+      );
+
       const { page = 1, limit = 20 } = pagination;
       const skip = (page - 1) * limit;
 
@@ -108,7 +110,10 @@ export class BrandService {
 
       return result;
     } catch (error) {
-      this.logger.error(`Error finding all brands: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error finding all brands: ${error.message}`,
+        error.stack,
+      );
       if (error instanceof HttpException) {
         throw error;
       }
@@ -122,7 +127,7 @@ export class BrandService {
   async findActive() {
     try {
       this.logger.log('Finding active brands');
-      
+
       const cacheKey = 'brand:active';
 
       const cached = await this.cacheService.getCachedBrands(cacheKey);
@@ -142,7 +147,10 @@ export class BrandService {
 
       return brands;
     } catch (error) {
-      this.logger.error(`Error finding active brands: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error finding active brands: ${error.message}`,
+        error.stack,
+      );
       if (error instanceof HttpException) {
         throw error;
       }
@@ -156,7 +164,7 @@ export class BrandService {
   async findOne(id: string) {
     try {
       this.logger.log(`Finding brand: ${id}`);
-      
+
       const cached = await this.cacheService.getCachedBrand(id);
       if (cached) {
         this.logger.log(`Cache hit for brand ${id}`);
@@ -175,7 +183,10 @@ export class BrandService {
       await this.cacheService.cacheBrand(id, brand);
       return brand;
     } catch (error) {
-      this.logger.error(`Error finding brand ${id}: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error finding brand ${id}: ${error.message}`,
+        error.stack,
+      );
       if (error instanceof HttpException) {
         throw error;
       }
@@ -189,7 +200,7 @@ export class BrandService {
   async update(id: string, dto: UpdateBrandDto) {
     try {
       this.logger.log(`Updating brand: ${id}`);
-      
+
       await this.findOne(id);
 
       const updateData: any = { ...dto };
@@ -207,7 +218,10 @@ export class BrandService {
 
       return brand;
     } catch (error) {
-      this.logger.error(`Error updating brand ${id}: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error updating brand ${id}: ${error.message}`,
+        error.stack,
+      );
       if (error instanceof HttpException) {
         throw error;
       }
@@ -221,7 +235,7 @@ export class BrandService {
   async remove(id: string) {
     try {
       this.logger.log(`Removing brand: ${id}`);
-      
+
       await this.findOne(id);
 
       const productsCount = await this.prisma.product.count({
@@ -240,7 +254,10 @@ export class BrandService {
 
       return { message: 'Brand deleted successfully' };
     } catch (error) {
-      this.logger.error(`Error removing brand ${id}: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error removing brand ${id}: ${error.message}`,
+        error.stack,
+      );
       if (error instanceof HttpException) {
         throw error;
       }

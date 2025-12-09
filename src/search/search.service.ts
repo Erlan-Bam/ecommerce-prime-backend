@@ -1,9 +1,4 @@
-import { 
-  Injectable, 
-  Logger,
-  HttpException,
-  HttpStatus,
-} from '@nestjs/common';
+import { Injectable, Logger, HttpException, HttpStatus } from '@nestjs/common';
 import { PrismaService } from '../shared/services/prisma.service';
 import { SearchCacheService } from './services/cache.service';
 import { SearchDto } from './dto';
@@ -20,7 +15,7 @@ export class SearchService {
   async autocomplete(dto: SearchDto) {
     try {
       this.logger.log(`Autocomplete search: ${dto.q}`);
-      
+
       const { q, limit = 10 } = dto;
 
       if (!q || q.length < 2) {
@@ -117,7 +112,7 @@ export class SearchService {
   async search(dto: SearchDto) {
     try {
       this.logger.log(`Search query: ${dto.q}`);
-      
+
       const { q, limit = 20 } = dto;
 
       if (!q || q.length < 2) {
@@ -211,7 +206,7 @@ export class SearchService {
   async getPopularSearches() {
     try {
       this.logger.log('Getting popular searches');
-      
+
       const cacheKey = 'search:popular';
       const cached = await this.cacheService.get<any>(cacheKey);
       if (cached) {
@@ -235,7 +230,10 @@ export class SearchService {
       this.logger.log('Cached popular searches');
       return result;
     } catch (error) {
-      this.logger.error(`Error getting popular searches: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error getting popular searches: ${error.message}`,
+        error.stack,
+      );
       if (error instanceof HttpException) {
         throw error;
       }
