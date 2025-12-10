@@ -31,7 +31,10 @@ export class CouponController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Create a new coupon (Admin)' })
   @ApiResponse({ status: 201, description: 'Coupon created successfully' })
-  @ApiResponse({ status: 409, description: 'Coupon with this code already exists' })
+  @ApiResponse({
+    status: 409,
+    description: 'Coupon with this code already exists',
+  })
   create(@Body() createCouponDto: CreateCouponDto) {
     return this.couponService.create(createCouponDto);
   }

@@ -34,11 +34,17 @@ export class CreateCouponDto {
   @Min(0)
   value: number;
 
-  @ApiProperty({ description: 'Valid from date', example: '2024-01-01T00:00:00Z' })
+  @ApiProperty({
+    description: 'Valid from date',
+    example: '2024-01-01T00:00:00Z',
+  })
   @IsDateString()
   validFrom: string;
 
-  @ApiProperty({ description: 'Valid to date', example: '2024-12-31T23:59:59Z' })
+  @ApiProperty({
+    description: 'Valid to date',
+    example: '2024-12-31T23:59:59Z',
+  })
   @IsDateString()
   validTo: string;
 

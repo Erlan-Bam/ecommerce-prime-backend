@@ -150,7 +150,8 @@ export class CouponService {
 
       // Filter out coupons that have exceeded their usage limit
       const filteredData = data.filter(
-        (coupon) => coupon.usageLimit === 0 || coupon.usageCount < coupon.usageLimit,
+        (coupon) =>
+          coupon.usageLimit === 0 || coupon.usageCount < coupon.usageLimit,
       );
 
       await this.cacheService.cacheCoupons(cacheKey, filteredData);
@@ -208,7 +209,8 @@ export class CouponService {
       const normalizedCode = code.toUpperCase().trim();
       this.logger.log(`Finding coupon by code: ${normalizedCode}`);
 
-      const cached = await this.cacheService.getCachedCouponByCode(normalizedCode);
+      const cached =
+        await this.cacheService.getCachedCouponByCode(normalizedCode);
       if (cached) {
         this.logger.log(`Cache hit for coupon code ${normalizedCode}`);
         return cached;
@@ -325,7 +327,8 @@ export class CouponService {
         }
         updateData.value = dto.value;
       }
-      if (dto.validFrom !== undefined) updateData.validFrom = new Date(dto.validFrom);
+      if (dto.validFrom !== undefined)
+        updateData.validFrom = new Date(dto.validFrom);
       if (dto.validTo !== undefined) updateData.validTo = new Date(dto.validTo);
       if (dto.usageLimit !== undefined) updateData.usageLimit = dto.usageLimit;
       if (dto.isActive !== undefined) updateData.isActive = dto.isActive;
