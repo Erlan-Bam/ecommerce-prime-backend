@@ -11,6 +11,7 @@ import { BrandModule } from './brand/brand.module';
 import { SearchModule } from './search/search.module';
 import { UploadModule } from './upload/upload.module';
 import { PickupPointModule } from './pickup-point/pickup-point.module';
+import { CouponModule } from './coupon/coupon.module';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { PickupPointModule } from './pickup-point/pickup-point.module';
     SearchModule,
     UploadModule,
     PickupPointModule,
+    CouponModule,
   ],
   controllers: [AppController],
   providers: [],

@@ -17,6 +17,11 @@ enum BonusType {
   DECREASE
 }
 
+enum CouponType {
+  FIXED
+  PERCENTAGE
+}
+
 model User {
   id        String   @id @default(uuid())
   email     String   @unique
@@ -179,4 +184,22 @@ model ProductStock {
   @@index([productId])
   @@index([pointId])
   @@index([sku])
+}
+
+model Coupon {
+  id         String     @id @default(uuid())
+  code       String     @unique
+  type       CouponType
+  value      Decimal    @db.Decimal(10, 2)
+  validFrom  DateTime
+  validTo    DateTime
+  usageLimit Int        @default(0) // 0 = unlimited
+  usageCount Int        @default(0)
+  isActive   Boolean    @default(true)
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  @@index([code])
+  @@index([isActive])
+  @@index([validFrom, validTo])
 }
