@@ -28,7 +28,7 @@ export class OrderService {
       data: {
         productId: dto.productId,
         quantity: dto.quantity,
-        price: product.price,
+        price: product.price.toNumber() * dto.quantity,
       },
       include: {
         product: {
