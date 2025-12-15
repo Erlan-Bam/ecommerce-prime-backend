@@ -603,7 +603,9 @@ export class OrderService {
               reserved: { decrement: 1 },
             },
           });
-          this.logger.log(`Released slot from previous window ${order.windowId}`);
+          this.logger.log(
+            `Released slot from previous window ${order.windowId}`,
+          );
         }
 
         // 6. Update the order with pickup point and window
@@ -676,7 +678,8 @@ export class OrderService {
 
     // Convert to Moscow time (UTC+3)
     const moscowOffset = 3 * 60; // +3 hours in minutes
-    const utcTime = pickupTime.getTime() + pickupTime.getTimezoneOffset() * 60000;
+    const utcTime =
+      pickupTime.getTime() + pickupTime.getTimezoneOffset() * 60000;
     const moscowTime = new Date(utcTime + moscowOffset * 60000);
 
     const moscowHour = moscowTime.getUTCHours();
@@ -700,7 +703,9 @@ export class OrderService {
     const windowStart = new Date(
       windowStartMoscow.getTime() - moscowOffset * 60000,
     );
-    const windowEnd = new Date(windowEndMoscow.getTime() - moscowOffset * 60000);
+    const windowEnd = new Date(
+      windowEndMoscow.getTime() - moscowOffset * 60000,
+    );
 
     this.logger.debug(
       `Calculated window: ${windowStart.toISOString()} - ${windowEnd.toISOString()} for requested time ${pickupTimeStr}`,
