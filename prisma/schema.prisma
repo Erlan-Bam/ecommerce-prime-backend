@@ -143,10 +143,17 @@ model PickupWindow {
   pointId   String
   startTime DateTime
   endTime   DateTime
+  capacity  Int      @default(24)
+  reserved  Int      @default(0)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   pickupPoint PickupPoint @relation(fields: [pointId], references: [id], onDelete: Cascade)
+  orders      Order[]
+
+  @@unique([pointId, startTime])
+  @@index([pointId])
+  @@index([startTime, endTime])
 }
 
 model OrderItem {
@@ -177,11 +184,15 @@ model Order {
   createdAt DateTime    @default(now())
   updatedAt DateTime    @updatedAt
 
-  user      User        @relation(fields: [userId], references: [id])
-  items     OrderItem[]
+  user         User          @relation(fields: [userId], references: [id])
+  items        OrderItem[]
+  pickupPoint  PickupPoint?  @relation(fields: [pointId], references: [id])
+  pickupWindow PickupWindow? @relation(fields: [windowId], references: [id])
 
   @@index([userId])
   @@index([status])
+  @@index([pointId])
+  @@index([windowId])
 }
 
 model Review {
@@ -220,8 +231,9 @@ model PickupPoint {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
-  productStock ProductStock[]
+  productStock  ProductStock[]
   pickupWindows PickupWindow[]
+  orders        Order[]
 
   @@index([isActive])
 }

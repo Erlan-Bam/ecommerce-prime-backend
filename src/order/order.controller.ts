@@ -14,7 +14,7 @@ import {
   ApiResponse,
 } from '@nestjs/swagger';
 import { OrderService } from './order.service';
-import { AddOrderItemDto, CheckoutResponseDto } from './dto';
+import { AddOrderItemDto, CheckoutResponseDto, SelectPickupDto, SelectPickupResponseDto } from './dto';
 import { UserGuard } from '../shared/guards/user.guard';
 import { User } from '../shared/decorator/user.decorator';
 
@@ -79,16 +79,16 @@ export class OrderController {
     return this.orderService.clearCart(userId);
   }
 
-  // Checkout endpoint
-  @Post('checkout')
+  // Init order endpoint
+  @Post('init')
   @ApiOperation({
-    summary: 'Checkout - Convert cart items to an order',
+    summary: 'Initialize order - Convert cart items to a pending order',
     description:
-      'Validates all cart items, ensures products are active, calculates total price, and creates an order. All operations are performed in a transaction.',
+      'Validates all cart items, ensures products are active, calculates total price, and creates a pending order. User must then select pickup point and window to complete checkout.',
   })
   @ApiResponse({
     status: 201,
-    description: 'Order created successfully',
+    description: 'Order initialized successfully',
     type: CheckoutResponseDto,
   })
   @ApiResponse({
@@ -96,8 +96,35 @@ export class OrderController {
     description: 'Bad request - Cart is empty or contains inactive products',
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  checkout(@User('id') userId: string) {
-    return this.orderService.checkout(userId);
+  initOrder(@User('id') userId: string) {
+    return this.orderService.initOrder(userId);
+  }
+
+  // Select pickup point and window endpoint
+  @Post(':id/pickup')
+  @ApiOperation({
+    summary: 'Select pickup point and window for an order',
+    description:
+      'Assigns a pickup point and time window to a pending order. Windows are hourly slots from 10:00 to 21:00 Moscow time, each with a capacity of 24 orders.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Pickup selected successfully',
+    type: SelectPickupResponseDto,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad request - Invalid time or order state',
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 404, description: 'Order or pickup point not found' })
+  @ApiResponse({ status: 409, description: 'Pickup window is fully booked' })
+  selectPickup(
+    @User('id') userId: string,
+    @Param('id') orderId: string,
+    @Body() dto: SelectPickupDto,
+  ) {
+    return this.orderService.selectPickup(userId, orderId, dto);
   }
 
   // Order endpoints
