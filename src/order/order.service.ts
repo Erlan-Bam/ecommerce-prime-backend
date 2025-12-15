@@ -5,10 +5,14 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../shared/services/prisma.service';
 import { AddOrderItemDto } from './dto';
+import { OrderCacheService } from './services/cache.service';
 
 @Injectable()
 export class OrderService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly cacheService: OrderCacheService,
+  ) {}
 
   async addOrderItem(userId: string, dto: AddOrderItemDto) {
     // Verify product exists and is active
@@ -36,7 +40,7 @@ export class OrderService {
     if (existingItem) {
       // Update existing item quantity
       const newQuantity = existingItem.quantity + dto.quantity;
-      return this.prisma.orderItem.update({
+      const result = await this.prisma.orderItem.update({
         where: { id: existingItem.id },
         data: {
           quantity: newQuantity,
@@ -53,9 +57,12 @@ export class OrderService {
           },
         },
       });
+
+      await this.cacheService.invalidateCart(userId);
+      return result;
     }
 
-    return this.prisma.orderItem.create({
+    const result = await this.prisma.orderItem.create({
       data: {
         userId,
         productId: dto.productId,
@@ -73,10 +80,19 @@ export class OrderService {
         },
       },
     });
+
+    await this.cacheService.invalidateCart(userId);
+    return result;
   }
 
   async getCartItems(userId: string) {
-    return this.prisma.orderItem.findMany({
+    // Try to get from cache first
+    const cached = await this.cacheService.getCachedCart(userId);
+    if (cached) {
+      return cached;
+    }
+
+    const cartItems = await this.prisma.orderItem.findMany({
       where: {
         userId,
         orderId: null, // Only items not yet in an order (cart items)
@@ -98,6 +114,11 @@ export class OrderService {
       },
       orderBy: { createdAt: 'desc' },
     });
+
+    // Cache the result
+    await this.cacheService.cacheCart(userId, cartItems);
+
+    return cartItems;
   }
 
   async removeOrderItem(
@@ -120,6 +141,8 @@ export class OrderService {
       where: { id: orderItemId },
     });
 
+    await this.cacheService.invalidateCart(userId);
+
     return { message: 'Cart item removed successfully' };
   }
 
@@ -130,6 +153,8 @@ export class OrderService {
         orderId: null,
       },
     });
+
+    await this.cacheService.invalidateCart(userId);
 
     return { message: 'Cart cleared successfully' };
   }
@@ -249,12 +274,22 @@ export class OrderService {
         },
       });
 
+      // Invalidate cart and orders cache
+      await this.cacheService.invalidateCart(userId);
+      await this.cacheService.invalidateUserOrders(userId);
+
       return completeOrder;
     });
   }
 
   async getUserOrders(userId: string) {
-    return this.prisma.order.findMany({
+    // Try to get from cache first
+    const cached = await this.cacheService.getCachedUserOrders(userId);
+    if (cached) {
+      return cached;
+    }
+
+    const orders = await this.prisma.order.findMany({
       where: { userId },
       include: {
         items: {
@@ -275,9 +310,20 @@ export class OrderService {
       },
       orderBy: { createdAt: 'desc' },
     });
+
+    // Cache the result
+    await this.cacheService.cacheUserOrders(userId, orders);
+
+    return orders;
   }
 
   async getOrderById(userId: string, orderId: string) {
+    // Try to get from cache first
+    const cached = await this.cacheService.getCachedOrder(userId, orderId);
+    if (cached) {
+      return cached;
+    }
+
     const order = await this.prisma.order.findFirst({
       where: {
         id: orderId,
@@ -305,6 +351,9 @@ export class OrderService {
     if (!order) {
       throw new NotFoundException('Order not found');
     }
+
+    // Cache the result
+    await this.cacheService.cacheOrder(userId, orderId, order);
 
     return order;
   }
