@@ -22,6 +22,14 @@ enum CouponType {
   PERCENTAGE
 }
 
+enum OrderStatus {
+  PENDING
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
 model User {
   id        String   @id @default(uuid())
   email     String   @unique
@@ -33,8 +41,10 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  bonuses   Bonus[]
-  reviews   Review[]
+  bonuses    Bonus[]
+  reviews    Review[]
+  orders     Order[]
+  orderItems OrderItem[]
 }
 
 model Category {
@@ -128,13 +138,50 @@ model ProductAttribute {
   @@index([name, value])
 }
 
+model PickupWindow {
+  id        String   @id @default(uuid())
+  pointId   String
+  startTime DateTime
+  endTime   DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  pickupPoint PickupPoint @relation(fields: [pointId], references: [id], onDelete: Cascade)
+}
+
 model OrderItem {
   id        String   @id @default(uuid())
+  userId    String
+  orderId   String?
   productId String
   quantity  Int
-  price     Decimal
+  price     Decimal  @db.Decimal(10, 2)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
+  user      User     @relation(fields: [userId], references: [id])
+  order     Order?   @relation(fields: [orderId], references: [id])
   product   Product  @relation(fields: [productId], references: [id])
+
+  @@index([userId])
+  @@index([orderId])
+}
+
+model Order {
+  id        String      @id @default(uuid())
+  userId    String
+  total     Decimal     @db.Decimal(10, 2)
+  status    OrderStatus @default(PENDING)
+  pointId   String?
+  windowId  String?
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  user      User        @relation(fields: [userId], references: [id])
+  items     OrderItem[]
+
+  @@index([userId])
+  @@index([status])
 }
 
 model Review {
@@ -174,6 +221,7 @@ model PickupPoint {
   updatedAt        DateTime @updatedAt
 
   productStock ProductStock[]
+  pickupWindows PickupWindow[]
 
   @@index([isActive])
 }
