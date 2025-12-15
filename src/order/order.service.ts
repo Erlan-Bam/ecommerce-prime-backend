@@ -20,7 +20,9 @@ export class OrderService {
 
   async addOrderItem(userId: string, dto: AddOrderItemDto) {
     try {
-      this.logger.log(`Adding item to cart for user ${userId}, product ${dto.productId}`);
+      this.logger.log(
+        `Adding item to cart for user ${userId}, product ${dto.productId}`,
+      );
 
       // Verify product exists and is active
       const product = await this.prisma.product.findUnique({
@@ -95,10 +97,16 @@ export class OrderService {
       this.logger.log(`Added new item to cart for user ${userId}`);
       return result;
     } catch (error) {
-      if (error instanceof NotFoundException || error instanceof BadRequestException) {
+      if (
+        error instanceof NotFoundException ||
+        error instanceof BadRequestException
+      ) {
         throw error;
       }
-      this.logger.error(`Error adding item to cart for user ${userId}: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error adding item to cart for user ${userId}: ${error.message}`,
+        error.stack,
+      );
       throw new InternalServerErrorException('Failed to add item to cart');
     }
   }
@@ -139,11 +147,16 @@ export class OrderService {
 
       // Cache the result
       await this.cacheService.cacheCart(userId, cartItems);
-      this.logger.log(`Fetched ${cartItems.length} cart items for user ${userId}`);
+      this.logger.log(
+        `Fetched ${cartItems.length} cart items for user ${userId}`,
+      );
 
       return cartItems;
     } catch (error) {
-      this.logger.error(`Error fetching cart items for user ${userId}: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error fetching cart items for user ${userId}: ${error.message}`,
+        error.stack,
+      );
       throw new InternalServerErrorException('Failed to fetch cart items');
     }
   }
@@ -164,7 +177,9 @@ export class OrderService {
       });
 
       if (!orderItem) {
-        this.logger.warn(`Cart item ${orderItemId} not found for user ${userId}`);
+        this.logger.warn(
+          `Cart item ${orderItemId} not found for user ${userId}`,
+        );
         throw new NotFoundException('Cart item not found');
       }
 
@@ -180,7 +195,10 @@ export class OrderService {
       if (error instanceof NotFoundException) {
         throw error;
       }
-      this.logger.error(`Error removing cart item ${orderItemId} for user ${userId}: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error removing cart item ${orderItemId} for user ${userId}: ${error.message}`,
+        error.stack,
+      );
       throw new InternalServerErrorException('Failed to remove cart item');
     }
   }
@@ -197,11 +215,16 @@ export class OrderService {
       });
 
       await this.cacheService.invalidateCart(userId);
-      this.logger.log(`Cleared ${result.count} items from cart for user ${userId}`);
+      this.logger.log(
+        `Cleared ${result.count} items from cart for user ${userId}`,
+      );
 
       return { message: 'Cart cleared successfully' };
     } catch (error) {
-      this.logger.error(`Error clearing cart for user ${userId}: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error clearing cart for user ${userId}: ${error.message}`,
+        error.stack,
+      );
       throw new InternalServerErrorException('Failed to clear cart');
     }
   }
@@ -232,7 +255,9 @@ export class OrderService {
 
         // Check if cart is empty
         if (cartItems.length === 0) {
-          this.logger.warn(`Checkout attempted with empty cart for user ${userId}`);
+          this.logger.warn(
+            `Checkout attempted with empty cart for user ${userId}`,
+          );
           throw new BadRequestException('Cart is empty');
         }
 
@@ -241,7 +266,9 @@ export class OrderService {
           (item) => !item.product.isActive,
         );
         if (inactiveProducts.length > 0) {
-          this.logger.warn(`Checkout blocked: ${inactiveProducts.length} inactive products for user ${userId}`);
+          this.logger.warn(
+            `Checkout blocked: ${inactiveProducts.length} inactive products for user ${userId}`,
+          );
           throw new BadRequestException({
             inactiveProducts: inactiveProducts,
             message: 'Remove these products to checkout the order',
@@ -256,7 +283,9 @@ export class OrderService {
 
             // Update item price if it changed
             if (item.price.toNumber() !== calculatedPrice) {
-              this.logger.debug(`Price updated for item ${item.id}: ${item.price} -> ${calculatedPrice}`);
+              this.logger.debug(
+                `Price updated for item ${item.id}: ${item.price} -> ${calculatedPrice}`,
+              );
               return tx.orderItem.update({
                 where: { id: item.id },
                 data: { price: calculatedPrice },
@@ -298,7 +327,9 @@ export class OrderService {
           },
         });
 
-        this.logger.log(`Created order ${newOrder.id} with total ${total} for user ${userId}`);
+        this.logger.log(
+          `Created order ${newOrder.id} with total ${total} for user ${userId}`,
+        );
 
         // Link all cart items to the order
         await tx.orderItem.updateMany({
@@ -336,13 +367,18 @@ export class OrderService {
       await this.cacheService.invalidateCart(userId);
       await this.cacheService.invalidateUserOrders(userId);
 
-      this.logger.log(`Checkout completed successfully for user ${userId}, order ${order?.id}`);
+      this.logger.log(
+        `Checkout completed successfully for user ${userId}, order ${order?.id}`,
+      );
       return order;
     } catch (error) {
       if (error instanceof BadRequestException) {
         throw error;
       }
-      this.logger.error(`Error during checkout for user ${userId}: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error during checkout for user ${userId}: ${error.message}`,
+        error.stack,
+      );
       throw new InternalServerErrorException('Failed to complete checkout');
     }
   }
@@ -386,7 +422,10 @@ export class OrderService {
 
       return orders;
     } catch (error) {
-      this.logger.error(`Error fetching orders for user ${userId}: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error fetching orders for user ${userId}: ${error.message}`,
+        error.stack,
+      );
       throw new InternalServerErrorException('Failed to fetch orders');
     }
   }
@@ -398,7 +437,9 @@ export class OrderService {
       // Try to get from cache first
       const cached = await this.cacheService.getCachedOrder(userId, orderId);
       if (cached) {
-        this.logger.debug(`Returning cached order ${orderId} for user ${userId}`);
+        this.logger.debug(
+          `Returning cached order ${orderId} for user ${userId}`,
+        );
         return cached;
       }
 
@@ -440,7 +481,10 @@ export class OrderService {
       if (error instanceof NotFoundException) {
         throw error;
       }
-      this.logger.error(`Error fetching order ${orderId} for user ${userId}: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error fetching order ${orderId} for user ${userId}: ${error.message}`,
+        error.stack,
+      );
       throw new InternalServerErrorException('Failed to fetch order');
     }
   }
