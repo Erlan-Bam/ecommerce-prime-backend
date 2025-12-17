@@ -39,7 +39,7 @@ export class FavoriteService {
         isOnSale: fav.product.isOnSale,
         inStock:
           fav.product.productStock.length > 0 &&
-          fav.product.productStock.some((stock) => stock.quantity > 0),
+          fav.product.productStock.some((stock) => stock.stockCount > 0),
         category: {
           id: fav.product.category.id,
           title: fav.product.category.title,
