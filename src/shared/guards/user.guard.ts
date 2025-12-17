@@ -34,7 +34,14 @@ export class UserGuard extends AuthGuard('jwt') {
     status?: any,
   ) {
     if (error || !user) {
-      throw error || new HttpException('Access denied', HttpStatus.FORBIDDEN);
+      // If token is expired or invalid, return 401
+      if (info?.name === 'TokenExpiredError') {
+        throw new HttpException('Token expired', HttpStatus.UNAUTHORIZED);
+      }
+      if (info?.name === 'JsonWebTokenError') {
+        throw new HttpException('Invalid token', HttpStatus.UNAUTHORIZED);
+      }
+      throw error || new HttpException('Unauthorized', HttpStatus.UNAUTHORIZED);
     }
 
     if (user.isBanned) {
