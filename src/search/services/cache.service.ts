@@ -49,4 +49,13 @@ export class SearchCacheService {
       this.cacheLogger.error('Error invalidating search caches:', error);
     }
   }
+
+  // Generic cache methods for additional search-related caching
+  async get<T>(key: string): Promise<T | null> {
+    return await this.redisService.get<T>(key);
+  }
+
+  async set(key: string, value: any, ttl?: number): Promise<void> {
+    await this.redisService.set(key, value, ttl || this.CACHE_TTL);
+  }
 }
