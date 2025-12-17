@@ -84,8 +84,8 @@ async function bootstrap() {
   );
 
   const port = Number(process.env.PORT || 6001);
-  await app.listen(port);
-  logger.log(`HTTP server listening on http://localhost:${port}`);
+  await app.listen(port, '0.0.0.0');
+  logger.log(`HTTP server listening on port ${port}`);
 }
 
 bootstrap();
