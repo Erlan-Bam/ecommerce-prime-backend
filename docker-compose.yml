@@ -1,7 +1,7 @@
 services:
   redis:
     image: redis:7-alpine
-    container_name: tma-redis
+    container_name: e-commerce-redis
     restart: unless-stopped
     logging:
       driver: "json-file"
@@ -36,7 +36,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: tma-backend
+    container_name: ecommerce-backend
     restart: unless-stopped
     logging:
       driver: "json-file"
