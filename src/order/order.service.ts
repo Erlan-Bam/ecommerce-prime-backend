@@ -5,6 +5,7 @@ import {
   InternalServerErrorException,
   Logger,
   ConflictException,
+  HttpException,
 } from '@nestjs/common';
 import { PrismaService } from '../shared/services/prisma.service';
 import { AddOrderItemDto, SelectPickupDto } from './dto';
@@ -98,10 +99,7 @@ export class OrderService {
       this.logger.log(`Added new item to cart for user ${userId}`);
       return result;
     } catch (error) {
-      if (
-        error instanceof NotFoundException ||
-        error instanceof BadRequestException
-      ) {
+      if (error instanceof HttpException) {
         throw error;
       }
       this.logger.error(
@@ -193,7 +191,7 @@ export class OrderService {
 
       return { message: 'Cart item removed successfully' };
     } catch (error) {
-      if (error instanceof NotFoundException) {
+      if (error instanceof HttpException) {
         throw error;
       }
       this.logger.error(
@@ -373,7 +371,7 @@ export class OrderService {
       );
       return order;
     } catch (error) {
-      if (error instanceof BadRequestException) {
+      if (error instanceof HttpException) {
         throw error;
       }
       this.logger.error(
@@ -479,7 +477,7 @@ export class OrderService {
 
       return order;
     } catch (error) {
-      if (error instanceof NotFoundException) {
+      if (error instanceof HttpException) {
         throw error;
       }
       this.logger.error(
@@ -649,11 +647,7 @@ export class OrderService {
         message: 'Pickup point and window selected successfully',
       };
     } catch (error) {
-      if (
-        error instanceof NotFoundException ||
-        error instanceof BadRequestException ||
-        error instanceof ConflictException
-      ) {
+      if (error instanceof HttpException) {
         throw error;
       }
       this.logger.error(
