@@ -31,8 +31,8 @@ async function bootstrap() {
 
   if (NODE_ENV !== 'production') {
     const config = new DocumentBuilder()
-      .setTitle('Arctic pay API')
-      .setDescription('Arctic pay API endpoints')
+      .setTitle('E-commerce API')
+      .setDescription('E-commerce API endpoints')
       .setVersion('1.0')
       .addBearerAuth(
         {
@@ -83,7 +83,7 @@ async function bootstrap() {
     }),
   );
 
-  const port = Number(process.env.PORT ?? 6001);
+  const port = Number(process.env.PORT || 6001);
   await app.listen(port);
   logger.log(`HTTP server listening on http://localhost:${port}`);
 }
