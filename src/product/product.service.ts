@@ -109,7 +109,7 @@ export class ProductService {
       const { page = 1, limit = 20 } = filter;
       const skip = (page - 1) * limit;
 
-      const where = this.buildWhereClause(filter);
+      const where = await this.buildWhereClause(filter);
       const orderBy = this.buildOrderByClause(filter.sortBy);
 
       const [products, total] = await Promise.all([
@@ -510,13 +510,42 @@ export class ProductService {
     }
   }
 
-  private buildWhereClause(filter: ProductFilterDto): any {
+  /**
+   * Recursively get all subcategory IDs for a given category
+   */
+  private async getAllSubcategoryIds(categoryId: string): Promise<string[]> {
+    const result: string[] = [categoryId];
+
+    const children = await this.prisma.category.findMany({
+      where: { parentId: categoryId },
+      select: { id: true },
+    });
+
+    if (children.length > 0) {
+      for (const child of children) {
+        const childIds = await this.getAllSubcategoryIds(child.id);
+        result.push(...childIds);
+      }
+    }
+
+    return result;
+  }
+
+  private async buildWhereClause(filter: ProductFilterDto): Promise<any> {
     const where: any = {
       isActive: true,
     };
 
     if (filter.categoryId) {
-      where.categoryId = filter.categoryId;
+      // Get all subcategory IDs recursively
+      const categoryIds = await this.getAllSubcategoryIds(filter.categoryId);
+
+      // Filter by parent category OR any of its subcategories
+      if (categoryIds.length > 1) {
+        where.categoryId = { in: categoryIds };
+      } else {
+        where.categoryId = filter.categoryId;
+      }
     }
 
     if (filter.brandIds?.length) {
