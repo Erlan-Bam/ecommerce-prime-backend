@@ -45,6 +45,7 @@ model User {
   reviews    Review[]
   orders     Order[]
   orderItems OrderItem[]
+  favorites  Favorite[]
 }
 
 model Category {
@@ -104,6 +105,7 @@ model Product {
   productStock ProductStock[]
   orderItems  OrderItem[]
   guestCartItems GuestCartItem[]
+  favorites   Favorite[]
 
   @@index([categoryId])
   @@index([brandId])
@@ -303,5 +305,19 @@ model GuestCartItem {
 
   @@unique([sessionId, productId])
   @@index([sessionId])
+  @@index([productId])
+}
+
+model Favorite {
+  id        String   @id @default(uuid())
+  userId    String
+  productId String
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, productId])
+  @@index([userId])
   @@index([productId])
 }

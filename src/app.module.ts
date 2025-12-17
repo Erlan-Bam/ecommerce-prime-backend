@@ -13,6 +13,7 @@ import { UploadModule } from './upload/upload.module';
 import { PickupPointModule } from './pickup-point/pickup-point.module';
 import { CouponModule } from './coupon/coupon.module';
 import { OrderModule } from './order/order.module';
+import { FavoriteModule } from './favorite/favorite.module';
 
 @Module({
   imports: [
@@ -41,6 +42,7 @@ import { OrderModule } from './order/order.module';
     PickupPointModule,
     CouponModule,
     OrderModule,
+    FavoriteModule,
   ],
   controllers: [AppController],
   providers: [],
