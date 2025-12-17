@@ -1,7 +1,12 @@
 import { Injectable, HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../shared/services/prisma.service';
-import { RegisterUserDto, LoginUserDto, LoginAdminDto } from './dto';
+import {
+  RegisterUserDto,
+  LoginUserDto,
+  LoginAdminDto,
+  GuestAuthDto,
+} from './dto';
 import * as bcrypt from 'bcryptjs';
 import { ConfigService } from '@nestjs/config';
 
@@ -262,6 +267,270 @@ export class AuthService {
       this.jwtService.signAsync(payload, {
         secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
         expiresIn: '7d',
+      }),
+    ]);
+
+    return {
+      accessToken,
+      refreshToken,
+    };
+  }
+
+  // ==================== GUEST AUTH ====================
+
+  async guestAuth(dto: GuestAuthDto, ipAddress?: string) {
+    try {
+      this.logger.log(
+        `Guest auth attempt with fingerprint: ${dto.fingerprint.substring(0, 8)}...`,
+      );
+
+      // Check if guest session already exists
+      let guestSession = await this.prisma.guestSession.findUnique({
+        where: { fingerprint: dto.fingerprint },
+      });
+
+      if (guestSession) {
+        // Update last active time
+        guestSession = await this.prisma.guestSession.update({
+          where: { id: guestSession.id },
+          data: {
+            lastActiveAt: new Date(),
+            userAgent: dto.userAgent || guestSession.userAgent,
+            ipAddress: ipAddress || guestSession.ipAddress,
+          },
+        });
+
+        this.logger.log(`Existing guest session found: ${guestSession.id}`);
+      } else {
+        // Create new guest session
+        guestSession = await this.prisma.guestSession.create({
+          data: {
+            fingerprint: dto.fingerprint,
+            userAgent: dto.userAgent,
+            ipAddress: ipAddress,
+          },
+        });
+
+        this.logger.log(`New guest session created: ${guestSession.id}`);
+      }
+
+      const tokens = await this.generateGuestTokens(
+        guestSession.id,
+        dto.fingerprint,
+      );
+
+      return {
+        guest: {
+          id: guestSession.id,
+          fingerprint: guestSession.fingerprint,
+          isGuest: true,
+        },
+        ...tokens,
+      };
+    } catch (error) {
+      this.logger.error(`Error in guest auth: ${error.message}`, error.stack);
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new HttpException(
+        error.message || 'Failed to authenticate guest',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  async refreshGuestTokens(refreshToken: string) {
+    try {
+      this.logger.log('Refreshing guest tokens');
+
+      const payload = await this.jwtService.verifyAsync(refreshToken, {
+        secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
+      });
+
+      // Check if this is a guest token
+      if (!payload.isGuest) {
+        throw new HttpException('Invalid guest token', HttpStatus.UNAUTHORIZED);
+      }
+
+      const guestSession = await this.prisma.guestSession.findUnique({
+        where: { id: payload.id },
+      });
+
+      if (!guestSession) {
+        throw new HttpException(
+          'Guest session not found',
+          HttpStatus.UNAUTHORIZED,
+        );
+      }
+
+      // Update last active time
+      await this.prisma.guestSession.update({
+        where: { id: guestSession.id },
+        data: { lastActiveAt: new Date() },
+      });
+
+      const tokens = await this.generateGuestTokens(
+        guestSession.id,
+        guestSession.fingerprint,
+      );
+
+      this.logger.log(`Guest tokens refreshed for session: ${guestSession.id}`);
+
+      return tokens;
+    } catch (error) {
+      this.logger.error(
+        `Error refreshing guest tokens: ${error.message}`,
+        error.stack,
+      );
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new HttpException(
+        error.message || 'Invalid refresh token',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  async getGuestSession(sessionId: string) {
+    try {
+      this.logger.log(`Getting guest session: ${sessionId}`);
+
+      const guestSession = await this.prisma.guestSession.findUnique({
+        where: { id: sessionId },
+        include: {
+          cartItems: {
+            include: {
+              product: {
+                include: {
+                  images: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+      if (!guestSession) {
+        throw new HttpException(
+          'Guest session not found',
+          HttpStatus.NOT_FOUND,
+        );
+      }
+
+      return {
+        id: guestSession.id,
+        fingerprint: guestSession.fingerprint,
+        isGuest: true,
+        cartItems: guestSession.cartItems,
+        lastActiveAt: guestSession.lastActiveAt,
+        createdAt: guestSession.createdAt,
+      };
+    } catch (error) {
+      this.logger.error(
+        `Error getting guest session: ${error.message}`,
+        error.stack,
+      );
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new HttpException(
+        error.message || 'Failed to get guest session',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  async mergeGuestCartToUser(guestSessionId: string, userId: string) {
+    try {
+      this.logger.log(`Merging guest cart ${guestSessionId} to user ${userId}`);
+
+      const guestSession = await this.prisma.guestSession.findUnique({
+        where: { id: guestSessionId },
+        include: { cartItems: true },
+      });
+
+      if (!guestSession || guestSession.cartItems.length === 0) {
+        return { merged: 0 };
+      }
+
+      // Merge cart items to user's order items (cart)
+      let mergedCount = 0;
+      for (const item of guestSession.cartItems) {
+        // Check if user already has this product in cart
+        const existingItem = await this.prisma.orderItem.findFirst({
+          where: {
+            userId,
+            productId: item.productId,
+            orderId: null, // Cart items have no orderId
+          },
+        });
+
+        if (existingItem) {
+          // Update quantity
+          await this.prisma.orderItem.update({
+            where: { id: existingItem.id },
+            data: { quantity: existingItem.quantity + item.quantity },
+          });
+        } else {
+          // Get product price
+          const product = await this.prisma.product.findUnique({
+            where: { id: item.productId },
+          });
+
+          if (product) {
+            await this.prisma.orderItem.create({
+              data: {
+                userId,
+                productId: item.productId,
+                quantity: item.quantity,
+                price: product.price,
+              },
+            });
+          }
+        }
+        mergedCount++;
+      }
+
+      // Delete guest cart items after merge
+      await this.prisma.guestCartItem.deleteMany({
+        where: { sessionId: guestSessionId },
+      });
+
+      this.logger.log(`Merged ${mergedCount} items from guest cart to user`);
+
+      return { merged: mergedCount };
+    } catch (error) {
+      this.logger.error(
+        `Error merging guest cart: ${error.message}`,
+        error.stack,
+      );
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new HttpException(
+        error.message || 'Failed to merge guest cart',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  private async generateGuestTokens(sessionId: string, fingerprint: string) {
+    const payload = {
+      id: sessionId,
+      fingerprint,
+      isGuest: true,
+      role: 'GUEST',
+    };
+
+    const [accessToken, refreshToken] = await Promise.all([
+      this.jwtService.signAsync(payload, {
+        secret: this.configService.get<string>('JWT_ACCESS_SECRET'),
+        expiresIn: '1h', // Longer for guests
+      }),
+      this.jwtService.signAsync(payload, {
+        secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
+        expiresIn: '30d', // Longer for guests
       }),
     ]);
 

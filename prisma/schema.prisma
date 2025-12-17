@@ -103,6 +103,7 @@ model Product {
   reviews     Review[]
   productStock ProductStock[]
   orderItems  OrderItem[]
+  guestCartItems GuestCartItem[]
 
   @@index([categoryId])
   @@index([brandId])
@@ -272,4 +273,35 @@ model Coupon {
   @@index([code])
   @@index([isActive])
   @@index([validFrom, validTo])
+}
+
+model GuestSession {
+  id            String   @id @default(uuid())
+  fingerprint   String   @unique // Device fingerprint hash
+  userAgent     String?
+  ipAddress     String?
+  lastActiveAt  DateTime @default(now())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  cartItems     GuestCartItem[]
+
+  @@index([fingerprint])
+  @@index([lastActiveAt])
+}
+
+model GuestCartItem {
+  id          String   @id @default(uuid())
+  sessionId   String
+  productId   String
+  quantity    Int      @default(1)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  session     GuestSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  product     Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, productId])
+  @@index([sessionId])
+  @@index([productId])
 }
