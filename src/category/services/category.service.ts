@@ -1,9 +1,4 @@
-import {
-  Injectable,
-  Logger,
-  HttpException,
-  HttpStatus,
-} from '@nestjs/common';
+import { Injectable, Logger, HttpException, HttpStatus } from '@nestjs/common';
 import { PrismaService } from '../../shared/services/prisma.service';
 import { CreateCategoryDto } from '../dto/create-category.dto';
 import { UpdateCategoryDto } from '../dto/update-category.dto';
@@ -233,7 +228,10 @@ export class CategoryService {
       });
 
       if (!category) {
-        throw new HttpException(`Category with ID ${id} not found`, HttpStatus.NOT_FOUND);
+        throw new HttpException(
+          `Category with ID ${id} not found`,
+          HttpStatus.NOT_FOUND,
+        );
       }
 
       await this.cacheService.cacheCategory(id, category);

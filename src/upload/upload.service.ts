@@ -1,9 +1,4 @@
-import {
-  Injectable,
-  HttpException,
-  HttpStatus,
-  Logger,
-} from '@nestjs/common';
+import { Injectable, HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { v2 as cloudinary } from 'cloudinary';
 
@@ -37,7 +32,10 @@ export class UploadService {
                 error.stack,
               );
               reject(
-                new HttpException('Failed to upload image to Cloudinary', HttpStatus.BAD_REQUEST),
+                new HttpException(
+                  'Failed to upload image to Cloudinary',
+                  HttpStatus.BAD_REQUEST,
+                ),
               );
             } else {
               this.logger.log(

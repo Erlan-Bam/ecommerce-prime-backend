@@ -38,7 +38,10 @@ export class AdminGuard extends AuthGuard('jwt') {
     }
 
     if (user.role !== 'ADMIN') {
-      throw new HttpException('Access denied: Admins only', HttpStatus.FORBIDDEN);
+      throw new HttpException(
+        'Access denied: Admins only',
+        HttpStatus.FORBIDDEN,
+      );
     }
 
     return user;

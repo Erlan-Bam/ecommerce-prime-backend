@@ -1,9 +1,4 @@
-import {
-  Injectable,
-  Logger,
-  HttpException,
-  HttpStatus,
-} from '@nestjs/common';
+import { Injectable, Logger, HttpException, HttpStatus } from '@nestjs/common';
 import { PrismaService } from '../shared/services/prisma.service';
 import { ProductCacheService } from './services/cache.service';
 import {
@@ -224,7 +219,10 @@ export class ProductService {
       });
 
       if (!product) {
-        throw new HttpException(`Product with ID ${id} not found`, HttpStatus.NOT_FOUND);
+        throw new HttpException(
+          `Product with ID ${id} not found`,
+          HttpStatus.NOT_FOUND,
+        );
       }
 
       // Update view count

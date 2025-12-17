@@ -81,7 +81,7 @@ async function main() {
 
   // Create Categories
   console.log('📁 Creating categories...');
-  
+
   // Parent categories
   const smartphones = await prisma.category.create({
     data: {
@@ -226,13 +226,13 @@ async function main() {
       address: 'ул. Абая 150, ТРЦ Мега, Алматы',
       coords: '43.2380,76.9450',
       workingSchedule: {
-        'Пн': { from: '10:00', to: '22:00' },
-        'Вт': { from: '10:00', to: '22:00' },
-        'Ср': { from: '10:00', to: '22:00' },
-        'Чт': { from: '10:00', to: '22:00' },
-        'Пт': { from: '10:00', to: '22:00' },
-        'Сб': { from: '10:00', to: '22:00' },
-        'Вс': { from: '10:00', to: '21:00' },
+        Пн: { from: '10:00', to: '22:00' },
+        Вт: { from: '10:00', to: '22:00' },
+        Ср: { from: '10:00', to: '22:00' },
+        Чт: { from: '10:00', to: '22:00' },
+        Пт: { from: '10:00', to: '22:00' },
+        Сб: { from: '10:00', to: '22:00' },
+        Вс: { from: '10:00', to: '21:00' },
       },
     },
   });
@@ -242,20 +242,20 @@ async function main() {
       address: 'пр. Достык 5, ТЦ Керуен, Астана',
       coords: '51.1280,71.4300',
       workingSchedule: {
-        'Пн': { from: '09:00', to: '21:00' },
-        'Вт': { from: '09:00', to: '21:00' },
-        'Ср': { from: '09:00', to: '21:00' },
-        'Чт': { from: '09:00', to: '21:00' },
-        'Пт': { from: '09:00', to: '21:00' },
-        'Сб': { from: '10:00', to: '20:00' },
-        'Вс': { from: '10:00', to: '20:00' },
+        Пн: { from: '09:00', to: '21:00' },
+        Вт: { from: '09:00', to: '21:00' },
+        Ср: { from: '09:00', to: '21:00' },
+        Чт: { from: '09:00', to: '21:00' },
+        Пт: { from: '09:00', to: '21:00' },
+        Сб: { from: '10:00', to: '20:00' },
+        Вс: { from: '10:00', to: '20:00' },
       },
     },
   });
 
   // Create Products
   console.log('📦 Creating products...');
-  
+
   const productsData = [
     // iPhones
     {
@@ -263,13 +263,20 @@ async function main() {
       brandId: brands.apple.id,
       name: 'iPhone 15 Pro Max 256GB',
       slug: 'iphone-15-pro-max-256gb',
-      description: 'Самый мощный iPhone с чипом A17 Pro, титановым корпусом и продвинутой камерой.',
+      description:
+        'Самый мощный iPhone с чипом A17 Pro, титановым корпусом и продвинутой камерой.',
       price: 699990,
       oldPrice: 749990,
       isOnSale: true,
       images: [
-        { url: '/images/products/iphone-15-pro-max-1.png', alt: 'iPhone 15 Pro Max' },
-        { url: '/images/products/iphone-15-pro-max-2.png', alt: 'iPhone 15 Pro Max сбоку' },
+        {
+          url: '/images/products/iphone-15-pro-max-1.png',
+          alt: 'iPhone 15 Pro Max',
+        },
+        {
+          url: '/images/products/iphone-15-pro-max-2.png',
+          alt: 'iPhone 15 Pro Max сбоку',
+        },
       ],
       attributes: [
         { name: 'Память', value: '256GB' },
@@ -301,9 +308,7 @@ async function main() {
       slug: 'iphone-15-256gb',
       description: 'Dynamic Island, 48-мегапиксельная камера и USB-C.',
       price: 449990,
-      images: [
-        { url: '/images/products/iphone-15-1.png', alt: 'iPhone 15' },
-      ],
+      images: [{ url: '/images/products/iphone-15-1.png', alt: 'iPhone 15' }],
       attributes: [
         { name: 'Память', value: '256GB' },
         { name: 'Цвет', value: 'Blue' },
@@ -318,9 +323,7 @@ async function main() {
       price: 349990,
       oldPrice: 399990,
       isOnSale: true,
-      images: [
-        { url: '/images/products/iphone-14-1.png', alt: 'iPhone 14' },
-      ],
+      images: [{ url: '/images/products/iphone-14-1.png', alt: 'iPhone 14' }],
       attributes: [
         { name: 'Память', value: '128GB' },
         { name: 'Цвет', value: 'Midnight' },
@@ -335,7 +338,10 @@ async function main() {
       description: 'Флагман с AI-функциями, S Pen и 200МП камерой.',
       price: 649990,
       images: [
-        { url: '/images/products/galaxy-s24-ultra-1.png', alt: 'Galaxy S24 Ultra' },
+        {
+          url: '/images/products/galaxy-s24-ultra-1.png',
+          alt: 'Galaxy S24 Ultra',
+        },
       ],
       attributes: [
         { name: 'Память', value: '512GB' },
@@ -384,7 +390,10 @@ async function main() {
       description: 'Флагман с камерой Leica и Snapdragon 8 Gen 3.',
       price: 549990,
       images: [
-        { url: '/images/products/xiaomi-14-ultra-1.png', alt: 'Xiaomi 14 Ultra' },
+        {
+          url: '/images/products/xiaomi-14-ultra-1.png',
+          alt: 'Xiaomi 14 Ultra',
+        },
       ],
       attributes: [
         { name: 'Память', value: '512GB' },
@@ -398,12 +407,8 @@ async function main() {
       slug: 'xiaomi-14-256gb',
       description: 'Компактный флагман с камерой Leica.',
       price: 399990,
-      images: [
-        { url: '/images/products/xiaomi-14-1.png', alt: 'Xiaomi 14' },
-      ],
-      attributes: [
-        { name: 'Память', value: '256GB' },
-      ],
+      images: [{ url: '/images/products/xiaomi-14-1.png', alt: 'Xiaomi 14' }],
+      attributes: [{ name: 'Память', value: '256GB' }],
     },
     {
       categoryId: xiaomiPhones.id,
@@ -415,7 +420,10 @@ async function main() {
       oldPrice: 179990,
       isOnSale: true,
       images: [
-        { url: '/images/products/redmi-note-13-pro-1.png', alt: 'Redmi Note 13 Pro' },
+        {
+          url: '/images/products/redmi-note-13-pro-1.png',
+          alt: 'Redmi Note 13 Pro',
+        },
       ],
       attributes: [
         { name: 'Память', value: '256GB' },
@@ -431,7 +439,10 @@ async function main() {
       description: 'Самые прочные Apple Watch для экстремальных условий.',
       price: 399990,
       images: [
-        { url: '/images/products/apple-watch-ultra-2-1.png', alt: 'Apple Watch Ultra 2' },
+        {
+          url: '/images/products/apple-watch-ultra-2-1.png',
+          alt: 'Apple Watch Ultra 2',
+        },
       ],
       attributes: [
         { name: 'Размер', value: '49mm' },
@@ -446,7 +457,10 @@ async function main() {
       description: 'Умные часы с двойным касанием и ярким дисплеем.',
       price: 249990,
       images: [
-        { url: '/images/products/apple-watch-s9-1.png', alt: 'Apple Watch Series 9' },
+        {
+          url: '/images/products/apple-watch-s9-1.png',
+          alt: 'Apple Watch Series 9',
+        },
       ],
       attributes: [
         { name: 'Размер', value: '45mm' },
@@ -462,7 +476,10 @@ async function main() {
       description: 'Премиальные смарт-часы с вращающимся безелем.',
       price: 199990,
       images: [
-        { url: '/images/products/galaxy-watch-6-classic-1.png', alt: 'Galaxy Watch 6 Classic' },
+        {
+          url: '/images/products/galaxy-watch-6-classic-1.png',
+          alt: 'Galaxy Watch 6 Classic',
+        },
       ],
       attributes: [
         { name: 'Размер', value: '47mm' },
@@ -511,11 +528,12 @@ async function main() {
       description: 'Беспроводные наушники с 360 Audio и шумоподавлением.',
       price: 99990,
       images: [
-        { url: '/images/products/galaxy-buds2-pro-1.png', alt: 'Galaxy Buds2 Pro' },
+        {
+          url: '/images/products/galaxy-buds2-pro-1.png',
+          alt: 'Galaxy Buds2 Pro',
+        },
       ],
-      attributes: [
-        { name: 'Аудио', value: '360 Audio' },
-      ],
+      attributes: [{ name: 'Аудио', value: '360 Audio' }],
     },
     // Laptops
     {
@@ -557,9 +575,7 @@ async function main() {
       slug: 'dyson-v15-detect-absolute',
       description: 'Беспроводной пылесос с лазерной подсветкой пыли.',
       price: 449990,
-      images: [
-        { url: '/images/products/dyson-v15-1.png', alt: 'Dyson V15' },
-      ],
+      images: [{ url: '/images/products/dyson-v15-1.png', alt: 'Dyson V15' }],
       attributes: [
         { name: 'Тип', value: 'Беспроводной' },
         { name: 'Мощность', value: '230AW' },
@@ -577,9 +593,7 @@ async function main() {
       images: [
         { url: '/images/products/dyson-airwrap-1.png', alt: 'Dyson Airwrap' },
       ],
-      attributes: [
-        { name: 'Насадки', value: '6 шт' },
-      ],
+      attributes: [{ name: 'Насадки', value: '6 шт' }],
     },
     // Tablets
     {
@@ -587,7 +601,8 @@ async function main() {
       brandId: brands.apple.id,
       name: 'iPad Pro 12.9" M2 256GB',
       slug: 'ipad-pro-12-9-m2-256gb',
-      description: 'Профессиональный планшет с чипом M2 и дисплеем Liquid Retina XDR.',
+      description:
+        'Профессиональный планшет с чипом M2 и дисплеем Liquid Retina XDR.',
       price: 599990,
       images: [
         { url: '/images/products/ipad-pro-1.png', alt: 'iPad Pro 12.9' },
@@ -606,7 +621,10 @@ async function main() {
       description: 'Большой планшет с AMOLED экраном и S Pen в комплекте.',
       price: 549990,
       images: [
-        { url: '/images/products/galaxy-tab-s9-ultra-1.png', alt: 'Galaxy Tab S9 Ultra' },
+        {
+          url: '/images/products/galaxy-tab-s9-ultra-1.png',
+          alt: 'Galaxy Tab S9 Ultra',
+        },
       ],
       attributes: [
         { name: 'Диагональ', value: '14.6"' },
@@ -622,11 +640,12 @@ async function main() {
       description: 'Беспроводное зарядное устройство с магнитным креплением.',
       price: 24990,
       images: [
-        { url: '/images/products/magsafe-charger-1.png', alt: 'MagSafe Charger' },
+        {
+          url: '/images/products/magsafe-charger-1.png',
+          alt: 'MagSafe Charger',
+        },
       ],
-      attributes: [
-        { name: 'Мощность', value: '15W' },
-      ],
+      attributes: [{ name: 'Мощность', value: '15W' }],
     },
     {
       categoryId: accessories.id,
@@ -647,7 +666,7 @@ async function main() {
 
   for (const productData of productsData) {
     const { images, attributes, ...data } = productData;
-    
+
     const product = await prisma.product.create({
       data: {
         ...data,
@@ -694,14 +713,19 @@ async function main() {
   for (const product of products) {
     const ratings = [4, 5, 5, 4, 5];
     for (const rating of ratings.slice(0, Math.floor(Math.random() * 3) + 2)) {
-      await prisma.review.create({
-        data: {
-          productId: product.id,
-          userId: testUser.id,
-          rating,
-          comment: rating === 5 ? 'Отличный товар! Рекомендую!' : 'Хороший товар, качество соответствует цене.',
-        },
-      }).catch(() => {}); // Skip if duplicate
+      await prisma.review
+        .create({
+          data: {
+            productId: product.id,
+            userId: testUser.id,
+            rating,
+            comment:
+              rating === 5
+                ? 'Отличный товар! Рекомендую!'
+                : 'Хороший товар, качество соответствует цене.',
+          },
+        })
+        .catch(() => {}); // Skip if duplicate
     }
   }
 

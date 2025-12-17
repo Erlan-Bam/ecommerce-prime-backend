@@ -38,7 +38,10 @@ export class UserGuard extends AuthGuard('jwt') {
     }
 
     if (user.isBanned) {
-      throw new HttpException('Access denied: User is banned', HttpStatus.FORBIDDEN);
+      throw new HttpException(
+        'Access denied: User is banned',
+        HttpStatus.FORBIDDEN,
+      );
     }
 
     return user;

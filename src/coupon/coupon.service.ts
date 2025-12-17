@@ -1,9 +1,4 @@
-import {
-  Injectable,
-  Logger,
-  HttpException,
-  HttpStatus,
-} from '@nestjs/common';
+import { Injectable, Logger, HttpException, HttpStatus } from '@nestjs/common';
 import { PrismaService } from '../shared/services/prisma.service';
 import { CreateCouponDto, UpdateCouponDto } from './dto';
 import { PaginationDto } from '../shared/dto/pagination.dto';
@@ -29,7 +24,10 @@ export class CouponService {
       });
 
       if (existing) {
-        throw new HttpException('Coupon with this code already exists', HttpStatus.CONFLICT);
+        throw new HttpException(
+          'Coupon with this code already exists',
+          HttpStatus.CONFLICT,
+        );
       }
 
       // Validate dates
@@ -37,12 +35,18 @@ export class CouponService {
       const validTo = new Date(dto.validTo);
 
       if (validTo <= validFrom) {
-        throw new HttpException('validTo must be after validFrom', HttpStatus.BAD_REQUEST);
+        throw new HttpException(
+          'validTo must be after validFrom',
+          HttpStatus.BAD_REQUEST,
+        );
       }
 
       // Validate percentage value
       if (dto.type === 'PERCENTAGE' && dto.value > 100) {
-        throw new HttpException('Percentage value cannot exceed 100', HttpStatus.BAD_REQUEST);
+        throw new HttpException(
+          'Percentage value cannot exceed 100',
+          HttpStatus.BAD_REQUEST,
+        );
       }
 
       const coupon = await this.prisma.coupon.create({
@@ -254,7 +258,10 @@ export class CouponService {
       }
 
       if (now < new Date(coupon.validFrom)) {
-        throw new HttpException('Coupon is not yet valid', HttpStatus.BAD_REQUEST);
+        throw new HttpException(
+          'Coupon is not yet valid',
+          HttpStatus.BAD_REQUEST,
+        );
       }
 
       if (now > new Date(coupon.validTo)) {
@@ -262,7 +269,10 @@ export class CouponService {
       }
 
       if (coupon.usageLimit > 0 && coupon.usageCount >= coupon.usageLimit) {
-        throw new HttpException('Coupon usage limit reached', HttpStatus.BAD_REQUEST);
+        throw new HttpException(
+          'Coupon usage limit reached',
+          HttpStatus.BAD_REQUEST,
+        );
       }
 
       return {
@@ -309,7 +319,10 @@ export class CouponService {
           where: { code: normalizedCode, id: { not: id } },
         });
         if (codeExists) {
-          throw new HttpException('Coupon with this code already exists', HttpStatus.CONFLICT);
+          throw new HttpException(
+            'Coupon with this code already exists',
+            HttpStatus.CONFLICT,
+          );
         }
         updateData.code = normalizedCode;
       }
@@ -320,7 +333,10 @@ export class CouponService {
           (dto.type === 'PERCENTAGE' || existing.type === 'PERCENTAGE') &&
           dto.value > 100
         ) {
-          throw new HttpException('Percentage value cannot exceed 100', HttpStatus.BAD_REQUEST);
+          throw new HttpException(
+            'Percentage value cannot exceed 100',
+            HttpStatus.BAD_REQUEST,
+          );
         }
         updateData.value = dto.value;
       }
@@ -334,7 +350,10 @@ export class CouponService {
       const validFrom = updateData.validFrom || existing.validFrom;
       const validTo = updateData.validTo || existing.validTo;
       if (validTo <= validFrom) {
-        throw new HttpException('validTo must be after validFrom', HttpStatus.BAD_REQUEST);
+        throw new HttpException(
+          'validTo must be after validFrom',
+          HttpStatus.BAD_REQUEST,
+        );
       }
 
       const coupon = await this.prisma.coupon.update({

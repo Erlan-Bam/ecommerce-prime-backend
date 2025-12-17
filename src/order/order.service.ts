@@ -36,7 +36,10 @@ export class OrderService {
 
       if (!product.isActive) {
         this.logger.warn(`Product ${dto.productId} is not active`);
-        throw new HttpException('Product is not available', HttpStatus.BAD_REQUEST);
+        throw new HttpException(
+          'Product is not available',
+          HttpStatus.BAD_REQUEST,
+        );
       }
 
       // Check if item already exists in cart for this user
@@ -266,10 +269,13 @@ export class OrderService {
           this.logger.warn(
             `Checkout blocked: ${inactiveProducts.length} inactive products for user ${userId}`,
           );
-          throw new HttpException({
-            inactiveProducts: inactiveProducts,
-            message: 'Remove these products to checkout the order',
-          }, HttpStatus.BAD_REQUEST);
+          throw new HttpException(
+            {
+              inactiveProducts: inactiveProducts,
+              message: 'Remove these products to checkout the order',
+            },
+            HttpStatus.BAD_REQUEST,
+          );
         }
 
         // Recalculate prices based on current product prices
@@ -528,12 +534,18 @@ export class OrderService {
 
         if (!pickupPoint) {
           this.logger.warn(`Pickup point ${dto.pointId} not found`);
-          throw new HttpException('Pickup point not found', HttpStatus.NOT_FOUND);
+          throw new HttpException(
+            'Pickup point not found',
+            HttpStatus.NOT_FOUND,
+          );
         }
 
         if (!pickupPoint.isActive) {
           this.logger.warn(`Pickup point ${dto.pointId} is not active`);
-          throw new HttpException('Pickup point is not available', HttpStatus.BAD_REQUEST);
+          throw new HttpException(
+            'Pickup point is not available',
+            HttpStatus.BAD_REQUEST,
+          );
         }
 
         // 3. Calculate the pickup window based on the requested time

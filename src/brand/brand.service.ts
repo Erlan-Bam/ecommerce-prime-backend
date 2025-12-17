@@ -1,9 +1,4 @@
-import {
-  Injectable,
-  Logger,
-  HttpException,
-  HttpStatus,
-} from '@nestjs/common';
+import { Injectable, Logger, HttpException, HttpStatus } from '@nestjs/common';
 import { PrismaService } from '../shared/services/prisma.service';
 import { CreateBrandDto, UpdateBrandDto } from './dto';
 import { PaginationDto } from '../shared/dto/pagination.dto';
@@ -38,7 +33,10 @@ export class BrandService {
       });
 
       if (existing) {
-        throw new HttpException('Brand with this name already exists', HttpStatus.CONFLICT);
+        throw new HttpException(
+          'Brand with this name already exists',
+          HttpStatus.CONFLICT,
+        );
       }
 
       const brand = await this.prisma.brand.create({
@@ -175,7 +173,10 @@ export class BrandService {
       });
 
       if (!brand) {
-        throw new HttpException(`Brand with ID ${id} not found`, HttpStatus.NOT_FOUND);
+        throw new HttpException(
+          `Brand with ID ${id} not found`,
+          HttpStatus.NOT_FOUND,
+        );
       }
 
       await this.cacheService.cacheBrand(id, brand);

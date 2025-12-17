@@ -1,9 +1,4 @@
-import {
-  Injectable,
-  Logger,
-  HttpException,
-  HttpStatus,
-} from '@nestjs/common';
+import { Injectable, Logger, HttpException, HttpStatus } from '@nestjs/common';
 import { PrismaService } from '../../shared/services/prisma.service';
 import {
   CreatePickupPointDto,
@@ -141,7 +136,10 @@ export class PickupPointService {
       });
 
       if (!pickupPoint) {
-        throw new HttpException(`Pickup point with ID ${id} not found`, HttpStatus.NOT_FOUND);
+        throw new HttpException(
+          `Pickup point with ID ${id} not found`,
+          HttpStatus.NOT_FOUND,
+        );
       }
 
       await this.cacheService.cachePickupPoint(id, pickupPoint);

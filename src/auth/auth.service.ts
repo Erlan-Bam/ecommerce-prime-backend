@@ -1,9 +1,4 @@
-import {
-  Injectable,
-  HttpException,
-  HttpStatus,
-  Logger,
-} from '@nestjs/common';
+import { Injectable, HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../shared/services/prisma.service';
 import { RegisterUserDto, LoginUserDto, LoginAdminDto } from './dto';
@@ -139,7 +134,10 @@ export class AuthService {
       }
 
       if (admin.role !== 'ADMIN') {
-        throw new HttpException('Access denied: Admins only', HttpStatus.FORBIDDEN);
+        throw new HttpException(
+          'Access denied: Admins only',
+          HttpStatus.FORBIDDEN,
+        );
       }
 
       const isPasswordValid = await bcrypt.compare(
