@@ -1,7 +1,8 @@
 import {
   Injectable,
   ExecutionContext,
-  ForbiddenException,
+  HttpException,
+  HttpStatus,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { Reflector } from '@nestjs/core';
@@ -33,11 +34,11 @@ export class AdminGuard extends AuthGuard('jwt') {
     status?: any,
   ) {
     if (err || !user) {
-      throw err || new ForbiddenException('Access denied');
+      throw err || new HttpException('Access denied', HttpStatus.FORBIDDEN);
     }
 
     if (user.role !== 'ADMIN') {
-      throw new ForbiddenException('Access denied: Admins only');
+      throw new HttpException('Access denied: Admins only', HttpStatus.FORBIDDEN);
     }
 
     return user;

@@ -1,7 +1,8 @@
 import {
   Injectable,
   ExecutionContext,
-  ForbiddenException,
+  HttpException,
+  HttpStatus,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { Reflector } from '@nestjs/core';
@@ -33,11 +34,11 @@ export class UserGuard extends AuthGuard('jwt') {
     status?: any,
   ) {
     if (error || !user) {
-      throw error || new ForbiddenException('Access denied');
+      throw error || new HttpException('Access denied', HttpStatus.FORBIDDEN);
     }
 
     if (user.isBanned) {
-      throw new ForbiddenException('Access denied: User is banned');
+      throw new HttpException('Access denied: User is banned', HttpStatus.FORBIDDEN);
     }
 
     return user;

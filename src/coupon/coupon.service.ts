@@ -1,8 +1,5 @@
 import {
   Injectable,
-  NotFoundException,
-  ConflictException,
-  BadRequestException,
   Logger,
   HttpException,
   HttpStatus,
@@ -32,7 +29,7 @@ export class CouponService {
       });
 
       if (existing) {
-        throw new ConflictException('Coupon with this code already exists');
+        throw new HttpException('Coupon with this code already exists', HttpStatus.CONFLICT);
       }
 
       // Validate dates
@@ -40,12 +37,12 @@ export class CouponService {
       const validTo = new Date(dto.validTo);
 
       if (validTo <= validFrom) {
-        throw new BadRequestException('validTo must be after validFrom');
+        throw new HttpException('validTo must be after validFrom', HttpStatus.BAD_REQUEST);
       }
 
       // Validate percentage value
       if (dto.type === 'PERCENTAGE' && dto.value > 100) {
-        throw new BadRequestException('Percentage value cannot exceed 100');
+        throw new HttpException('Percentage value cannot exceed 100', HttpStatus.BAD_REQUEST);
       }
 
       const coupon = await this.prisma.coupon.create({
@@ -185,7 +182,7 @@ export class CouponService {
       });
 
       if (!coupon) {
-        throw new NotFoundException('Coupon not found');
+        throw new HttpException('Coupon not found', HttpStatus.NOT_FOUND);
       }
 
       await this.cacheService.cacheCoupon(id, coupon);
@@ -221,7 +218,7 @@ export class CouponService {
       });
 
       if (!coupon) {
-        throw new NotFoundException('Coupon not found');
+        throw new HttpException('Coupon not found', HttpStatus.NOT_FOUND);
       }
 
       await this.cacheService.cacheCouponByCode(normalizedCode, coupon);
@@ -253,19 +250,19 @@ export class CouponService {
       const now = new Date();
 
       if (!coupon.isActive) {
-        throw new BadRequestException('Coupon is not active');
+        throw new HttpException('Coupon is not active', HttpStatus.BAD_REQUEST);
       }
 
       if (now < new Date(coupon.validFrom)) {
-        throw new BadRequestException('Coupon is not yet valid');
+        throw new HttpException('Coupon is not yet valid', HttpStatus.BAD_REQUEST);
       }
 
       if (now > new Date(coupon.validTo)) {
-        throw new BadRequestException('Coupon has expired');
+        throw new HttpException('Coupon has expired', HttpStatus.BAD_REQUEST);
       }
 
       if (coupon.usageLimit > 0 && coupon.usageCount >= coupon.usageLimit) {
-        throw new BadRequestException('Coupon usage limit reached');
+        throw new HttpException('Coupon usage limit reached', HttpStatus.BAD_REQUEST);
       }
 
       return {
@@ -301,7 +298,7 @@ export class CouponService {
       });
 
       if (!existing) {
-        throw new NotFoundException('Coupon not found');
+        throw new HttpException('Coupon not found', HttpStatus.NOT_FOUND);
       }
 
       const updateData: any = {};
@@ -312,7 +309,7 @@ export class CouponService {
           where: { code: normalizedCode, id: { not: id } },
         });
         if (codeExists) {
-          throw new ConflictException('Coupon with this code already exists');
+          throw new HttpException('Coupon with this code already exists', HttpStatus.CONFLICT);
         }
         updateData.code = normalizedCode;
       }
@@ -323,7 +320,7 @@ export class CouponService {
           (dto.type === 'PERCENTAGE' || existing.type === 'PERCENTAGE') &&
           dto.value > 100
         ) {
-          throw new BadRequestException('Percentage value cannot exceed 100');
+          throw new HttpException('Percentage value cannot exceed 100', HttpStatus.BAD_REQUEST);
         }
         updateData.value = dto.value;
       }
@@ -337,7 +334,7 @@ export class CouponService {
       const validFrom = updateData.validFrom || existing.validFrom;
       const validTo = updateData.validTo || existing.validTo;
       if (validTo <= validFrom) {
-        throw new BadRequestException('validTo must be after validFrom');
+        throw new HttpException('validTo must be after validFrom', HttpStatus.BAD_REQUEST);
       }
 
       const coupon = await this.prisma.coupon.update({
@@ -373,7 +370,7 @@ export class CouponService {
       });
 
       if (!existing) {
-        throw new NotFoundException('Coupon not found');
+        throw new HttpException('Coupon not found', HttpStatus.NOT_FOUND);
       }
 
       await this.prisma.coupon.delete({

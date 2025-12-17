@@ -1,6 +1,5 @@
 import {
   Injectable,
-  BadRequestException,
   HttpException,
   HttpStatus,
   Logger,
@@ -38,7 +37,7 @@ export class UploadService {
                 error.stack,
               );
               reject(
-                new BadRequestException('Failed to upload image to Cloudinary'),
+                new HttpException('Failed to upload image to Cloudinary', HttpStatus.BAD_REQUEST),
               );
             } else {
               this.logger.log(

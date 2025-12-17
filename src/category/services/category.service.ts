@@ -1,8 +1,6 @@
 import {
   Injectable,
-  NotFoundException,
   Logger,
-  ConflictException,
   HttpException,
   HttpStatus,
 } from '@nestjs/common';
@@ -193,7 +191,7 @@ export class CategoryService {
       });
 
       if (!category) {
-        throw new NotFoundException(`Category not found`);
+        throw new HttpException(`Category not found`, HttpStatus.NOT_FOUND);
       }
 
       return category;
@@ -235,7 +233,7 @@ export class CategoryService {
       });
 
       if (!category) {
-        throw new NotFoundException(`Category with ID ${id} not found`);
+        throw new HttpException(`Category with ID ${id} not found`, HttpStatus.NOT_FOUND);
       }
 
       await this.cacheService.cacheCategory(id, category);
@@ -307,8 +305,9 @@ export class CategoryService {
       });
 
       if (productsCount > 0) {
-        throw new ConflictException(
+        throw new HttpException(
           `Cannot delete category with ${productsCount} associated products`,
+          HttpStatus.CONFLICT,
         );
       }
 
@@ -317,8 +316,9 @@ export class CategoryService {
       });
 
       if (childrenCount > 0) {
-        throw new ConflictException(
+        throw new HttpException(
           `Cannot delete category with ${childrenCount} subcategories`,
+          HttpStatus.CONFLICT,
         );
       }
 

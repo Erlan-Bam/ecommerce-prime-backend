@@ -1,6 +1,5 @@
 import {
   Injectable,
-  NotFoundException,
   Logger,
   HttpException,
   HttpStatus,
@@ -225,7 +224,7 @@ export class ProductService {
       });
 
       if (!product) {
-        throw new NotFoundException(`Product with ID ${id} not found`);
+        throw new HttpException(`Product with ID ${id} not found`, HttpStatus.NOT_FOUND);
       }
 
       // Update view count
@@ -303,7 +302,7 @@ export class ProductService {
       });
 
       if (!product) {
-        throw new NotFoundException(`Product not found`);
+        throw new HttpException(`Product not found`, HttpStatus.NOT_FOUND);
       }
 
       await this.prisma.product.update({

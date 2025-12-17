@@ -1,9 +1,5 @@
 import {
   Injectable,
-  ConflictException,
-  UnauthorizedException,
-  ForbiddenException,
-  NotFoundException,
   HttpException,
   HttpStatus,
   Logger,
@@ -36,9 +32,9 @@ export class AuthService {
 
       if (existingUser) {
         if (existingUser.email === dto.email) {
-          throw new ConflictException('Email already exists');
+          throw new HttpException('Email already exists', HttpStatus.CONFLICT);
         }
-        throw new ConflictException('Phone already exists');
+        throw new HttpException('Phone already exists', HttpStatus.CONFLICT);
       }
 
       const hashedPassword = await bcrypt.hash(dto.password, 10);
@@ -91,17 +87,17 @@ export class AuthService {
       });
 
       if (!user) {
-        throw new UnauthorizedException('Invalid credentials');
+        throw new HttpException('Invalid credentials', HttpStatus.UNAUTHORIZED);
       }
 
       if (user.isBanned) {
-        throw new ForbiddenException('User is banned');
+        throw new HttpException('User is banned', HttpStatus.FORBIDDEN);
       }
 
       const isPasswordValid = await bcrypt.compare(dto.password, user.password);
 
       if (!isPasswordValid) {
-        throw new UnauthorizedException('Invalid credentials');
+        throw new HttpException('Invalid credentials', HttpStatus.UNAUTHORIZED);
       }
 
       const tokens = await this.generateTokens(user.id, user.role);
@@ -139,11 +135,11 @@ export class AuthService {
       });
 
       if (!admin) {
-        throw new UnauthorizedException('Invalid credentials');
+        throw new HttpException('Invalid credentials', HttpStatus.UNAUTHORIZED);
       }
 
       if (admin.role !== 'ADMIN') {
-        throw new ForbiddenException('Access denied: Admins only');
+        throw new HttpException('Access denied: Admins only', HttpStatus.FORBIDDEN);
       }
 
       const isPasswordValid = await bcrypt.compare(
@@ -152,7 +148,7 @@ export class AuthService {
       );
 
       if (!isPasswordValid) {
-        throw new UnauthorizedException('Invalid credentials');
+        throw new HttpException('Invalid credentials', HttpStatus.UNAUTHORIZED);
       }
 
       const tokens = await this.generateTokens(admin.id, admin.role);
@@ -197,11 +193,11 @@ export class AuthService {
       });
 
       if (!user) {
-        throw new UnauthorizedException('User not found');
+        throw new HttpException('User not found', HttpStatus.UNAUTHORIZED);
       }
 
       if (user.isBanned) {
-        throw new ForbiddenException('User is banned');
+        throw new HttpException('User is banned', HttpStatus.FORBIDDEN);
       }
 
       const tokens = await this.generateTokens(user.id, user.role);
@@ -241,7 +237,7 @@ export class AuthService {
       });
 
       if (!user) {
-        throw new NotFoundException('User not found');
+        throw new HttpException('User not found', HttpStatus.NOT_FOUND);
       }
 
       return user;

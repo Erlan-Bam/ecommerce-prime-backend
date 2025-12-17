@@ -1,8 +1,6 @@
 import {
   Injectable,
-  NotFoundException,
   Logger,
-  ConflictException,
   HttpException,
   HttpStatus,
 } from '@nestjs/common';
@@ -143,7 +141,7 @@ export class PickupPointService {
       });
 
       if (!pickupPoint) {
-        throw new NotFoundException(`Pickup point with ID ${id} not found`);
+        throw new HttpException(`Pickup point with ID ${id} not found`, HttpStatus.NOT_FOUND);
       }
 
       await this.cacheService.cachePickupPoint(id, pickupPoint);
@@ -237,8 +235,9 @@ export class PickupPointService {
         where: { id: dto.productId },
       });
       if (!product) {
-        throw new NotFoundException(
+        throw new HttpException(
           `Product with ID ${dto.productId} not found`,
+          HttpStatus.NOT_FOUND,
         );
       }
 
@@ -247,8 +246,9 @@ export class PickupPointService {
         where: { id: dto.pointId },
       });
       if (!pickupPoint) {
-        throw new NotFoundException(
+        throw new HttpException(
           `Pickup point with ID ${dto.pointId} not found`,
+          HttpStatus.NOT_FOUND,
         );
       }
 
@@ -262,8 +262,9 @@ export class PickupPointService {
         },
       });
       if (existing) {
-        throw new ConflictException(
+        throw new HttpException(
           'Stock entry already exists for this product and pickup point',
+          HttpStatus.CONFLICT,
         );
       }
 
@@ -318,7 +319,7 @@ export class PickupPointService {
       });
 
       if (!existing) {
-        throw new NotFoundException('Stock entry not found');
+        throw new HttpException('Stock entry not found', HttpStatus.NOT_FOUND);
       }
 
       const productStock = await this.prisma.productStock.update({
@@ -369,7 +370,7 @@ export class PickupPointService {
       });
 
       if (!existing) {
-        throw new NotFoundException('Stock entry not found');
+        throw new HttpException('Stock entry not found', HttpStatus.NOT_FOUND);
       }
 
       await this.prisma.productStock.delete({

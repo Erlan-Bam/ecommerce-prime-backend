@@ -4,7 +4,8 @@ import {
   UploadedFile,
   UploadedFiles,
   UseInterceptors,
-  BadRequestException,
+  HttpException,
+  HttpStatus,
 } from '@nestjs/common';
 import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
@@ -44,8 +45,9 @@ export class UploadController {
           callback(null, true);
         } else {
           callback(
-            new BadRequestException(
+            new HttpException(
               `Invalid image type. Allowed types: ${allowedTypes.join(', ')}`,
+              400,
             ),
             false,
           );
@@ -55,7 +57,7 @@ export class UploadController {
   )
   async uploadImage(@UploadedFile() file: Express.Multer.File) {
     if (!file) {
-      throw new BadRequestException('No file uploaded');
+      throw new HttpException('No file uploaded', HttpStatus.BAD_REQUEST);
     }
 
     const ext = file.originalname.substring(file.originalname.lastIndexOf('.'));
@@ -102,8 +104,9 @@ export class UploadController {
           callback(null, true);
         } else {
           callback(
-            new BadRequestException(
+            new HttpException(
               `Invalid image type. Allowed types: ${allowedTypes.join(', ')}`,
+              HttpStatus.BAD_REQUEST,
             ),
             false,
           );
@@ -113,7 +116,7 @@ export class UploadController {
   )
   async uploadImages(@UploadedFiles() files: Express.Multer.File[]) {
     if (!files || files.length === 0) {
-      throw new BadRequestException('No files uploaded');
+      throw new HttpException('No files uploaded', HttpStatus.BAD_REQUEST);
     }
 
     return Promise.all(

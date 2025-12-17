@@ -1,11 +1,9 @@
 import {
   Injectable,
-  NotFoundException,
-  BadRequestException,
   InternalServerErrorException,
   Logger,
-  ConflictException,
   HttpException,
+  HttpStatus,
 } from '@nestjs/common';
 import { PrismaService } from '../shared/services/prisma.service';
 import { AddOrderItemDto, SelectPickupDto } from './dto';
@@ -33,12 +31,12 @@ export class OrderService {
 
       if (!product) {
         this.logger.warn(`Product ${dto.productId} not found`);
-        throw new NotFoundException('Product not found');
+        throw new HttpException('Product not found', HttpStatus.NOT_FOUND);
       }
 
       if (!product.isActive) {
         this.logger.warn(`Product ${dto.productId} is not active`);
-        throw new BadRequestException('Product is not available');
+        throw new HttpException('Product is not available', HttpStatus.BAD_REQUEST);
       }
 
       // Check if item already exists in cart for this user
@@ -179,7 +177,7 @@ export class OrderService {
         this.logger.warn(
           `Cart item ${orderItemId} not found for user ${userId}`,
         );
-        throw new NotFoundException('Cart item not found');
+        throw new HttpException('Cart item not found', HttpStatus.NOT_FOUND);
       }
 
       await this.prisma.orderItem.delete({
@@ -257,7 +255,7 @@ export class OrderService {
           this.logger.warn(
             `Checkout attempted with empty cart for user ${userId}`,
           );
-          throw new BadRequestException('Cart is empty');
+          throw new HttpException('Cart is empty', HttpStatus.BAD_REQUEST);
         }
 
         // Validate all products are still active
@@ -268,10 +266,10 @@ export class OrderService {
           this.logger.warn(
             `Checkout blocked: ${inactiveProducts.length} inactive products for user ${userId}`,
           );
-          throw new BadRequestException({
+          throw new HttpException({
             inactiveProducts: inactiveProducts,
             message: 'Remove these products to checkout the order',
-          });
+          }, HttpStatus.BAD_REQUEST);
         }
 
         // Recalculate prices based on current product prices
@@ -468,7 +466,7 @@ export class OrderService {
 
       if (!order) {
         this.logger.warn(`Order ${orderId} not found for user ${userId}`);
-        throw new NotFoundException('Order not found');
+        throw new HttpException('Order not found', HttpStatus.NOT_FOUND);
       }
 
       // Cache the result
@@ -510,15 +508,16 @@ export class OrderService {
 
         if (!order) {
           this.logger.warn(`Order ${orderId} not found for user ${userId}`);
-          throw new NotFoundException('Order not found');
+          throw new HttpException('Order not found', HttpStatus.NOT_FOUND);
         }
 
         if (order.status !== 'PENDING') {
           this.logger.warn(
             `Order ${orderId} is not in PENDING status: ${order.status}`,
           );
-          throw new BadRequestException(
+          throw new HttpException(
             'Order is not in a state that allows pickup selection',
+            HttpStatus.BAD_REQUEST,
           );
         }
 
@@ -529,12 +528,12 @@ export class OrderService {
 
         if (!pickupPoint) {
           this.logger.warn(`Pickup point ${dto.pointId} not found`);
-          throw new NotFoundException('Pickup point not found');
+          throw new HttpException('Pickup point not found', HttpStatus.NOT_FOUND);
         }
 
         if (!pickupPoint.isActive) {
           this.logger.warn(`Pickup point ${dto.pointId} is not active`);
-          throw new BadRequestException('Pickup point is not available');
+          throw new HttpException('Pickup point is not available', HttpStatus.BAD_REQUEST);
         }
 
         // 3. Calculate the pickup window based on the requested time
@@ -558,8 +557,9 @@ export class OrderService {
             this.logger.warn(
               `Pickup window ${pickupWindow.id} is full for point ${dto.pointId}`,
             );
-            throw new ConflictException(
+            throw new HttpException(
               'This pickup window is fully booked. Please select a different time.',
+              HttpStatus.CONFLICT,
             );
           }
 
@@ -680,8 +680,9 @@ export class OrderService {
 
     // Validate pickup time is within allowed window (10:00 - 21:00 Moscow)
     if (moscowHour < 10 || moscowHour >= 21) {
-      throw new BadRequestException(
+      throw new HttpException(
         'Pickup time must be between 10:00 and 21:00 Moscow time',
+        HttpStatus.BAD_REQUEST,
       );
     }
 

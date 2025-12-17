@@ -1,7 +1,5 @@
 import {
   Injectable,
-  NotFoundException,
-  ConflictException,
   Logger,
   HttpException,
   HttpStatus,
@@ -40,7 +38,7 @@ export class BrandService {
       });
 
       if (existing) {
-        throw new ConflictException('Brand with this name already exists');
+        throw new HttpException('Brand with this name already exists', HttpStatus.CONFLICT);
       }
 
       const brand = await this.prisma.brand.create({
@@ -177,7 +175,7 @@ export class BrandService {
       });
 
       if (!brand) {
-        throw new NotFoundException(`Brand with ID ${id} not found`);
+        throw new HttpException(`Brand with ID ${id} not found`, HttpStatus.NOT_FOUND);
       }
 
       await this.cacheService.cacheBrand(id, brand);
@@ -243,8 +241,9 @@ export class BrandService {
       });
 
       if (productsCount > 0) {
-        throw new ConflictException(
+        throw new HttpException(
           `Cannot delete brand with ${productsCount} associated products`,
+          HttpStatus.CONFLICT,
         );
       }
 
