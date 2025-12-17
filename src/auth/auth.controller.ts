@@ -25,6 +25,7 @@ import {
   RefreshResponseDto,
   GuestAuthDto,
   GuestAuthResponseDto,
+  ChangePasswordDto,
 } from './dto';
 import { Public } from '../shared/decorator/public.decorator';
 import { User } from '../shared/decorator/user.decorator';
@@ -119,6 +120,27 @@ export class AuthController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async getProfile(@User('id') userId: string) {
     return this.authService.getProfile(userId);
+  }
+
+  @UseGuards(UserGuard)
+  @Post('change-password')
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Change user password' })
+  @ApiResponse({ status: 200, description: 'Password changed successfully' })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad request - Passwords do not match',
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  async changePassword(
+    @User('id') userId: string,
+    @Body() dto: ChangePasswordDto,
+  ) {
+    if (dto.newPassword !== dto.confirmPassword) {
+      throw new HttpException('Passwords do not match', HttpStatus.BAD_REQUEST);
+    }
+    return this.authService.changePassword(userId, dto.newPassword);
   }
 
   @UseGuards(AdminGuard)

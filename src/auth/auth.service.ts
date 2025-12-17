@@ -256,6 +256,43 @@ export class AuthService {
     }
   }
 
+  async changePassword(userId: string, newPassword: string) {
+    try {
+      this.logger.log(`Changing password for user: ${userId}`);
+
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+      });
+
+      if (!user) {
+        throw new HttpException('User not found', HttpStatus.NOT_FOUND);
+      }
+
+      const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+      await this.prisma.user.update({
+        where: { id: userId },
+        data: { password: hashedPassword },
+      });
+
+      this.logger.log(`Password changed successfully for user: ${userId}`);
+
+      return { message: 'Password changed successfully' };
+    } catch (error) {
+      this.logger.error(
+        `Error changing password: ${error.message}`,
+        error.stack,
+      );
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new HttpException(
+        error.message || 'Failed to change password',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
   private async generateTokens(userId: string, role: string) {
     const payload = { id: userId, role };
 
