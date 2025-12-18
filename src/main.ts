@@ -17,7 +17,10 @@ async function bootstrap() {
     app.setGlobalPrefix('api');
   }
   app.enableCors({
-    origin: ['http://localhost:3000'],
+    origin: [
+      'http://localhost:3000',
+      'https://e-commerce-production-bf09.up.railway.app',
+    ],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: [
       'Content-Type',
@@ -27,6 +30,7 @@ async function bootstrap() {
       'Origin',
     ],
     exposedHeaders: ['Authorization'],
+    credentials: true,
   });
 
   if (NODE_ENV !== 'production') {
