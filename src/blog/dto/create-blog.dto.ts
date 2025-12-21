@@ -33,13 +33,18 @@ export class CreateBlogDto {
   @IsNotEmpty()
   @IsString()
   @Matches(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, {
-    message: 'Slug must be URL-friendly (lowercase letters, numbers, and hyphens only)',
+    message:
+      'Slug must be URL-friendly (lowercase letters, numbers, and hyphens only)',
   })
   slug: string;
 
   @ApiPropertyOptional({
     description: 'SEO meta data (description, keywords, ogImage)',
-    example: { description: 'SEO description', keywords: 'key1, key2', ogImage: 'https://example.com/image.jpg' },
+    example: {
+      description: 'SEO description',
+      keywords: 'key1, key2',
+      ogImage: 'https://example.com/image.jpg',
+    },
   })
   @IsOptional()
   @IsObject()

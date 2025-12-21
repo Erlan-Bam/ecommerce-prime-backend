@@ -1,9 +1,4 @@
-import {
-  Injectable,
-  HttpException,
-  HttpStatus,
-  Logger,
-} from '@nestjs/common';
+import { Injectable, HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { PrismaService } from '../../shared/services/prisma.service';
 import { BlogCacheService } from './cache.service';
 import { CreateBlogDto, UpdateBlogDto } from '../dto';
@@ -65,7 +60,10 @@ export class BlogService {
 
       return result;
     } catch (error) {
-      this.logger.error(`Error fetching blog posts: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error fetching blog posts: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         'Failed to fetch blog posts',
         HttpStatus.INTERNAL_SERVER_ERROR,
@@ -97,7 +95,10 @@ export class BlogService {
         },
       };
     } catch (error) {
-      this.logger.error(`Error fetching all blog posts: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error fetching all blog posts: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         'Failed to fetch blog posts',
         HttpStatus.INTERNAL_SERVER_ERROR,
@@ -130,7 +131,10 @@ export class BlogService {
       if (error instanceof HttpException) {
         throw error;
       }
-      this.logger.error(`Error fetching blog post: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error fetching blog post: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         'Failed to fetch blog post',
         HttpStatus.INTERNAL_SERVER_ERROR,
@@ -153,7 +157,10 @@ export class BlogService {
       if (error instanceof HttpException) {
         throw error;
       }
-      this.logger.error(`Error fetching blog post: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error fetching blog post: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         'Failed to fetch blog post',
         HttpStatus.INTERNAL_SERVER_ERROR,
@@ -194,7 +201,10 @@ export class BlogService {
       if (error instanceof HttpException) {
         throw error;
       }
-      this.logger.error(`Error creating blog post: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error creating blog post: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         'Failed to create blog post',
         HttpStatus.INTERNAL_SERVER_ERROR,
@@ -250,7 +260,10 @@ export class BlogService {
       if (error instanceof HttpException) {
         throw error;
       }
-      this.logger.error(`Error updating blog post: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error updating blog post: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         'Failed to update blog post',
         HttpStatus.INTERNAL_SERVER_ERROR,
@@ -281,7 +294,10 @@ export class BlogService {
       if (error instanceof HttpException) {
         throw error;
       }
-      this.logger.error(`Error deleting blog post: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error deleting blog post: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         'Failed to delete blog post',
         HttpStatus.INTERNAL_SERVER_ERROR,
