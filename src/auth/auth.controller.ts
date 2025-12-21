@@ -195,29 +195,4 @@ export class AuthController {
   async refreshGuestTokens(@Body('refreshToken') refreshToken: string) {
     return this.authService.refreshGuestTokens(refreshToken);
   }
-
-  @UseGuards(UserGuard)
-  @Post('guest/merge')
-  @ApiBearerAuth()
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Merge guest cart to authenticated user cart' })
-  @ApiBody({
-    schema: {
-      type: 'object',
-      properties: {
-        guestSessionId: { type: 'string' },
-      },
-      required: ['guestSessionId'],
-    },
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Guest cart merged successfully',
-  })
-  async mergeGuestCart(
-    @User('id') userId: string,
-    @Body('guestSessionId') guestSessionId: string,
-  ) {
-    return this.authService.mergeGuestCartToUser(guestSessionId, userId);
-  }
 }
