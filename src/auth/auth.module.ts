@@ -4,8 +4,6 @@ import { PassportModule } from '@nestjs/passport';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
-import { GuestCartController } from './guest-cart.controller';
-import { GuestCartService } from './guest-cart.service';
 import { GuestGuard } from '../shared/guards/guest.guard';
 
 @Module({
@@ -22,8 +20,8 @@ import { GuestGuard } from '../shared/guards/guest.guard';
       inject: [ConfigService],
     }),
   ],
-  controllers: [AuthController, GuestCartController],
-  providers: [AuthService, GuestCartService, GuestGuard],
-  exports: [AuthService, GuestCartService, GuestGuard],
+  controllers: [AuthController],
+  providers: [AuthService, GuestGuard],
+  exports: [AuthService, GuestGuard],
 })
 export class AuthModule {}

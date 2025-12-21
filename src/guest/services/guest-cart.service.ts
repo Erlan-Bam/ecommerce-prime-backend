@@ -1,19 +1,33 @@
 import { Injectable, HttpException, HttpStatus, Logger } from '@nestjs/common';
-import { PrismaService } from '../shared/services/prisma.service';
-import { AddGuestCartItemDto } from './dto';
+import { PrismaService } from '../../shared/services/prisma.service';
+import { GuestCacheService } from './cache.service';
+import { AddGuestCartItemDto } from '../dto';
 
 @Injectable()
 export class GuestCartService {
   private readonly logger = new Logger(GuestCartService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly cacheService: GuestCacheService,
+  ) {}
 
   async getCart(sessionId: string) {
     try {
       this.logger.log(`Getting cart for session: ${sessionId}`);
 
-      const cartItems = await this.prisma.guestCartItem.findMany({
-        where: { sessionId },
+      // Try cache first
+      const cached = await this.cacheService.getCachedCart(sessionId);
+      if (cached) {
+        this.logger.debug(`Returning cached cart for session: ${sessionId}`);
+        return cached;
+      }
+
+      const cartItems = await this.prisma.orderItem.findMany({
+        where: {
+          sessionId,
+          orderId: null, // Only cart items (not yet in an order)
+        },
         include: {
           product: {
             include: {
@@ -43,17 +57,22 @@ export class GuestCartService {
           image: item.product.images[0]?.url || null,
           category: item.product.category,
         },
-        subtotal: Number(item.product.price) * item.quantity,
+        subtotal: Number(item.price),
       }));
 
       const total = items.reduce((sum, item) => sum + item.subtotal, 0);
 
-      return {
+      const result = {
         items,
         itemCount: items.length,
         totalQuantity: items.reduce((sum, item) => sum + item.quantity, 0),
         total,
       };
+
+      // Cache the result
+      await this.cacheService.cacheCart(sessionId, result);
+
+      return result;
     } catch (error) {
       this.logger.error(`Error getting cart: ${error.message}`, error.stack);
       throw new HttpException(
@@ -77,20 +96,23 @@ export class GuestCartService {
       }
 
       // Check if item already exists in cart
-      const existingItem = await this.prisma.guestCartItem.findUnique({
+      const existingItem = await this.prisma.orderItem.findFirst({
         where: {
-          sessionId_productId: {
-            sessionId,
-            productId: dto.productId,
-          },
+          sessionId,
+          productId: dto.productId,
+          orderId: null,
         },
       });
 
       if (existingItem) {
         // Update quantity
-        const updatedItem = await this.prisma.guestCartItem.update({
+        const newQuantity = existingItem.quantity + dto.quantity;
+        const updatedItem = await this.prisma.orderItem.update({
           where: { id: existingItem.id },
-          data: { quantity: existingItem.quantity + dto.quantity },
+          data: {
+            quantity: newQuantity,
+            price: product.price.toNumber() * newQuantity,
+          },
           include: {
             product: {
               include: {
@@ -99,6 +121,9 @@ export class GuestCartService {
             },
           },
         });
+
+        // Invalidate cache
+        await this.cacheService.invalidateCart(sessionId);
 
         return {
           id: updatedItem.id,
@@ -114,11 +139,12 @@ export class GuestCartService {
       }
 
       // Create new cart item
-      const cartItem = await this.prisma.guestCartItem.create({
+      const cartItem = await this.prisma.orderItem.create({
         data: {
           sessionId,
           productId: dto.productId,
           quantity: dto.quantity,
+          price: product.price.toNumber() * dto.quantity,
         },
         include: {
           product: {
@@ -134,6 +160,9 @@ export class GuestCartService {
         where: { id: sessionId },
         data: { lastActiveAt: new Date() },
       });
+
+      // Invalidate cache
+      await this.cacheService.invalidateCart(sessionId);
 
       return {
         id: cartItem.id,
@@ -167,12 +196,11 @@ export class GuestCartService {
         `Updating cart item: ${productId}, quantity: ${quantity}`,
       );
 
-      const existingItem = await this.prisma.guestCartItem.findUnique({
+      const existingItem = await this.prisma.orderItem.findFirst({
         where: {
-          sessionId_productId: {
-            sessionId,
-            productId,
-          },
+          sessionId,
+          productId,
+          orderId: null,
         },
       });
 
@@ -181,15 +209,27 @@ export class GuestCartService {
       }
 
       if (quantity <= 0) {
-        await this.prisma.guestCartItem.delete({
+        await this.prisma.orderItem.delete({
           where: { id: existingItem.id },
         });
+
+        // Invalidate cache
+        await this.cacheService.invalidateCart(sessionId);
+
         return { deleted: true };
       }
 
-      const updatedItem = await this.prisma.guestCartItem.update({
+      // Get product price for recalculation
+      const product = await this.prisma.product.findUnique({
+        where: { id: productId },
+      });
+
+      const updatedItem = await this.prisma.orderItem.update({
         where: { id: existingItem.id },
-        data: { quantity },
+        data: {
+          quantity,
+          price: product.price.toNumber() * quantity,
+        },
         include: {
           product: {
             include: {
@@ -198,6 +238,9 @@ export class GuestCartService {
           },
         },
       });
+
+      // Invalidate cache
+      await this.cacheService.invalidateCart(sessionId);
 
       return {
         id: updatedItem.id,
@@ -229,12 +272,11 @@ export class GuestCartService {
     try {
       this.logger.log(`Removing item from cart: ${productId}`);
 
-      const existingItem = await this.prisma.guestCartItem.findUnique({
+      const existingItem = await this.prisma.orderItem.findFirst({
         where: {
-          sessionId_productId: {
-            sessionId,
-            productId,
-          },
+          sessionId,
+          productId,
+          orderId: null,
         },
       });
 
@@ -242,9 +284,12 @@ export class GuestCartService {
         throw new HttpException('Cart item not found', HttpStatus.NOT_FOUND);
       }
 
-      await this.prisma.guestCartItem.delete({
+      await this.prisma.orderItem.delete({
         where: { id: existingItem.id },
       });
+
+      // Invalidate cache
+      await this.cacheService.invalidateCart(sessionId);
 
       return { deleted: true };
     } catch (error) {
@@ -266,9 +311,15 @@ export class GuestCartService {
     try {
       this.logger.log(`Clearing cart for session: ${sessionId}`);
 
-      await this.prisma.guestCartItem.deleteMany({
-        where: { sessionId },
+      await this.prisma.orderItem.deleteMany({
+        where: {
+          sessionId,
+          orderId: null,
+        },
       });
+
+      // Invalidate cache
+      await this.cacheService.invalidateCart(sessionId);
 
       return { cleared: true };
     } catch (error) {

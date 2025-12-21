@@ -6,6 +6,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { BullModule } from '@nestjs/bull';
 import { CategoryModule } from './category/category.module';
 import { AuthModule } from './auth/auth.module';
+import { GuestModule } from './guest/guest.module';
 import { ProductModule } from './product/product.module';
 import { BrandModule } from './brand/brand.module';
 import { SearchModule } from './search/search.module';
@@ -14,6 +15,7 @@ import { PickupPointModule } from './pickup-point/pickup-point.module';
 import { CouponModule } from './coupon/coupon.module';
 import { OrderModule } from './order/order.module';
 import { FavoriteModule } from './favorite/favorite.module';
+import { BlogModule } from './blog/blog.module';
 
 @Module({
   imports: [
@@ -34,6 +36,7 @@ import { FavoriteModule } from './favorite/favorite.module';
     }),
     SharedModule,
     AuthModule,
+    GuestModule,
     CategoryModule,
     BrandModule,
     ProductModule,
@@ -43,6 +46,7 @@ import { FavoriteModule } from './favorite/favorite.module';
     CouponModule,
     OrderModule,
     FavoriteModule,
+    BlogModule,
   ],
   controllers: [AppController],
   providers: [],

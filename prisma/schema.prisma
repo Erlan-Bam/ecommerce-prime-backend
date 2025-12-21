@@ -104,7 +104,6 @@ model Product {
   reviews     Review[]
   productStock ProductStock[]
   orderItems  OrderItem[]
-  guestCartItems GuestCartItem[]
   favorites   Favorite[]
 
   @@index([categoryId])
@@ -161,7 +160,8 @@ model PickupWindow {
 
 model OrderItem {
   id        String   @id @default(uuid())
-  userId    String
+  userId    String?
+  sessionId String?
   orderId   String?
   productId String
   quantity  Int
@@ -169,11 +169,14 @@ model OrderItem {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  user      User     @relation(fields: [userId], references: [id])
-  order     Order?   @relation(fields: [orderId], references: [id])
-  product   Product  @relation(fields: [productId], references: [id])
+  user      User?         @relation(fields: [userId], references: [id])
+  session   GuestSession? @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  order     Order?        @relation(fields: [orderId], references: [id])
+  product   Product       @relation(fields: [productId], references: [id])
 
+  @@unique([sessionId, productId, orderId])
   @@index([userId])
+  @@index([sessionId])
   @@index([orderId])
 }
 
@@ -286,26 +289,25 @@ model GuestSession {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  cartItems     GuestCartItem[]
+  cartItems     OrderItem[]
 
   @@index([fingerprint])
   @@index([lastActiveAt])
 }
 
-model GuestCartItem {
-  id          String   @id @default(uuid())
-  sessionId   String
-  productId   String
-  quantity    Int      @default(1)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+model Blog {
+  id        String   @id @default(uuid())
+  title     String
+  text      String
+  slug      String   @unique
+  meta      Json?    // SEO meta data: { description, keywords, ogImage, etc. }
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  session     GuestSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  product     Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
-
-  @@unique([sessionId, productId])
-  @@index([sessionId])
-  @@index([productId])
+  @@index([slug])
+  @@index([isActive])
+  @@index([createdAt])
 }
 
 model Favorite {
