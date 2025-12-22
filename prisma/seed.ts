@@ -87,7 +87,7 @@ async function main() {
     data: {
       title: 'Apple',
       slug: 'apple',
-      image: '/images/categories/macbook.png',
+      image: '/images/categories/apple.png',
       sortOrder: 1,
     },
   });
@@ -141,7 +141,7 @@ async function main() {
     data: {
       title: 'Умные часы',
       slug: 'smart-watches',
-      image: '/images/categories/watches.png',
+      image: '/images/categories/smart-watches.png',
       sortOrder: 7,
     },
   });
@@ -159,7 +159,7 @@ async function main() {
     data: {
       title: 'Игровые приставки',
       slug: 'gaming-consoles',
-      image: '/images/categories/gaming-consoles.png',
+      image: '/images/categories/playstations.png',
       sortOrder: 9,
     },
   });
@@ -179,7 +179,7 @@ async function main() {
       title: 'iPhone',
       slug: 'iphone',
       parentId: apple.id,
-      image: '/images/categories/iphone.png',
+      image: '/images/categories/smartphones.png',
       sortOrder: 1,
     },
   });
@@ -189,7 +189,7 @@ async function main() {
       title: 'Apple Watch',
       slug: 'apple-watch',
       parentId: apple.id,
-      image: '/images/categories/apple-watch.png',
+      image: '/images/categories/smart-watches.png',
       sortOrder: 2,
     },
   });
@@ -199,7 +199,7 @@ async function main() {
       title: 'AirPods',
       slug: 'airpods',
       parentId: apple.id,
-      image: '/images/categories/airpods.png',
+      image: '/images/categories/headphones.png',
       sortOrder: 3,
     },
   });
@@ -209,7 +209,7 @@ async function main() {
       title: 'iMac',
       slug: 'imac',
       parentId: apple.id,
-      image: '/images/categories/imac.png',
+      image: '/images/categories/laptops.png',
       sortOrder: 4,
     },
   });
@@ -219,7 +219,7 @@ async function main() {
       title: 'iPad',
       slug: 'ipad',
       parentId: apple.id,
-      image: '/images/categories/ipad.png',
+      image: '/images/categories/laptops.png',
       sortOrder: 5,
     },
   });
@@ -239,7 +239,7 @@ async function main() {
       title: 'Mac mini',
       slug: 'mac-mini',
       parentId: apple.id,
-      image: '/images/categories/mac-mini.png',
+      image: '/images/categories/laptops.png',
       sortOrder: 7,
     },
   });
@@ -250,7 +250,7 @@ async function main() {
       title: 'Samsung Galaxy',
       slug: 'samsung-galaxy',
       parentId: samsung.id,
-      image: '/images/categories/samsung-phones.png',
+      image: '/images/categories/smartphones.png',
       sortOrder: 1,
     },
   });
@@ -260,7 +260,7 @@ async function main() {
       title: 'Samsung Galaxy Watch',
       slug: 'samsung-watch',
       parentId: samsung.id,
-      image: '/images/categories/samsung-watch.png',
+      image: '/images/categories/smart-watches.png',
       sortOrder: 2,
     },
   });
@@ -270,7 +270,7 @@ async function main() {
       title: 'Galaxy Buds',
       slug: 'galaxy-buds',
       parentId: samsung.id,
-      image: '/images/categories/galaxy-buds.png',
+      image: '/images/categories/headphones.png',
       sortOrder: 3,
     },
   });
@@ -280,7 +280,7 @@ async function main() {
       title: 'Samsung Tablets',
       slug: 'samsung-tablets',
       parentId: samsung.id,
-      image: '/images/categories/samsung-tablets.png',
+      image: '/images/categories/laptops.png',
       sortOrder: 4,
     },
   });
@@ -291,7 +291,7 @@ async function main() {
       title: 'Xiaomi Phones',
       slug: 'xiaomi-phones',
       parentId: xiaomi.id,
-      image: '/images/categories/xiaomi-phones.png',
+      image: '/images/categories/smartphones.png',
       sortOrder: 1,
     },
   });
@@ -301,7 +301,7 @@ async function main() {
       title: 'Xiaomi Watch',
       slug: 'xiaomi-watch',
       parentId: xiaomi.id,
-      image: '/images/categories/xiaomi-watch.png',
+      image: '/images/categories/smart-watches.png',
       sortOrder: 2,
     },
   });
@@ -311,7 +311,7 @@ async function main() {
       title: 'Xiaomi Buds',
       slug: 'xiaomi-buds',
       parentId: xiaomi.id,
-      image: '/images/categories/xiaomi-buds.png',
+      image: '/images/categories/headphones.png',
       sortOrder: 3,
     },
   });
@@ -322,7 +322,7 @@ async function main() {
       title: 'Dyson Vacuums',
       slug: 'dyson-vacuums',
       parentId: dyson.id,
-      image: '/images/categories/dyson-vacuums.png',
+      image: '/images/categories/dyson.png',
       sortOrder: 1,
     },
   });
@@ -332,7 +332,7 @@ async function main() {
       title: 'Dyson Aircare',
       slug: 'dyson-aircare',
       parentId: dyson.id,
-      image: '/images/categories/dyson-aircare.png',
+      image: '/images/categories/dyson.png',
       sortOrder: 2,
     },
   });
@@ -342,7 +342,7 @@ async function main() {
       title: 'Dyson Haircare',
       slug: 'dyson-haircare',
       parentId: dyson.id,
-      image: '/images/categories/dyson-haircare.png',
+      image: '/images/categories/dyson.png',
       sortOrder: 3,
     },
   });
