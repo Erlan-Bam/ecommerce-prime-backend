@@ -17,6 +17,9 @@ const prisma = new PrismaClient({
   adapter: new PrismaPg(pool),
 });
 
+// Base URL for static images
+const BASE_URL = 'https://ecommerce-prime-backend-production.up.railway.app';
+
 async function main() {
   console.log('🌱 Starting database seed...');
 
@@ -87,7 +90,7 @@ async function main() {
     data: {
       title: 'Apple',
       slug: 'apple',
-      image: '/images/categories/apple.png',
+      image: `${BASE_URL}/images/categories/apple.png`,
       sortOrder: 1,
     },
   });
@@ -96,7 +99,7 @@ async function main() {
     data: {
       title: 'Samsung',
       slug: 'samsung',
-      image: '/images/categories/samsung.png',
+      image: `${BASE_URL}/images/categories/samsung.png`,
       sortOrder: 2,
     },
   });
@@ -105,7 +108,7 @@ async function main() {
     data: {
       title: 'Xiaomi',
       slug: 'xiaomi',
-      image: '/images/categories/xiaomi.png',
+      image: `${BASE_URL}/images/categories/xiaomi.png`,
       sortOrder: 3,
     },
   });
@@ -114,7 +117,7 @@ async function main() {
     data: {
       title: 'Dyson',
       slug: 'dyson',
-      image: '/images/categories/dyson.png',
+      image: `${BASE_URL}/images/categories/dyson.png`,
       sortOrder: 4,
     },
   });
@@ -123,7 +126,7 @@ async function main() {
     data: {
       title: 'Смартфоны',
       slug: 'smartphones',
-      image: '/images/categories/smartphones.png',
+      image: `${BASE_URL}/images/categories/smartphones.png`,
       sortOrder: 5,
     },
   });
@@ -132,7 +135,7 @@ async function main() {
     data: {
       title: 'Ноутбуки',
       slug: 'laptops',
-      image: '/images/categories/laptops.png',
+      image: `${BASE_URL}/images/categories/laptops.png`,
       sortOrder: 6,
     },
   });
@@ -141,7 +144,7 @@ async function main() {
     data: {
       title: 'Умные часы',
       slug: 'smart-watches',
-      image: '/images/categories/smart-watches.png',
+      image: `${BASE_URL}/images/categories/smart-watches.png`,
       sortOrder: 7,
     },
   });
@@ -150,7 +153,7 @@ async function main() {
     data: {
       title: 'Наушники',
       slug: 'headphones',
-      image: '/images/categories/headphones.png',
+      image: `${BASE_URL}/images/categories/headphones.png`,
       sortOrder: 8,
     },
   });
@@ -159,7 +162,7 @@ async function main() {
     data: {
       title: 'Игровые приставки',
       slug: 'gaming-consoles',
-      image: '/images/categories/playstations.png',
+      image: `${BASE_URL}/images/categories/playstations.png`,
       sortOrder: 9,
     },
   });
@@ -168,7 +171,7 @@ async function main() {
     data: {
       title: 'Аксессуары',
       slug: 'accessories',
-      image: '/images/categories/accessories.png',
+      image: `${BASE_URL}/images/categories/accessories.png`,
       sortOrder: 10,
     },
   });
@@ -179,7 +182,7 @@ async function main() {
       title: 'iPhone',
       slug: 'iphone',
       parentId: apple.id,
-      image: '/images/categories/smartphones.png',
+      image: `${BASE_URL}/images/categories/smartphones.png`,
       sortOrder: 1,
     },
   });
@@ -189,7 +192,7 @@ async function main() {
       title: 'Apple Watch',
       slug: 'apple-watch',
       parentId: apple.id,
-      image: '/images/categories/smart-watches.png',
+      image: `${BASE_URL}/images/categories/smart-watches.png`,
       sortOrder: 2,
     },
   });
@@ -199,7 +202,7 @@ async function main() {
       title: 'AirPods',
       slug: 'airpods',
       parentId: apple.id,
-      image: '/images/categories/headphones.png',
+      image: `${BASE_URL}/images/categories/headphones.png`,
       sortOrder: 3,
     },
   });
@@ -209,7 +212,7 @@ async function main() {
       title: 'iMac',
       slug: 'imac',
       parentId: apple.id,
-      image: '/images/categories/laptops.png',
+      image: `${BASE_URL}/images/categories/laptops.png`,
       sortOrder: 4,
     },
   });
@@ -219,7 +222,7 @@ async function main() {
       title: 'iPad',
       slug: 'ipad',
       parentId: apple.id,
-      image: '/images/categories/laptops.png',
+      image: `${BASE_URL}/images/categories/laptops.png`,
       sortOrder: 5,
     },
   });
@@ -229,7 +232,7 @@ async function main() {
       title: 'MacBook',
       slug: 'macbook',
       parentId: apple.id,
-      image: '/images/categories/macbook.png',
+      image: `${BASE_URL}/images/categories/macbook.png`,
       sortOrder: 6,
     },
   });
@@ -239,7 +242,7 @@ async function main() {
       title: 'Mac mini',
       slug: 'mac-mini',
       parentId: apple.id,
-      image: '/images/categories/laptops.png',
+      image: `${BASE_URL}/images/categories/laptops.png`,
       sortOrder: 7,
     },
   });
@@ -250,7 +253,7 @@ async function main() {
       title: 'Samsung Galaxy',
       slug: 'samsung-galaxy',
       parentId: samsung.id,
-      image: '/images/categories/smartphones.png',
+      image: `${BASE_URL}/images/categories/smartphones.png`,
       sortOrder: 1,
     },
   });
@@ -260,7 +263,7 @@ async function main() {
       title: 'Samsung Galaxy Watch',
       slug: 'samsung-watch',
       parentId: samsung.id,
-      image: '/images/categories/smart-watches.png',
+      image: `${BASE_URL}/images/categories/smart-watches.png`,
       sortOrder: 2,
     },
   });
@@ -270,7 +273,7 @@ async function main() {
       title: 'Galaxy Buds',
       slug: 'galaxy-buds',
       parentId: samsung.id,
-      image: '/images/categories/headphones.png',
+      image: `${BASE_URL}/images/categories/headphones.png`,
       sortOrder: 3,
     },
   });
@@ -280,7 +283,7 @@ async function main() {
       title: 'Samsung Tablets',
       slug: 'samsung-tablets',
       parentId: samsung.id,
-      image: '/images/categories/laptops.png',
+      image: `${BASE_URL}/images/categories/laptops.png`,
       sortOrder: 4,
     },
   });
@@ -291,7 +294,7 @@ async function main() {
       title: 'Xiaomi Phones',
       slug: 'xiaomi-phones',
       parentId: xiaomi.id,
-      image: '/images/categories/smartphones.png',
+      image: `${BASE_URL}/images/categories/smartphones.png`,
       sortOrder: 1,
     },
   });
@@ -301,7 +304,7 @@ async function main() {
       title: 'Xiaomi Watch',
       slug: 'xiaomi-watch',
       parentId: xiaomi.id,
-      image: '/images/categories/smart-watches.png',
+      image: `${BASE_URL}/images/categories/smart-watches.png`,
       sortOrder: 2,
     },
   });
@@ -311,7 +314,7 @@ async function main() {
       title: 'Xiaomi Buds',
       slug: 'xiaomi-buds',
       parentId: xiaomi.id,
-      image: '/images/categories/headphones.png',
+      image: `${BASE_URL}/images/categories/headphones.png`,
       sortOrder: 3,
     },
   });
@@ -322,7 +325,7 @@ async function main() {
       title: 'Dyson Vacuums',
       slug: 'dyson-vacuums',
       parentId: dyson.id,
-      image: '/images/categories/dyson.png',
+      image: `${BASE_URL}/images/categories/dyson.png`,
       sortOrder: 1,
     },
   });
@@ -332,7 +335,7 @@ async function main() {
       title: 'Dyson Aircare',
       slug: 'dyson-aircare',
       parentId: dyson.id,
-      image: '/images/categories/dyson.png',
+      image: `${BASE_URL}/images/categories/dyson.png`,
       sortOrder: 2,
     },
   });
@@ -342,7 +345,7 @@ async function main() {
       title: 'Dyson Haircare',
       slug: 'dyson-haircare',
       parentId: dyson.id,
-      image: '/images/categories/dyson.png',
+      image: `${BASE_URL}/images/categories/dyson.png`,
       sortOrder: 3,
     },
   });

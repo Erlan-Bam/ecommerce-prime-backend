@@ -4,6 +4,8 @@ import { SharedModule } from './shared/shared.module';
 import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
 import { BullModule } from '@nestjs/bull';
+import { ServeStaticModule } from '@nestjs/serve-static';
+import { join } from 'path';
 import { CategoryModule } from './category/category.module';
 import { AuthModule } from './auth/auth.module';
 import { GuestModule } from './guest/guest.module';
@@ -24,6 +26,13 @@ import { BlogModule } from './blog/blog.module';
       cache: true,
       expandVariables: true,
       envFilePath: ['.env'],
+    }),
+    ServeStaticModule.forRoot({
+      rootPath: join(process.cwd(), 'public', 'images'),
+      serveRoot: '/images',
+      serveStaticOptions: {
+        index: false,
+      },
     }),
     ScheduleModule.forRoot(),
     BullModule.forRoot({
