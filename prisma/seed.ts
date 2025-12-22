@@ -20,26 +20,39 @@ const prisma = new PrismaClient({
 // Base URL for static images
 const BASE_URL = 'https://ecommerce-prime-backend-production.up.railway.app';
 
+// Product images - using the 4 provided images
+const PRODUCT_IMAGES = [
+  `${BASE_URL}/images/products/product-1.png`,
+  `${BASE_URL}/images/products/product-2.png`,
+  `${BASE_URL}/images/products/product-3.png`,
+  `${BASE_URL}/images/products/product-4.png`,
+];
+
 async function main() {
   console.log('🌱 Starting database seed...');
 
   // Clean existing data
   console.log('🧹 Cleaning existing data...');
-  await prisma.productAttribute.deleteMany();
-  await prisma.productImage.deleteMany();
-  await prisma.productStock.deleteMany();
-  await prisma.review.deleteMany();
-  await prisma.orderItem.deleteMany();
-  await prisma.order.deleteMany();
-  await prisma.product.deleteMany();
-  await prisma.category.deleteMany();
-  await prisma.brand.deleteMany();
-  await prisma.pickupWindow.deleteMany();
-  await prisma.pickupPoint.deleteMany();
-  await prisma.bonus.deleteMany();
-  await prisma.coupon.deleteMany();
-  await prisma.user.deleteMany();
+  
+  // Use raw SQL to truncate tables with CASCADE to handle foreign key constraints
+  await prisma.$executeRawUnsafe('TRUNCATE TABLE "ProductAttribute" CASCADE');
+  await prisma.$executeRawUnsafe('TRUNCATE TABLE "ProductImage" CASCADE');
+  await prisma.$executeRawUnsafe('TRUNCATE TABLE "ProductStock" CASCADE');
+  // await prisma.$executeRawUnsafe('TRUNCATE TABLE "Review" CASCADE');
+  // await prisma.$executeRawUnsafe('TRUNCATE TABLE "OrderItem" CASCADE');
+  // await prisma.$executeRawUnsafe('TRUNCATE TABLE "Order" CASCADE');
+  await prisma.$executeRawUnsafe('TRUNCATE TABLE "Product" CASCADE');
+  // await prisma.$executeRawUnsafe('TRUNCATE TABLE "Category" CASCADE');
+  // await prisma.$executeRawUnsafe('TRUNCATE TABLE "Brand" CASCADE');
+  // await prisma.$executeRawUnsafe('TRUNCATE TABLE "PickupWindow" CASCADE');
+  // await prisma.$executeRawUnsafe('TRUNCATE TABLE "PickupPoint" CASCADE');
+  // await prisma.$executeRawUnsafe('TRUNCATE TABLE "Bonus" CASCADE');
+  // await prisma.$executeRawUnsafe('TRUNCATE TABLE "Coupon" CASCADE');
+  // await prisma.$executeRawUnsafe('TRUNCATE TABLE "Favorite" CASCADE');
+  // await prisma.$executeRawUnsafe('TRUNCATE TABLE "GuestSession" CASCADE');
+  // await prisma.$executeRawUnsafe('TRUNCATE TABLE "User" CASCADE');
 
+  /* COMMENTED OUT - NOT SEEDING USERS
   // Create admin user
   console.log('👤 Creating admin user...');
   const hashedPassword = await bcrypt.hash('admin123', 10);
@@ -63,7 +76,9 @@ async function main() {
       role: Role.USER,
     },
   });
+  */
 
+  /* COMMENTED OUT - NOT SEEDING BRANDS
   // Create Brands
   console.log('🏷️ Creating brands...');
   const brandsData = [
@@ -81,7 +96,16 @@ async function main() {
   for (const brand of brandsData) {
     brands[brand.slug] = await prisma.brand.create({ data: brand });
   }
+  */
 
+  // Get existing brands and categories from database
+  const brands: Record<string, any> = {};
+  const existingBrands = await prisma.brand.findMany();
+  for (const brand of existingBrands) {
+    brands[brand.slug] = brand;
+  }
+
+  /* COMMENTED OUT - NOT SEEDING CATEGORIES
   // Create Categories
   console.log('📁 Creating categories...');
 
@@ -349,7 +373,35 @@ async function main() {
       sortOrder: 3,
     },
   });
+  */
 
+  // Get existing categories from database
+  const categories = await prisma.category.findMany();
+  const iphoneCategory = categories.find(c => c.slug === 'iphone');
+  const appleWatch = categories.find(c => c.slug === 'apple-watch');
+  const airpods = categories.find(c => c.slug === 'airpods');
+  const imac = categories.find(c => c.slug === 'imac');
+  const ipad = categories.find(c => c.slug === 'ipad');
+  const macbook = categories.find(c => c.slug === 'macbook');
+  const macMini = categories.find(c => c.slug === 'mac-mini');
+  const samsungPhones = categories.find(c => c.slug === 'samsung-galaxy');
+  const samsungWatch = categories.find(c => c.slug === 'samsung-watch');
+  const galaxyBuds = categories.find(c => c.slug === 'galaxy-buds');
+  const samsungTablets = categories.find(c => c.slug === 'samsung-tablets');
+  const xiaomiPhones = categories.find(c => c.slug === 'xiaomi-phones');
+  const xiaomiWatch = categories.find(c => c.slug === 'xiaomi-watch');
+  const xiaomiBuds = categories.find(c => c.slug === 'xiaomi-buds');
+  const dysonVacuums = categories.find(c => c.slug === 'dyson-vacuums');
+  const dysonAircare = categories.find(c => c.slug === 'dyson-aircare');
+  const dysonHaircare = categories.find(c => c.slug === 'dyson-haircare');
+  const smartphones = categories.find(c => c.slug === 'smartphones');
+  const laptops = categories.find(c => c.slug === 'laptops');
+  const watches = categories.find(c => c.slug === 'smart-watches');
+  const headphones = categories.find(c => c.slug === 'headphones');
+  const gamingConsoles = categories.find(c => c.slug === 'gaming-consoles');
+  const accessories = categories.find(c => c.slug === 'accessories');
+
+  /* COMMENTED OUT - NOT SEEDING PICKUP POINTS
   // Create Pickup Points
   console.log('📍 Creating pickup points...');
   const pickupPoint1 = await prisma.pickupPoint.create({
@@ -383,12 +435,18 @@ async function main() {
       },
     },
   });
+  */
+
+  // Get existing pickup points from database
+  const pickupPoints = await prisma.pickupPoint.findMany();
+  const pickupPoint1 = pickupPoints[0];
+  const pickupPoint2 = pickupPoints[1];
 
   // Create Products
   console.log('📦 Creating products...');
 
-  // Real product image URLs
-  const productImages = {
+  // Real product image URLs - COMMENTED OUT, USING PROVIDED IMAGES
+  /* const productImages = {
     // iPhone images
     iphone15ProMax: [
       'https://store.storeimages.cdn-apple.com/4982/as-images.apple.com/is/iphone-15-pro-max-black-titanium-select?wid=800&hei=800',
@@ -559,7 +617,7 @@ async function main() {
       'https://www.jbl.com/dw/image/v2/AAUJ_PRD/on/demandware.static/-/Sites-masterCatalog_Harman/default/dw7c6c8b5b/JBL_FLIP_6_HERO_BLACK.png',
       'https://www.jbl.com/dw/image/v2/AAUJ_PRD/on/demandware.static/-/Sites-masterCatalog_Harman/default/dw7c6c8b5b/JBL_FLIP_6_BACK_BLACK.png',
     ],
-  };
+  }; */
 
   // Helper function to generate products for a category
   const generateProducts = (
@@ -569,7 +627,7 @@ async function main() {
     baseSlug: string,
     baseDescription: string,
     basePrice: number,
-    images: string[],
+    images: string[], // This parameter is now ignored, using PRODUCT_IMAGES instead
     count: number = 40,
     attributesTemplate: { name: string; values: string[] }[] = [],
   ) => {
@@ -611,23 +669,17 @@ async function main() {
         price: basePrice + priceVariation + storages.indexOf(storage) * 20000,
         oldPrice: hasOldPrice ? basePrice + priceVariation + 30000 : null,
         isOnSale,
-        images: [
-          {
-            url: images[0],
-            alt: `${baseName} ${color} вид спереди`,
-          },
-          {
-            url: images[1],
-            alt: `${baseName} ${color} вид сзади`,
-          },
-        ],
+        images: PRODUCT_IMAGES.map((url, idx) => ({
+          url,
+          alt: `${baseName} ${color} - Image ${idx + 1}`,
+        })),
         attributes,
       });
     }
     return products;
   };
 
-  const productsData = [
+  const productsData = !iphoneCategory || !brands.apple ? [] : [
     // ==================== APPLE PRODUCTS ====================
     // iPhones - 40 products
     ...generateProducts(
@@ -637,7 +689,7 @@ async function main() {
       'iphone-15-pro-max',
       'Самый мощный iPhone с чипом A17 Pro, титановым корпусом и продвинутой камерой.',
       699990,
-      productImages.iphone15ProMax,
+      PRODUCT_IMAGES, // Using custom images
       10,
       [
         { name: 'Процессор', values: ['A17 Pro'] },
@@ -652,7 +704,7 @@ async function main() {
       'iphone-15-pro',
       'Титановый дизайн, чип A17 Pro и система камер Pro.',
       549990,
-      productImages.iphone15Pro,
+      PRODUCT_IMAGES,
       10,
       [
         { name: 'Процессор', values: ['A17 Pro'] },
@@ -666,7 +718,7 @@ async function main() {
       'iphone-15',
       'Dynamic Island, 48-мегапиксельная камера и USB-C.',
       449990,
-      productImages.iphone15,
+      PRODUCT_IMAGES,
       10,
       [
         { name: 'Процессор', values: ['A16 Bionic'] },
@@ -680,7 +732,7 @@ async function main() {
       'iphone-14',
       'Отличный смартфон с чипом A15 Bionic.',
       349990,
-      productImages.iphone14,
+      PRODUCT_IMAGES,
       10,
       [
         { name: 'Процессор', values: ['A15 Bionic'] },
@@ -696,7 +748,7 @@ async function main() {
       'apple-watch-ultra-2',
       'Самые прочные Apple Watch для экстремальных условий.',
       399990,
-      productImages.appleWatchUltra,
+      PRODUCT_IMAGES,
       15,
       [
         { name: 'Размер', values: ['49mm'] },
@@ -711,7 +763,7 @@ async function main() {
       'apple-watch-series-9',
       'Умные часы с двойным касанием и ярким дисплеем.',
       249990,
-      productImages.appleWatchS9,
+      PRODUCT_IMAGES,
       15,
       [
         { name: 'Размер', values: ['41mm', '45mm'] },
@@ -725,7 +777,7 @@ async function main() {
       'apple-watch-se',
       'Доступные умные часы с основными функциями.',
       149990,
-      productImages.appleWatchSE,
+      PRODUCT_IMAGES,
       10,
       [{ name: 'Размер', values: ['40mm', '44mm'] }],
     ),
@@ -738,7 +790,7 @@ async function main() {
       'airpods-pro-2',
       'Наушники с активным шумоподавлением и USB-C.',
       129990,
-      productImages.airpodsPro,
+      PRODUCT_IMAGES,
       15,
       [
         { name: 'Шумоподавление', values: ['Активное'] },
@@ -752,7 +804,7 @@ async function main() {
       'airpods-max',
       'Накладные наушники премиум-класса с Hi-Fi звуком.',
       299990,
-      productImages.airpodsMax,
+      PRODUCT_IMAGES,
       15,
       [
         { name: 'Тип', values: ['Накладные'] },
@@ -766,7 +818,7 @@ async function main() {
       'airpods-3',
       'Беспроводные наушники с пространственным звуком.',
       99990,
-      productImages.airpods3,
+      PRODUCT_IMAGES,
       10,
       [{ name: 'Тип', values: ['Вкладыши'] }],
     ),
@@ -779,7 +831,7 @@ async function main() {
       'imac-24-m3',
       'Моноблок с чипом M3 и ярким дисплеем Retina 4.5K.',
       749990,
-      productImages.imac24,
+      PRODUCT_IMAGES,
       20,
       [
         { name: 'Чип', values: ['M3'] },
@@ -794,7 +846,7 @@ async function main() {
       'imac-24-m1',
       'Моноблок с чипом M1 и великолепным дизайном.',
       599990,
-      productImages.imac24,
+      PRODUCT_IMAGES,
       20,
       [
         { name: 'Чип', values: ['M1'] },
@@ -810,7 +862,7 @@ async function main() {
       'ipad-pro-12-9-m2',
       'Профессиональный планшет с чипом M2 и дисплеем Liquid Retina XDR.',
       599990,
-      productImages.ipadPro,
+      PRODUCT_IMAGES,
       10,
       [
         { name: 'Чип', values: ['M2'] },
@@ -824,7 +876,7 @@ async function main() {
       'ipad-pro-11-m2',
       'Компактный профессиональный планшет с чипом M2.',
       449990,
-      productImages.ipadPro,
+      PRODUCT_IMAGES,
       10,
       [
         { name: 'Чип', values: ['M2'] },
@@ -838,7 +890,7 @@ async function main() {
       'ipad-air',
       'Тонкий и мощный планшет с чипом M1.',
       349990,
-      productImages.ipadAir,
+      PRODUCT_IMAGES,
       10,
       [
         { name: 'Чип', values: ['M1'] },
@@ -852,7 +904,7 @@ async function main() {
       'ipad-10',
       'Доступный планшет с современным дизайном.',
       249990,
-      productImages.ipadAir,
+      PRODUCT_IMAGES,
       10,
       [
         { name: 'Чип', values: ['A14 Bionic'] },
@@ -868,7 +920,7 @@ async function main() {
       'macbook-pro-16-m3-max',
       'Самый мощный ноутбук Apple с чипом M3 Max.',
       1999990,
-      productImages.macbookPro,
+      PRODUCT_IMAGES,
       10,
       [
         { name: 'Чип', values: ['M3 Max'] },
@@ -883,7 +935,7 @@ async function main() {
       'macbook-pro-14-m3-pro',
       'Профессиональный ноутбук с чипом M3 Pro.',
       1099990,
-      productImages.macbookPro,
+      PRODUCT_IMAGES,
       10,
       [
         { name: 'Чип', values: ['M3 Pro'] },
@@ -898,7 +950,7 @@ async function main() {
       'macbook-air-15-m3',
       'Тонкий и лёгкий ноутбук с большим экраном.',
       749990,
-      productImages.macbookAir,
+      PRODUCT_IMAGES,
       10,
       [
         { name: 'Чип', values: ['M3'] },
@@ -912,7 +964,7 @@ async function main() {
       'macbook-air-13-m3',
       'Компактный и мощный ноутбук для повседневных задач.',
       599990,
-      productImages.macbookAir,
+      PRODUCT_IMAGES,
       10,
       [
         { name: 'Чип', values: ['M3'] },
@@ -928,7 +980,7 @@ async function main() {
       'mac-mini-m2-pro',
       'Компактный десктоп с профессиональной производительностью.',
       699990,
-      productImages.macMini,
+      PRODUCT_IMAGES,
       20,
       [
         { name: 'Чип', values: ['M2 Pro'] },
@@ -943,7 +995,7 @@ async function main() {
       'mac-mini-m2',
       'Доступный и мощный компактный компьютер.',
       349990,
-      productImages.macMini,
+      PRODUCT_IMAGES,
       20,
       [
         { name: 'Чип', values: ['M2'] },
@@ -960,7 +1012,7 @@ async function main() {
       'samsung-galaxy-s24-ultra',
       'Флагман с AI-функциями, S Pen и 200МП камерой.',
       649990,
-      productImages.samsungS24Ultra,
+      PRODUCT_IMAGES,
       10,
       [
         { name: 'Камера', values: ['200MP'] },
@@ -975,7 +1027,7 @@ async function main() {
       'samsung-galaxy-s24-plus',
       'Большой экран, мощный процессор и AI возможности.',
       499990,
-      productImages.samsungS24,
+      PRODUCT_IMAGES,
       10,
       [
         { name: 'Диагональ', values: ['6.7"'] },
@@ -989,7 +1041,7 @@ async function main() {
       'samsung-galaxy-s24',
       'Компактный флагман с передовыми AI функциями.',
       399990,
-      productImages.samsungS24,
+      PRODUCT_IMAGES,
       10,
       [{ name: 'Диагональ', values: ['6.2"'] }],
     ),
@@ -1000,7 +1052,7 @@ async function main() {
       'samsung-galaxy-z-fold5',
       'Инновационный складной смартфон с большим экраном.',
       799990,
-      productImages.samsungFold,
+      PRODUCT_IMAGES,
       10,
       [
         { name: 'Тип', values: ['Складной'] },
@@ -1016,7 +1068,7 @@ async function main() {
       'samsung-galaxy-watch-6-classic',
       'Премиальные смарт-часы с вращающимся безелем.',
       199990,
-      productImages.galaxyWatch6,
+      PRODUCT_IMAGES,
       15,
       [
         { name: 'Размер', values: ['43mm', '47mm'] },
@@ -1030,7 +1082,7 @@ async function main() {
       'samsung-galaxy-watch-6',
       'Стильные смарт-часы с продвинутыми функциями здоровья.',
       149990,
-      productImages.galaxyWatch6,
+      PRODUCT_IMAGES,
       15,
       [{ name: 'Размер', values: ['40mm', '44mm'] }],
     ),
@@ -1041,7 +1093,7 @@ async function main() {
       'samsung-galaxy-watch-fe',
       'Доступные смарт-часы с основными функциями.',
       99990,
-      productImages.galaxyWatch6,
+      PRODUCT_IMAGES,
       10,
       [{ name: 'Размер', values: ['40mm'] }],
     ),
@@ -1054,7 +1106,7 @@ async function main() {
       'samsung-galaxy-buds3-pro',
       'Премиальные наушники с продвинутым шумоподавлением.',
       119990,
-      productImages.galaxyBuds2Pro,
+      PRODUCT_IMAGES,
       15,
       [
         { name: 'Шумоподавление', values: ['Активное'] },
@@ -1068,7 +1120,7 @@ async function main() {
       'samsung-galaxy-buds3',
       'Беспроводные наушники с отличным звуком.',
       79990,
-      productImages.galaxyBuds2Pro,
+      PRODUCT_IMAGES,
       15,
       [{ name: 'Шумоподавление', values: ['Пассивное'] }],
     ),
@@ -1079,7 +1131,7 @@ async function main() {
       'samsung-galaxy-buds-fe',
       'Доступные наушники с хорошим звуком.',
       49990,
-      productImages.galaxyBuds2Pro,
+      PRODUCT_IMAGES,
       10,
       [],
     ),
@@ -1092,7 +1144,7 @@ async function main() {
       'samsung-galaxy-tab-s9-ultra',
       'Большой планшет с AMOLED экраном и S Pen в комплекте.',
       549990,
-      productImages.galaxyTabS9,
+      PRODUCT_IMAGES,
       10,
       [
         { name: 'Диагональ', values: ['14.6"'] },
@@ -1106,7 +1158,7 @@ async function main() {
       'samsung-galaxy-tab-s9-plus',
       'Производительный планшет для работы и развлечений.',
       449990,
-      productImages.galaxyTabS9,
+      PRODUCT_IMAGES,
       10,
       [{ name: 'Диагональ', values: ['12.4"'] }],
     ),
@@ -1117,7 +1169,7 @@ async function main() {
       'samsung-galaxy-tab-s9',
       'Компактный планшет с отличным экраном.',
       349990,
-      productImages.galaxyTabS9,
+      PRODUCT_IMAGES,
       10,
       [{ name: 'Диагональ', values: ['11"'] }],
     ),
@@ -1128,7 +1180,7 @@ async function main() {
       'samsung-galaxy-tab-a9-plus',
       'Доступный планшет для всей семьи.',
       149990,
-      productImages.galaxyTabS9,
+      PRODUCT_IMAGES,
       10,
       [{ name: 'Диагональ', values: ['11"'] }],
     ),
@@ -1142,7 +1194,7 @@ async function main() {
       'xiaomi-14-ultra',
       'Флагман с камерой Leica и Snapdragon 8 Gen 3.',
       549990,
-      productImages.xiaomi14Ultra,
+      PRODUCT_IMAGES,
       10,
       [
         { name: 'Камера', values: ['Leica'] },
@@ -1156,7 +1208,7 @@ async function main() {
       'xiaomi-14',
       'Компактный флагман с камерой Leica.',
       399990,
-      productImages.xiaomi14,
+      PRODUCT_IMAGES,
       10,
       [
         { name: 'Камера', values: ['Leica'] },
@@ -1170,7 +1222,7 @@ async function main() {
       'redmi-note-13-pro-plus',
       'Отличное соотношение цена/качество с 200МП камерой.',
       199990,
-      productImages.xiaomi14,
+      PRODUCT_IMAGES,
       10,
       [{ name: 'Камера', values: ['200MP'] }],
     ),
@@ -1181,7 +1233,7 @@ async function main() {
       'redmi-note-13-pro',
       'Мощный смартфон среднего класса.',
       149990,
-      productImages.xiaomi14,
+      PRODUCT_IMAGES,
       10,
       [{ name: 'Камера', values: ['200MP'] }],
     ),
@@ -1194,7 +1246,7 @@ async function main() {
       'xiaomi-watch-2-pro',
       'Премиальные смарт-часы с Wear OS.',
       149990,
-      productImages.xiaomiWatch,
+      PRODUCT_IMAGES,
       15,
       [
         { name: 'ОС', values: ['Wear OS'] },
@@ -1208,7 +1260,7 @@ async function main() {
       'xiaomi-watch-s3',
       'Стильные смарт-часы со сменными безелями.',
       99990,
-      productImages.xiaomiWatch,
+      PRODUCT_IMAGES,
       15,
       [{ name: 'Безель', values: ['Сменный'] }],
     ),
@@ -1219,7 +1271,7 @@ async function main() {
       'xiaomi-smart-band-8',
       'Доступный фитнес-браслет с AMOLED экраном.',
       29990,
-      productImages.xiaomiWatch,
+      PRODUCT_IMAGES,
       10,
       [{ name: 'Тип', values: ['Фитнес-браслет'] }],
     ),
@@ -1232,7 +1284,7 @@ async function main() {
       'xiaomi-buds-4-pro',
       'Премиальные наушники с отличным шумоподавлением.',
       89990,
-      productImages.xiaomiBuds,
+      PRODUCT_IMAGES,
       15,
       [
         { name: 'Шумоподавление', values: ['Активное'] },
@@ -1246,7 +1298,7 @@ async function main() {
       'xiaomi-buds-4',
       'Беспроводные наушники с хорошим звуком.',
       49990,
-      productImages.xiaomiBuds,
+      PRODUCT_IMAGES,
       15,
       [],
     ),
@@ -1257,7 +1309,7 @@ async function main() {
       'redmi-buds-5-pro',
       'Доступные наушники с шумоподавлением.',
       39990,
-      productImages.xiaomiBuds,
+      PRODUCT_IMAGES,
       10,
       [{ name: 'Шумоподавление', values: ['Активное'] }],
     ),
@@ -1271,7 +1323,7 @@ async function main() {
       'dyson-v15-detect-absolute',
       'Беспроводной пылесос с лазерной подсветкой пыли.',
       449990,
-      productImages.dysonV15,
+      PRODUCT_IMAGES,
       15,
       [
         { name: 'Тип', values: ['Беспроводной'] },
@@ -1286,7 +1338,7 @@ async function main() {
       'dyson-v12-detect-slim',
       'Лёгкий беспроводной пылесос с лазером.',
       349990,
-      productImages.dysonV15,
+      PRODUCT_IMAGES,
       15,
       [
         { name: 'Тип', values: ['Беспроводной'] },
@@ -1300,7 +1352,7 @@ async function main() {
       'dyson-v8-origin',
       'Надёжный беспроводной пылесос.',
       199990,
-      productImages.dysonV15,
+      PRODUCT_IMAGES,
       10,
       [
         { name: 'Тип', values: ['Беспроводной'] },
@@ -1316,7 +1368,7 @@ async function main() {
       'dyson-purifier-hot-cool',
       'Очиститель воздуха с функцией обогрева и охлаждения.',
       399990,
-      productImages.dysonPurifier,
+      PRODUCT_IMAGES,
       15,
       [
         { name: 'Функции', values: ['Очистка', 'Обогрев', 'Охлаждение'] },
@@ -1330,7 +1382,7 @@ async function main() {
       'dyson-purifier-cool',
       'Очиститель воздуха с вентилятором.',
       299990,
-      productImages.dysonPurifier,
+      PRODUCT_IMAGES,
       15,
       [{ name: 'Функции', values: ['Очистка', 'Охлаждение'] }],
     ),
@@ -1341,7 +1393,7 @@ async function main() {
       'dyson-humidify-cool',
       'Увлажнитель с функцией очистки воздуха.',
       349990,
-      productImages.dysonPurifier,
+      PRODUCT_IMAGES,
       10,
       [{ name: 'Функции', values: ['Увлажнение', 'Охлаждение'] }],
     ),
@@ -1354,7 +1406,7 @@ async function main() {
       'dyson-airwrap-complete-long',
       'Стайлер для длинных волос с эффектом Коанда.',
       299990,
-      productImages.dysonAirwrap,
+      PRODUCT_IMAGES,
       15,
       [
         { name: 'Насадки', values: ['6 шт', '8 шт'] },
@@ -1368,7 +1420,7 @@ async function main() {
       'dyson-supersonic',
       'Профессиональный фен с интеллектуальным контролем температуры.',
       249990,
-      productImages.dysonSupersonic,
+      PRODUCT_IMAGES,
       15,
       [
         { name: 'Мощность', values: ['1600W'] },
@@ -1382,7 +1434,7 @@ async function main() {
       'dyson-corrale',
       'Беспроводной выпрямитель с гибкими пластинами.',
       249990,
-      productImages.dysonSupersonic,
+      PRODUCT_IMAGES,
       10,
       [
         { name: 'Тип', values: ['Беспроводной'] },
@@ -1399,7 +1451,7 @@ async function main() {
       'google-pixel-8-pro',
       'Флагман Google с лучшей камерой и AI функциями.',
       499990,
-      productImages.pixel8Pro,
+      PRODUCT_IMAGES,
       20,
       [
         { name: 'Камера', values: ['50MP'] },
@@ -1413,7 +1465,7 @@ async function main() {
       'huawei-mate-60-pro',
       'Флагман Huawei с передовыми технологиями.',
       599990,
-      productImages.huaweiMate60,
+      PRODUCT_IMAGES,
       20,
       [{ name: 'Камера', values: ['48MP'] }],
     ),
@@ -1426,7 +1478,7 @@ async function main() {
       'huawei-matebook-x-pro',
       'Премиальный ультрабук с OLED экраном.',
       799990,
-      productImages.huaweiMatebook,
+      PRODUCT_IMAGES,
       20,
       [
         { name: 'Диагональ', values: ['14.2"'] },
@@ -1440,7 +1492,7 @@ async function main() {
       'huawei-matebook-14',
       'Тонкий ноутбук для работы и учёбы.',
       499990,
-      productImages.huaweiMatebook,
+      PRODUCT_IMAGES,
       20,
       [{ name: 'Диагональ', values: ['14"'] }],
     ),
@@ -1453,7 +1505,7 @@ async function main() {
       'huawei-watch-gt-4',
       'Стильные смарт-часы с долгим временем работы.',
       129990,
-      productImages.huaweiWatch,
+      PRODUCT_IMAGES,
       20,
       [
         { name: 'Автономность', values: ['14 дней'] },
@@ -1467,7 +1519,7 @@ async function main() {
       'google-pixel-watch-2',
       'Умные часы с Wear OS и интеграцией Fitbit.',
       179990,
-      productImages.pixelWatch,
+      PRODUCT_IMAGES,
       20,
       [
         { name: 'ОС', values: ['Wear OS'] },
@@ -1483,7 +1535,7 @@ async function main() {
       'sony-wh-1000xm5',
       'Лучшие наушники с шумоподавлением в мире.',
       199990,
-      productImages.sonyWH1000XM5,
+      PRODUCT_IMAGES,
       15,
       [
         { name: 'Тип', values: ['Накладные'] },
@@ -1497,7 +1549,7 @@ async function main() {
       'sony-wf-1000xm5',
       'Компактные TWS наушники с превосходным звуком.',
       149990,
-      productImages.sonyWF1000XM5,
+      PRODUCT_IMAGES,
       15,
       [
         { name: 'Тип', values: ['TWS'] },
@@ -1511,7 +1563,7 @@ async function main() {
       'jbl-tour-one-m2',
       'Накладные наушники с мощным басом.',
       149990,
-      productImages.jblParty,
+      PRODUCT_IMAGES,
       10,
       [
         { name: 'Тип', values: ['Накладные'] },
@@ -1527,7 +1579,7 @@ async function main() {
       'playstation-5',
       'Игровая консоль нового поколения с ray tracing.',
       349990,
-      productImages.sonyWH1000XM5,
+      PRODUCT_IMAGES,
       15,
       [
         { name: 'SSD', values: ['825GB'] },
@@ -1541,7 +1593,7 @@ async function main() {
       'playstation-5-slim',
       'Компактная версия PlayStation 5.',
       329990,
-      productImages.sonyWH1000XM5,
+      PRODUCT_IMAGES,
       15,
       [
         { name: 'SSD', values: ['1TB'] },
@@ -1555,7 +1607,7 @@ async function main() {
       'playstation-5-digital',
       'Цифровая версия PS5 без дисковода.',
       299990,
-      productImages.sonyWH1000XM5,
+      PRODUCT_IMAGES,
       10,
       [{ name: 'Тип', values: ['Digital'] }],
     ),
@@ -1568,7 +1620,7 @@ async function main() {
       'apple-magsafe-charger',
       'Беспроводное зарядное устройство с магнитным креплением.',
       24990,
-      productImages.airpodsMax,
+      PRODUCT_IMAGES,
       10,
       [{ name: 'Мощность', values: ['15W'] }],
     ),
@@ -1579,7 +1631,7 @@ async function main() {
       'apple-leather-case-iphone-15-pro',
       'Кожаный чехол с MagSafe для iPhone 15 Pro.',
       34990,
-      productImages.iphone15Pro,
+      PRODUCT_IMAGES,
       10,
       [
         { name: 'Материал', values: ['Кожа'] },
@@ -1593,7 +1645,7 @@ async function main() {
       'samsung-45w-power-adapter',
       'Быстрое зарядное устройство для Samsung устройств.',
       14990,
-      productImages.samsungS24Ultra,
+      PRODUCT_IMAGES,
       10,
       [{ name: 'Мощность', values: ['45W'] }],
     ),
@@ -1604,7 +1656,7 @@ async function main() {
       'apple-airtag',
       'Трекер для поиска вещей.',
       14990,
-      productImages.airpodsPro,
+      PRODUCT_IMAGES,
       10,
       [{ name: 'В комплекте', values: ['1 шт', '4 шт'] }],
     ),
@@ -1639,24 +1691,27 @@ async function main() {
     });
 
     // Add stock to pickup points
-    await prisma.productStock.createMany({
-      data: [
-        {
-          productId: product.id,
-          pointId: pickupPoint1.id,
-          sku: `SKU-${product.slug}-1`,
-          stockCount: Math.floor(Math.random() * 50) + 5,
-        },
-        {
-          productId: product.id,
-          pointId: pickupPoint2.id,
-          sku: `SKU-${product.slug}-2`,
-          stockCount: Math.floor(Math.random() * 30) + 3,
-        },
-      ],
-    });
+    if (pickupPoint1 && pickupPoint2) {
+      await prisma.productStock.createMany({
+        data: [
+          {
+            productId: product.id,
+            pointId: pickupPoint1.id,
+            sku: `SKU-${product.slug}-1`,
+            stockCount: Math.floor(Math.random() * 50) + 5,
+          },
+          {
+            productId: product.id,
+            pointId: pickupPoint2.id,
+            sku: `SKU-${product.slug}-2`,
+            stockCount: Math.floor(Math.random() * 30) + 3,
+          },
+        ],
+      });
+    }
   }
 
+  /* COMMENTED OUT - NOT SEEDING REVIEWS
   // Create some reviews
   console.log('⭐ Creating reviews...');
   const products = await prisma.product.findMany({ take: 50 });
@@ -1678,7 +1733,9 @@ async function main() {
         .catch(() => {}); // Skip if duplicate
     }
   }
+  */
 
+  /* COMMENTED OUT - NOT SEEDING COUPONS
   // Create coupons
   console.log('🎟️ Creating coupons...');
   await prisma.coupon.createMany({
@@ -1701,6 +1758,7 @@ async function main() {
       },
     ],
   });
+  */
 
   console.log('📊 Seed summary:');
   console.log(`   - Users: ${await prisma.user.count()}`);
