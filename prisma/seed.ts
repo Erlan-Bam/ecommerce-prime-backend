@@ -33,7 +33,7 @@ async function main() {
 
   // Clean existing data
   console.log('🧹 Cleaning existing data...');
-  
+
   // Use raw SQL to truncate tables with CASCADE to handle foreign key constraints
   await prisma.$executeRawUnsafe('TRUNCATE TABLE "ProductAttribute" CASCADE');
   await prisma.$executeRawUnsafe('TRUNCATE TABLE "ProductImage" CASCADE');
@@ -52,31 +52,53 @@ async function main() {
   // await prisma.$executeRawUnsafe('TRUNCATE TABLE "GuestSession" CASCADE');
   // await prisma.$executeRawUnsafe('TRUNCATE TABLE "User" CASCADE');
 
-  /* COMMENTED OUT - NOT SEEDING USERS
   // Create admin user
   console.log('👤 Creating admin user...');
   const hashedPassword = await bcrypt.hash('admin123', 10);
-  const admin = await prisma.user.create({
-    data: {
-      email: 'admin@ecommerce.com',
-      phone: '+77001234567',
-      password: hashedPassword,
-      name: 'Admin User',
-      role: Role.ADMIN,
-    },
+
+  // Check if admin already exists
+  const existingAdmin = await prisma.user.findUnique({
+    where: { email: 'admin@ecommerce.com' },
   });
 
+  let admin;
+  if (existingAdmin) {
+    console.log('ℹ️ Admin user already exists:', existingAdmin.email);
+    admin = existingAdmin;
+  } else {
+    admin = await prisma.user.create({
+      data: {
+        email: 'admin@ecommerce.com',
+        phone: '+77001234567',
+        password: hashedPassword,
+        name: 'Admin User',
+        role: Role.ADMIN,
+      },
+    });
+    console.log('✅ Admin user created:', admin.email);
+  }
+
   // Create test user
-  const testUser = await prisma.user.create({
-    data: {
-      email: 'user@ecommerce.com',
-      phone: '+77007654321',
-      password: await bcrypt.hash('user123', 10),
-      name: 'Test User',
-      role: Role.USER,
-    },
+  const existingTestUser = await prisma.user.findUnique({
+    where: { email: 'user@ecommerce.com' },
   });
-  */
+
+  let testUser;
+  if (existingTestUser) {
+    console.log('ℹ️ Test user already exists:', existingTestUser.email);
+    testUser = existingTestUser;
+  } else {
+    testUser = await prisma.user.create({
+      data: {
+        email: 'user@ecommerce.com',
+        phone: '+77007654321',
+        password: await bcrypt.hash('user123', 10),
+        name: 'Test User',
+        role: Role.USER,
+      },
+    });
+    console.log('✅ Test user created:', testUser.email);
+  }
 
   /* COMMENTED OUT - NOT SEEDING BRANDS
   // Create Brands
@@ -377,29 +399,29 @@ async function main() {
 
   // Get existing categories from database
   const categories = await prisma.category.findMany();
-  const iphoneCategory = categories.find(c => c.slug === 'iphone');
-  const appleWatch = categories.find(c => c.slug === 'apple-watch');
-  const airpods = categories.find(c => c.slug === 'airpods');
-  const imac = categories.find(c => c.slug === 'imac');
-  const ipad = categories.find(c => c.slug === 'ipad');
-  const macbook = categories.find(c => c.slug === 'macbook');
-  const macMini = categories.find(c => c.slug === 'mac-mini');
-  const samsungPhones = categories.find(c => c.slug === 'samsung-galaxy');
-  const samsungWatch = categories.find(c => c.slug === 'samsung-watch');
-  const galaxyBuds = categories.find(c => c.slug === 'galaxy-buds');
-  const samsungTablets = categories.find(c => c.slug === 'samsung-tablets');
-  const xiaomiPhones = categories.find(c => c.slug === 'xiaomi-phones');
-  const xiaomiWatch = categories.find(c => c.slug === 'xiaomi-watch');
-  const xiaomiBuds = categories.find(c => c.slug === 'xiaomi-buds');
-  const dysonVacuums = categories.find(c => c.slug === 'dyson-vacuums');
-  const dysonAircare = categories.find(c => c.slug === 'dyson-aircare');
-  const dysonHaircare = categories.find(c => c.slug === 'dyson-haircare');
-  const smartphones = categories.find(c => c.slug === 'smartphones');
-  const laptops = categories.find(c => c.slug === 'laptops');
-  const watches = categories.find(c => c.slug === 'smart-watches');
-  const headphones = categories.find(c => c.slug === 'headphones');
-  const gamingConsoles = categories.find(c => c.slug === 'gaming-consoles');
-  const accessories = categories.find(c => c.slug === 'accessories');
+  const iphoneCategory = categories.find((c) => c.slug === 'iphone');
+  const appleWatch = categories.find((c) => c.slug === 'apple-watch');
+  const airpods = categories.find((c) => c.slug === 'airpods');
+  const imac = categories.find((c) => c.slug === 'imac');
+  const ipad = categories.find((c) => c.slug === 'ipad');
+  const macbook = categories.find((c) => c.slug === 'macbook');
+  const macMini = categories.find((c) => c.slug === 'mac-mini');
+  const samsungPhones = categories.find((c) => c.slug === 'samsung-galaxy');
+  const samsungWatch = categories.find((c) => c.slug === 'samsung-watch');
+  const galaxyBuds = categories.find((c) => c.slug === 'galaxy-buds');
+  const samsungTablets = categories.find((c) => c.slug === 'samsung-tablets');
+  const xiaomiPhones = categories.find((c) => c.slug === 'xiaomi-phones');
+  const xiaomiWatch = categories.find((c) => c.slug === 'xiaomi-watch');
+  const xiaomiBuds = categories.find((c) => c.slug === 'xiaomi-buds');
+  const dysonVacuums = categories.find((c) => c.slug === 'dyson-vacuums');
+  const dysonAircare = categories.find((c) => c.slug === 'dyson-aircare');
+  const dysonHaircare = categories.find((c) => c.slug === 'dyson-haircare');
+  const smartphones = categories.find((c) => c.slug === 'smartphones');
+  const laptops = categories.find((c) => c.slug === 'laptops');
+  const watches = categories.find((c) => c.slug === 'smart-watches');
+  const headphones = categories.find((c) => c.slug === 'headphones');
+  const gamingConsoles = categories.find((c) => c.slug === 'gaming-consoles');
+  const accessories = categories.find((c) => c.slug === 'accessories');
 
   /* COMMENTED OUT - NOT SEEDING PICKUP POINTS
   // Create Pickup Points
@@ -679,988 +701,994 @@ async function main() {
     return products;
   };
 
-  const productsData = !iphoneCategory || !brands.apple ? [] : [
-    // ==================== APPLE PRODUCTS ====================
-    // iPhones - 40 products
-    ...generateProducts(
-      iphoneCategory.id,
-      brands.apple.id,
-      'iPhone 15 Pro Max',
-      'iphone-15-pro-max',
-      'Самый мощный iPhone с чипом A17 Pro, титановым корпусом и продвинутой камерой.',
-      699990,
-      PRODUCT_IMAGES, // Using custom images
-      10,
-      [
-        { name: 'Процессор', values: ['A17 Pro'] },
-        { name: 'Диагональ', values: ['6.7"'] },
-        { name: 'Камера', values: ['48MP'] },
-      ],
-    ),
-    ...generateProducts(
-      iphoneCategory.id,
-      brands.apple.id,
-      'iPhone 15 Pro',
-      'iphone-15-pro',
-      'Титановый дизайн, чип A17 Pro и система камер Pro.',
-      549990,
-      PRODUCT_IMAGES,
-      10,
-      [
-        { name: 'Процессор', values: ['A17 Pro'] },
-        { name: 'Диагональ', values: ['6.1"'] },
-      ],
-    ),
-    ...generateProducts(
-      iphoneCategory.id,
-      brands.apple.id,
-      'iPhone 15',
-      'iphone-15',
-      'Dynamic Island, 48-мегапиксельная камера и USB-C.',
-      449990,
-      PRODUCT_IMAGES,
-      10,
-      [
-        { name: 'Процессор', values: ['A16 Bionic'] },
-        { name: 'Диагональ', values: ['6.1"'] },
-      ],
-    ),
-    ...generateProducts(
-      iphoneCategory.id,
-      brands.apple.id,
-      'iPhone 14',
-      'iphone-14',
-      'Отличный смартфон с чипом A15 Bionic.',
-      349990,
-      PRODUCT_IMAGES,
-      10,
-      [
-        { name: 'Процессор', values: ['A15 Bionic'] },
-        { name: 'Диагональ', values: ['6.1"'] },
-      ],
-    ),
+  const productsData =
+    !iphoneCategory || !brands.apple
+      ? []
+      : [
+          // ==================== APPLE PRODUCTS ====================
+          // iPhones - 40 products
+          ...generateProducts(
+            iphoneCategory.id,
+            brands.apple.id,
+            'iPhone 15 Pro Max',
+            'iphone-15-pro-max',
+            'Самый мощный iPhone с чипом A17 Pro, титановым корпусом и продвинутой камерой.',
+            699990,
+            PRODUCT_IMAGES, // Using custom images
+            10,
+            [
+              { name: 'Процессор', values: ['A17 Pro'] },
+              { name: 'Диагональ', values: ['6.7"'] },
+              { name: 'Камера', values: ['48MP'] },
+            ],
+          ),
+          ...generateProducts(
+            iphoneCategory.id,
+            brands.apple.id,
+            'iPhone 15 Pro',
+            'iphone-15-pro',
+            'Титановый дизайн, чип A17 Pro и система камер Pro.',
+            549990,
+            PRODUCT_IMAGES,
+            10,
+            [
+              { name: 'Процессор', values: ['A17 Pro'] },
+              { name: 'Диагональ', values: ['6.1"'] },
+            ],
+          ),
+          ...generateProducts(
+            iphoneCategory.id,
+            brands.apple.id,
+            'iPhone 15',
+            'iphone-15',
+            'Dynamic Island, 48-мегапиксельная камера и USB-C.',
+            449990,
+            PRODUCT_IMAGES,
+            10,
+            [
+              { name: 'Процессор', values: ['A16 Bionic'] },
+              { name: 'Диагональ', values: ['6.1"'] },
+            ],
+          ),
+          ...generateProducts(
+            iphoneCategory.id,
+            brands.apple.id,
+            'iPhone 14',
+            'iphone-14',
+            'Отличный смартфон с чипом A15 Bionic.',
+            349990,
+            PRODUCT_IMAGES,
+            10,
+            [
+              { name: 'Процессор', values: ['A15 Bionic'] },
+              { name: 'Диагональ', values: ['6.1"'] },
+            ],
+          ),
 
-    // Apple Watch - 40 products
-    ...generateProducts(
-      appleWatch.id,
-      brands.apple.id,
-      'Apple Watch Ultra 2',
-      'apple-watch-ultra-2',
-      'Самые прочные Apple Watch для экстремальных условий.',
-      399990,
-      PRODUCT_IMAGES,
-      15,
-      [
-        { name: 'Размер', values: ['49mm'] },
-        { name: 'Материал', values: ['Титан'] },
-        { name: 'GPS', values: ['GPS + Cellular'] },
-      ],
-    ),
-    ...generateProducts(
-      appleWatch.id,
-      brands.apple.id,
-      'Apple Watch Series 9',
-      'apple-watch-series-9',
-      'Умные часы с двойным касанием и ярким дисплеем.',
-      249990,
-      PRODUCT_IMAGES,
-      15,
-      [
-        { name: 'Размер', values: ['41mm', '45mm'] },
-        { name: 'GPS', values: ['GPS', 'GPS + Cellular'] },
-      ],
-    ),
-    ...generateProducts(
-      appleWatch.id,
-      brands.apple.id,
-      'Apple Watch SE',
-      'apple-watch-se',
-      'Доступные умные часы с основными функциями.',
-      149990,
-      PRODUCT_IMAGES,
-      10,
-      [{ name: 'Размер', values: ['40mm', '44mm'] }],
-    ),
+          // Apple Watch - 40 products
+          ...generateProducts(
+            appleWatch.id,
+            brands.apple.id,
+            'Apple Watch Ultra 2',
+            'apple-watch-ultra-2',
+            'Самые прочные Apple Watch для экстремальных условий.',
+            399990,
+            PRODUCT_IMAGES,
+            15,
+            [
+              { name: 'Размер', values: ['49mm'] },
+              { name: 'Материал', values: ['Титан'] },
+              { name: 'GPS', values: ['GPS + Cellular'] },
+            ],
+          ),
+          ...generateProducts(
+            appleWatch.id,
+            brands.apple.id,
+            'Apple Watch Series 9',
+            'apple-watch-series-9',
+            'Умные часы с двойным касанием и ярким дисплеем.',
+            249990,
+            PRODUCT_IMAGES,
+            15,
+            [
+              { name: 'Размер', values: ['41mm', '45mm'] },
+              { name: 'GPS', values: ['GPS', 'GPS + Cellular'] },
+            ],
+          ),
+          ...generateProducts(
+            appleWatch.id,
+            brands.apple.id,
+            'Apple Watch SE',
+            'apple-watch-se',
+            'Доступные умные часы с основными функциями.',
+            149990,
+            PRODUCT_IMAGES,
+            10,
+            [{ name: 'Размер', values: ['40mm', '44mm'] }],
+          ),
 
-    // AirPods - 40 products
-    ...generateProducts(
-      airpods.id,
-      brands.apple.id,
-      'AirPods Pro 2',
-      'airpods-pro-2',
-      'Наушники с активным шумоподавлением и USB-C.',
-      129990,
-      PRODUCT_IMAGES,
-      15,
-      [
-        { name: 'Шумоподавление', values: ['Активное'] },
-        { name: 'Разъём', values: ['USB-C'] },
-      ],
-    ),
-    ...generateProducts(
-      airpods.id,
-      brands.apple.id,
-      'AirPods Max',
-      'airpods-max',
-      'Накладные наушники премиум-класса с Hi-Fi звуком.',
-      299990,
-      PRODUCT_IMAGES,
-      15,
-      [
-        { name: 'Тип', values: ['Накладные'] },
-        { name: 'Материал', values: ['Алюминий'] },
-      ],
-    ),
-    ...generateProducts(
-      airpods.id,
-      brands.apple.id,
-      'AirPods 3',
-      'airpods-3',
-      'Беспроводные наушники с пространственным звуком.',
-      99990,
-      PRODUCT_IMAGES,
-      10,
-      [{ name: 'Тип', values: ['Вкладыши'] }],
-    ),
+          // AirPods - 40 products
+          ...generateProducts(
+            airpods.id,
+            brands.apple.id,
+            'AirPods Pro 2',
+            'airpods-pro-2',
+            'Наушники с активным шумоподавлением и USB-C.',
+            129990,
+            PRODUCT_IMAGES,
+            15,
+            [
+              { name: 'Шумоподавление', values: ['Активное'] },
+              { name: 'Разъём', values: ['USB-C'] },
+            ],
+          ),
+          ...generateProducts(
+            airpods.id,
+            brands.apple.id,
+            'AirPods Max',
+            'airpods-max',
+            'Накладные наушники премиум-класса с Hi-Fi звуком.',
+            299990,
+            PRODUCT_IMAGES,
+            15,
+            [
+              { name: 'Тип', values: ['Накладные'] },
+              { name: 'Материал', values: ['Алюминий'] },
+            ],
+          ),
+          ...generateProducts(
+            airpods.id,
+            brands.apple.id,
+            'AirPods 3',
+            'airpods-3',
+            'Беспроводные наушники с пространственным звуком.',
+            99990,
+            PRODUCT_IMAGES,
+            10,
+            [{ name: 'Тип', values: ['Вкладыши'] }],
+          ),
 
-    // iMac - 40 products
-    ...generateProducts(
-      imac.id,
-      brands.apple.id,
-      'iMac 24" M3',
-      'imac-24-m3',
-      'Моноблок с чипом M3 и ярким дисплеем Retina 4.5K.',
-      749990,
-      PRODUCT_IMAGES,
-      20,
-      [
-        { name: 'Чип', values: ['M3'] },
-        { name: 'Диагональ', values: ['24"'] },
-        { name: 'RAM', values: ['8GB', '16GB', '24GB'] },
-      ],
-    ),
-    ...generateProducts(
-      imac.id,
-      brands.apple.id,
-      'iMac 24" M1',
-      'imac-24-m1',
-      'Моноблок с чипом M1 и великолепным дизайном.',
-      599990,
-      PRODUCT_IMAGES,
-      20,
-      [
-        { name: 'Чип', values: ['M1'] },
-        { name: 'RAM', values: ['8GB', '16GB'] },
-      ],
-    ),
+          // iMac - 40 products
+          ...generateProducts(
+            imac.id,
+            brands.apple.id,
+            'iMac 24" M3',
+            'imac-24-m3',
+            'Моноблок с чипом M3 и ярким дисплеем Retina 4.5K.',
+            749990,
+            PRODUCT_IMAGES,
+            20,
+            [
+              { name: 'Чип', values: ['M3'] },
+              { name: 'Диагональ', values: ['24"'] },
+              { name: 'RAM', values: ['8GB', '16GB', '24GB'] },
+            ],
+          ),
+          ...generateProducts(
+            imac.id,
+            brands.apple.id,
+            'iMac 24" M1',
+            'imac-24-m1',
+            'Моноблок с чипом M1 и великолепным дизайном.',
+            599990,
+            PRODUCT_IMAGES,
+            20,
+            [
+              { name: 'Чип', values: ['M1'] },
+              { name: 'RAM', values: ['8GB', '16GB'] },
+            ],
+          ),
 
-    // iPad - 40 products
-    ...generateProducts(
-      ipad.id,
-      brands.apple.id,
-      'iPad Pro 12.9" M2',
-      'ipad-pro-12-9-m2',
-      'Профессиональный планшет с чипом M2 и дисплеем Liquid Retina XDR.',
-      599990,
-      PRODUCT_IMAGES,
-      10,
-      [
-        { name: 'Чип', values: ['M2'] },
-        { name: 'Диагональ', values: ['12.9"'] },
-      ],
-    ),
-    ...generateProducts(
-      ipad.id,
-      brands.apple.id,
-      'iPad Pro 11" M2',
-      'ipad-pro-11-m2',
-      'Компактный профессиональный планшет с чипом M2.',
-      449990,
-      PRODUCT_IMAGES,
-      10,
-      [
-        { name: 'Чип', values: ['M2'] },
-        { name: 'Диагональ', values: ['11"'] },
-      ],
-    ),
-    ...generateProducts(
-      ipad.id,
-      brands.apple.id,
-      'iPad Air',
-      'ipad-air',
-      'Тонкий и мощный планшет с чипом M1.',
-      349990,
-      PRODUCT_IMAGES,
-      10,
-      [
-        { name: 'Чип', values: ['M1'] },
-        { name: 'Диагональ', values: ['10.9"'] },
-      ],
-    ),
-    ...generateProducts(
-      ipad.id,
-      brands.apple.id,
-      'iPad 10',
-      'ipad-10',
-      'Доступный планшет с современным дизайном.',
-      249990,
-      PRODUCT_IMAGES,
-      10,
-      [
-        { name: 'Чип', values: ['A14 Bionic'] },
-        { name: 'Диагональ', values: ['10.9"'] },
-      ],
-    ),
+          // iPad - 40 products
+          ...generateProducts(
+            ipad.id,
+            brands.apple.id,
+            'iPad Pro 12.9" M2',
+            'ipad-pro-12-9-m2',
+            'Профессиональный планшет с чипом M2 и дисплеем Liquid Retina XDR.',
+            599990,
+            PRODUCT_IMAGES,
+            10,
+            [
+              { name: 'Чип', values: ['M2'] },
+              { name: 'Диагональ', values: ['12.9"'] },
+            ],
+          ),
+          ...generateProducts(
+            ipad.id,
+            brands.apple.id,
+            'iPad Pro 11" M2',
+            'ipad-pro-11-m2',
+            'Компактный профессиональный планшет с чипом M2.',
+            449990,
+            PRODUCT_IMAGES,
+            10,
+            [
+              { name: 'Чип', values: ['M2'] },
+              { name: 'Диагональ', values: ['11"'] },
+            ],
+          ),
+          ...generateProducts(
+            ipad.id,
+            brands.apple.id,
+            'iPad Air',
+            'ipad-air',
+            'Тонкий и мощный планшет с чипом M1.',
+            349990,
+            PRODUCT_IMAGES,
+            10,
+            [
+              { name: 'Чип', values: ['M1'] },
+              { name: 'Диагональ', values: ['10.9"'] },
+            ],
+          ),
+          ...generateProducts(
+            ipad.id,
+            brands.apple.id,
+            'iPad 10',
+            'ipad-10',
+            'Доступный планшет с современным дизайном.',
+            249990,
+            PRODUCT_IMAGES,
+            10,
+            [
+              { name: 'Чип', values: ['A14 Bionic'] },
+              { name: 'Диагональ', values: ['10.9"'] },
+            ],
+          ),
 
-    // MacBook - 40 products
-    ...generateProducts(
-      macbook.id,
-      brands.apple.id,
-      'MacBook Pro 16" M3 Max',
-      'macbook-pro-16-m3-max',
-      'Самый мощный ноутбук Apple с чипом M3 Max.',
-      1999990,
-      PRODUCT_IMAGES,
-      10,
-      [
-        { name: 'Чип', values: ['M3 Max'] },
-        { name: 'Диагональ', values: ['16"'] },
-        { name: 'RAM', values: ['36GB', '48GB', '64GB', '96GB', '128GB'] },
-      ],
-    ),
-    ...generateProducts(
-      macbook.id,
-      brands.apple.id,
-      'MacBook Pro 14" M3 Pro',
-      'macbook-pro-14-m3-pro',
-      'Профессиональный ноутбук с чипом M3 Pro.',
-      1099990,
-      PRODUCT_IMAGES,
-      10,
-      [
-        { name: 'Чип', values: ['M3 Pro'] },
-        { name: 'Диагональ', values: ['14"'] },
-        { name: 'RAM', values: ['18GB', '36GB'] },
-      ],
-    ),
-    ...generateProducts(
-      macbook.id,
-      brands.apple.id,
-      'MacBook Air 15" M3',
-      'macbook-air-15-m3',
-      'Тонкий и лёгкий ноутбук с большим экраном.',
-      749990,
-      PRODUCT_IMAGES,
-      10,
-      [
-        { name: 'Чип', values: ['M3'] },
-        { name: 'Диагональ', values: ['15.3"'] },
-      ],
-    ),
-    ...generateProducts(
-      macbook.id,
-      brands.apple.id,
-      'MacBook Air 13" M3',
-      'macbook-air-13-m3',
-      'Компактный и мощный ноутбук для повседневных задач.',
-      599990,
-      PRODUCT_IMAGES,
-      10,
-      [
-        { name: 'Чип', values: ['M3'] },
-        { name: 'Диагональ', values: ['13.6"'] },
-      ],
-    ),
+          // MacBook - 40 products
+          ...generateProducts(
+            macbook.id,
+            brands.apple.id,
+            'MacBook Pro 16" M3 Max',
+            'macbook-pro-16-m3-max',
+            'Самый мощный ноутбук Apple с чипом M3 Max.',
+            1999990,
+            PRODUCT_IMAGES,
+            10,
+            [
+              { name: 'Чип', values: ['M3 Max'] },
+              { name: 'Диагональ', values: ['16"'] },
+              {
+                name: 'RAM',
+                values: ['36GB', '48GB', '64GB', '96GB', '128GB'],
+              },
+            ],
+          ),
+          ...generateProducts(
+            macbook.id,
+            brands.apple.id,
+            'MacBook Pro 14" M3 Pro',
+            'macbook-pro-14-m3-pro',
+            'Профессиональный ноутбук с чипом M3 Pro.',
+            1099990,
+            PRODUCT_IMAGES,
+            10,
+            [
+              { name: 'Чип', values: ['M3 Pro'] },
+              { name: 'Диагональ', values: ['14"'] },
+              { name: 'RAM', values: ['18GB', '36GB'] },
+            ],
+          ),
+          ...generateProducts(
+            macbook.id,
+            brands.apple.id,
+            'MacBook Air 15" M3',
+            'macbook-air-15-m3',
+            'Тонкий и лёгкий ноутбук с большим экраном.',
+            749990,
+            PRODUCT_IMAGES,
+            10,
+            [
+              { name: 'Чип', values: ['M3'] },
+              { name: 'Диагональ', values: ['15.3"'] },
+            ],
+          ),
+          ...generateProducts(
+            macbook.id,
+            brands.apple.id,
+            'MacBook Air 13" M3',
+            'macbook-air-13-m3',
+            'Компактный и мощный ноутбук для повседневных задач.',
+            599990,
+            PRODUCT_IMAGES,
+            10,
+            [
+              { name: 'Чип', values: ['M3'] },
+              { name: 'Диагональ', values: ['13.6"'] },
+            ],
+          ),
 
-    // Mac mini - 40 products
-    ...generateProducts(
-      macMini.id,
-      brands.apple.id,
-      'Mac mini M2 Pro',
-      'mac-mini-m2-pro',
-      'Компактный десктоп с профессиональной производительностью.',
-      699990,
-      PRODUCT_IMAGES,
-      20,
-      [
-        { name: 'Чип', values: ['M2 Pro'] },
-        { name: 'RAM', values: ['16GB', '32GB'] },
-        { name: 'SSD', values: ['512GB', '1TB', '2TB'] },
-      ],
-    ),
-    ...generateProducts(
-      macMini.id,
-      brands.apple.id,
-      'Mac mini M2',
-      'mac-mini-m2',
-      'Доступный и мощный компактный компьютер.',
-      349990,
-      PRODUCT_IMAGES,
-      20,
-      [
-        { name: 'Чип', values: ['M2'] },
-        { name: 'RAM', values: ['8GB', '16GB', '24GB'] },
-      ],
-    ),
+          // Mac mini - 40 products
+          ...generateProducts(
+            macMini.id,
+            brands.apple.id,
+            'Mac mini M2 Pro',
+            'mac-mini-m2-pro',
+            'Компактный десктоп с профессиональной производительностью.',
+            699990,
+            PRODUCT_IMAGES,
+            20,
+            [
+              { name: 'Чип', values: ['M2 Pro'] },
+              { name: 'RAM', values: ['16GB', '32GB'] },
+              { name: 'SSD', values: ['512GB', '1TB', '2TB'] },
+            ],
+          ),
+          ...generateProducts(
+            macMini.id,
+            brands.apple.id,
+            'Mac mini M2',
+            'mac-mini-m2',
+            'Доступный и мощный компактный компьютер.',
+            349990,
+            PRODUCT_IMAGES,
+            20,
+            [
+              { name: 'Чип', values: ['M2'] },
+              { name: 'RAM', values: ['8GB', '16GB', '24GB'] },
+            ],
+          ),
 
-    // ==================== SAMSUNG PRODUCTS ====================
-    // Samsung Galaxy phones - 40 products
-    ...generateProducts(
-      samsungPhones.id,
-      brands.samsung.id,
-      'Samsung Galaxy S24 Ultra',
-      'samsung-galaxy-s24-ultra',
-      'Флагман с AI-функциями, S Pen и 200МП камерой.',
-      649990,
-      PRODUCT_IMAGES,
-      10,
-      [
-        { name: 'Камера', values: ['200MP'] },
-        { name: 'S Pen', values: ['В комплекте'] },
-        { name: 'Диагональ', values: ['6.8"'] },
-      ],
-    ),
-    ...generateProducts(
-      samsungPhones.id,
-      brands.samsung.id,
-      'Samsung Galaxy S24+',
-      'samsung-galaxy-s24-plus',
-      'Большой экран, мощный процессор и AI возможности.',
-      499990,
-      PRODUCT_IMAGES,
-      10,
-      [
-        { name: 'Диагональ', values: ['6.7"'] },
-        { name: 'Камера', values: ['50MP'] },
-      ],
-    ),
-    ...generateProducts(
-      samsungPhones.id,
-      brands.samsung.id,
-      'Samsung Galaxy S24',
-      'samsung-galaxy-s24',
-      'Компактный флагман с передовыми AI функциями.',
-      399990,
-      PRODUCT_IMAGES,
-      10,
-      [{ name: 'Диагональ', values: ['6.2"'] }],
-    ),
-    ...generateProducts(
-      samsungPhones.id,
-      brands.samsung.id,
-      'Samsung Galaxy Z Fold5',
-      'samsung-galaxy-z-fold5',
-      'Инновационный складной смартфон с большим экраном.',
-      799990,
-      PRODUCT_IMAGES,
-      10,
-      [
-        { name: 'Тип', values: ['Складной'] },
-        { name: 'Диагональ', values: ['7.6"'] },
-      ],
-    ),
+          // ==================== SAMSUNG PRODUCTS ====================
+          // Samsung Galaxy phones - 40 products
+          ...generateProducts(
+            samsungPhones.id,
+            brands.samsung.id,
+            'Samsung Galaxy S24 Ultra',
+            'samsung-galaxy-s24-ultra',
+            'Флагман с AI-функциями, S Pen и 200МП камерой.',
+            649990,
+            PRODUCT_IMAGES,
+            10,
+            [
+              { name: 'Камера', values: ['200MP'] },
+              { name: 'S Pen', values: ['В комплекте'] },
+              { name: 'Диагональ', values: ['6.8"'] },
+            ],
+          ),
+          ...generateProducts(
+            samsungPhones.id,
+            brands.samsung.id,
+            'Samsung Galaxy S24+',
+            'samsung-galaxy-s24-plus',
+            'Большой экран, мощный процессор и AI возможности.',
+            499990,
+            PRODUCT_IMAGES,
+            10,
+            [
+              { name: 'Диагональ', values: ['6.7"'] },
+              { name: 'Камера', values: ['50MP'] },
+            ],
+          ),
+          ...generateProducts(
+            samsungPhones.id,
+            brands.samsung.id,
+            'Samsung Galaxy S24',
+            'samsung-galaxy-s24',
+            'Компактный флагман с передовыми AI функциями.',
+            399990,
+            PRODUCT_IMAGES,
+            10,
+            [{ name: 'Диагональ', values: ['6.2"'] }],
+          ),
+          ...generateProducts(
+            samsungPhones.id,
+            brands.samsung.id,
+            'Samsung Galaxy Z Fold5',
+            'samsung-galaxy-z-fold5',
+            'Инновационный складной смартфон с большим экраном.',
+            799990,
+            PRODUCT_IMAGES,
+            10,
+            [
+              { name: 'Тип', values: ['Складной'] },
+              { name: 'Диагональ', values: ['7.6"'] },
+            ],
+          ),
 
-    // Samsung Watch - 40 products
-    ...generateProducts(
-      samsungWatch.id,
-      brands.samsung.id,
-      'Samsung Galaxy Watch 6 Classic',
-      'samsung-galaxy-watch-6-classic',
-      'Премиальные смарт-часы с вращающимся безелем.',
-      199990,
-      PRODUCT_IMAGES,
-      15,
-      [
-        { name: 'Размер', values: ['43mm', '47mm'] },
-        { name: 'Безель', values: ['Вращающийся'] },
-      ],
-    ),
-    ...generateProducts(
-      samsungWatch.id,
-      brands.samsung.id,
-      'Samsung Galaxy Watch 6',
-      'samsung-galaxy-watch-6',
-      'Стильные смарт-часы с продвинутыми функциями здоровья.',
-      149990,
-      PRODUCT_IMAGES,
-      15,
-      [{ name: 'Размер', values: ['40mm', '44mm'] }],
-    ),
-    ...generateProducts(
-      samsungWatch.id,
-      brands.samsung.id,
-      'Samsung Galaxy Watch FE',
-      'samsung-galaxy-watch-fe',
-      'Доступные смарт-часы с основными функциями.',
-      99990,
-      PRODUCT_IMAGES,
-      10,
-      [{ name: 'Размер', values: ['40mm'] }],
-    ),
+          // Samsung Watch - 40 products
+          ...generateProducts(
+            samsungWatch.id,
+            brands.samsung.id,
+            'Samsung Galaxy Watch 6 Classic',
+            'samsung-galaxy-watch-6-classic',
+            'Премиальные смарт-часы с вращающимся безелем.',
+            199990,
+            PRODUCT_IMAGES,
+            15,
+            [
+              { name: 'Размер', values: ['43mm', '47mm'] },
+              { name: 'Безель', values: ['Вращающийся'] },
+            ],
+          ),
+          ...generateProducts(
+            samsungWatch.id,
+            brands.samsung.id,
+            'Samsung Galaxy Watch 6',
+            'samsung-galaxy-watch-6',
+            'Стильные смарт-часы с продвинутыми функциями здоровья.',
+            149990,
+            PRODUCT_IMAGES,
+            15,
+            [{ name: 'Размер', values: ['40mm', '44mm'] }],
+          ),
+          ...generateProducts(
+            samsungWatch.id,
+            brands.samsung.id,
+            'Samsung Galaxy Watch FE',
+            'samsung-galaxy-watch-fe',
+            'Доступные смарт-часы с основными функциями.',
+            99990,
+            PRODUCT_IMAGES,
+            10,
+            [{ name: 'Размер', values: ['40mm'] }],
+          ),
 
-    // Galaxy Buds - 40 products
-    ...generateProducts(
-      galaxyBuds.id,
-      brands.samsung.id,
-      'Samsung Galaxy Buds3 Pro',
-      'samsung-galaxy-buds3-pro',
-      'Премиальные наушники с продвинутым шумоподавлением.',
-      119990,
-      PRODUCT_IMAGES,
-      15,
-      [
-        { name: 'Шумоподавление', values: ['Активное'] },
-        { name: 'Аудио', values: ['360 Audio'] },
-      ],
-    ),
-    ...generateProducts(
-      galaxyBuds.id,
-      brands.samsung.id,
-      'Samsung Galaxy Buds3',
-      'samsung-galaxy-buds3',
-      'Беспроводные наушники с отличным звуком.',
-      79990,
-      PRODUCT_IMAGES,
-      15,
-      [{ name: 'Шумоподавление', values: ['Пассивное'] }],
-    ),
-    ...generateProducts(
-      galaxyBuds.id,
-      brands.samsung.id,
-      'Samsung Galaxy Buds FE',
-      'samsung-galaxy-buds-fe',
-      'Доступные наушники с хорошим звуком.',
-      49990,
-      PRODUCT_IMAGES,
-      10,
-      [],
-    ),
+          // Galaxy Buds - 40 products
+          ...generateProducts(
+            galaxyBuds.id,
+            brands.samsung.id,
+            'Samsung Galaxy Buds3 Pro',
+            'samsung-galaxy-buds3-pro',
+            'Премиальные наушники с продвинутым шумоподавлением.',
+            119990,
+            PRODUCT_IMAGES,
+            15,
+            [
+              { name: 'Шумоподавление', values: ['Активное'] },
+              { name: 'Аудио', values: ['360 Audio'] },
+            ],
+          ),
+          ...generateProducts(
+            galaxyBuds.id,
+            brands.samsung.id,
+            'Samsung Galaxy Buds3',
+            'samsung-galaxy-buds3',
+            'Беспроводные наушники с отличным звуком.',
+            79990,
+            PRODUCT_IMAGES,
+            15,
+            [{ name: 'Шумоподавление', values: ['Пассивное'] }],
+          ),
+          ...generateProducts(
+            galaxyBuds.id,
+            brands.samsung.id,
+            'Samsung Galaxy Buds FE',
+            'samsung-galaxy-buds-fe',
+            'Доступные наушники с хорошим звуком.',
+            49990,
+            PRODUCT_IMAGES,
+            10,
+            [],
+          ),
 
-    // Samsung Tablets - 40 products
-    ...generateProducts(
-      samsungTablets.id,
-      brands.samsung.id,
-      'Samsung Galaxy Tab S9 Ultra',
-      'samsung-galaxy-tab-s9-ultra',
-      'Большой планшет с AMOLED экраном и S Pen в комплекте.',
-      549990,
-      PRODUCT_IMAGES,
-      10,
-      [
-        { name: 'Диагональ', values: ['14.6"'] },
-        { name: 'S Pen', values: ['В комплекте'] },
-      ],
-    ),
-    ...generateProducts(
-      samsungTablets.id,
-      brands.samsung.id,
-      'Samsung Galaxy Tab S9+',
-      'samsung-galaxy-tab-s9-plus',
-      'Производительный планшет для работы и развлечений.',
-      449990,
-      PRODUCT_IMAGES,
-      10,
-      [{ name: 'Диагональ', values: ['12.4"'] }],
-    ),
-    ...generateProducts(
-      samsungTablets.id,
-      brands.samsung.id,
-      'Samsung Galaxy Tab S9',
-      'samsung-galaxy-tab-s9',
-      'Компактный планшет с отличным экраном.',
-      349990,
-      PRODUCT_IMAGES,
-      10,
-      [{ name: 'Диагональ', values: ['11"'] }],
-    ),
-    ...generateProducts(
-      samsungTablets.id,
-      brands.samsung.id,
-      'Samsung Galaxy Tab A9+',
-      'samsung-galaxy-tab-a9-plus',
-      'Доступный планшет для всей семьи.',
-      149990,
-      PRODUCT_IMAGES,
-      10,
-      [{ name: 'Диагональ', values: ['11"'] }],
-    ),
+          // Samsung Tablets - 40 products
+          ...generateProducts(
+            samsungTablets.id,
+            brands.samsung.id,
+            'Samsung Galaxy Tab S9 Ultra',
+            'samsung-galaxy-tab-s9-ultra',
+            'Большой планшет с AMOLED экраном и S Pen в комплекте.',
+            549990,
+            PRODUCT_IMAGES,
+            10,
+            [
+              { name: 'Диагональ', values: ['14.6"'] },
+              { name: 'S Pen', values: ['В комплекте'] },
+            ],
+          ),
+          ...generateProducts(
+            samsungTablets.id,
+            brands.samsung.id,
+            'Samsung Galaxy Tab S9+',
+            'samsung-galaxy-tab-s9-plus',
+            'Производительный планшет для работы и развлечений.',
+            449990,
+            PRODUCT_IMAGES,
+            10,
+            [{ name: 'Диагональ', values: ['12.4"'] }],
+          ),
+          ...generateProducts(
+            samsungTablets.id,
+            brands.samsung.id,
+            'Samsung Galaxy Tab S9',
+            'samsung-galaxy-tab-s9',
+            'Компактный планшет с отличным экраном.',
+            349990,
+            PRODUCT_IMAGES,
+            10,
+            [{ name: 'Диагональ', values: ['11"'] }],
+          ),
+          ...generateProducts(
+            samsungTablets.id,
+            brands.samsung.id,
+            'Samsung Galaxy Tab A9+',
+            'samsung-galaxy-tab-a9-plus',
+            'Доступный планшет для всей семьи.',
+            149990,
+            PRODUCT_IMAGES,
+            10,
+            [{ name: 'Диагональ', values: ['11"'] }],
+          ),
 
-    // ==================== XIAOMI PRODUCTS ====================
-    // Xiaomi Phones - 40 products
-    ...generateProducts(
-      xiaomiPhones.id,
-      brands.xiaomi.id,
-      'Xiaomi 14 Ultra',
-      'xiaomi-14-ultra',
-      'Флагман с камерой Leica и Snapdragon 8 Gen 3.',
-      549990,
-      PRODUCT_IMAGES,
-      10,
-      [
-        { name: 'Камера', values: ['Leica'] },
-        { name: 'Процессор', values: ['Snapdragon 8 Gen 3'] },
-      ],
-    ),
-    ...generateProducts(
-      xiaomiPhones.id,
-      brands.xiaomi.id,
-      'Xiaomi 14',
-      'xiaomi-14',
-      'Компактный флагман с камерой Leica.',
-      399990,
-      PRODUCT_IMAGES,
-      10,
-      [
-        { name: 'Камера', values: ['Leica'] },
-        { name: 'Диагональ', values: ['6.36"'] },
-      ],
-    ),
-    ...generateProducts(
-      xiaomiPhones.id,
-      brands.xiaomi.id,
-      'Redmi Note 13 Pro+',
-      'redmi-note-13-pro-plus',
-      'Отличное соотношение цена/качество с 200МП камерой.',
-      199990,
-      PRODUCT_IMAGES,
-      10,
-      [{ name: 'Камера', values: ['200MP'] }],
-    ),
-    ...generateProducts(
-      xiaomiPhones.id,
-      brands.xiaomi.id,
-      'Redmi Note 13 Pro',
-      'redmi-note-13-pro',
-      'Мощный смартфон среднего класса.',
-      149990,
-      PRODUCT_IMAGES,
-      10,
-      [{ name: 'Камера', values: ['200MP'] }],
-    ),
+          // ==================== XIAOMI PRODUCTS ====================
+          // Xiaomi Phones - 40 products
+          ...generateProducts(
+            xiaomiPhones.id,
+            brands.xiaomi.id,
+            'Xiaomi 14 Ultra',
+            'xiaomi-14-ultra',
+            'Флагман с камерой Leica и Snapdragon 8 Gen 3.',
+            549990,
+            PRODUCT_IMAGES,
+            10,
+            [
+              { name: 'Камера', values: ['Leica'] },
+              { name: 'Процессор', values: ['Snapdragon 8 Gen 3'] },
+            ],
+          ),
+          ...generateProducts(
+            xiaomiPhones.id,
+            brands.xiaomi.id,
+            'Xiaomi 14',
+            'xiaomi-14',
+            'Компактный флагман с камерой Leica.',
+            399990,
+            PRODUCT_IMAGES,
+            10,
+            [
+              { name: 'Камера', values: ['Leica'] },
+              { name: 'Диагональ', values: ['6.36"'] },
+            ],
+          ),
+          ...generateProducts(
+            xiaomiPhones.id,
+            brands.xiaomi.id,
+            'Redmi Note 13 Pro+',
+            'redmi-note-13-pro-plus',
+            'Отличное соотношение цена/качество с 200МП камерой.',
+            199990,
+            PRODUCT_IMAGES,
+            10,
+            [{ name: 'Камера', values: ['200MP'] }],
+          ),
+          ...generateProducts(
+            xiaomiPhones.id,
+            brands.xiaomi.id,
+            'Redmi Note 13 Pro',
+            'redmi-note-13-pro',
+            'Мощный смартфон среднего класса.',
+            149990,
+            PRODUCT_IMAGES,
+            10,
+            [{ name: 'Камера', values: ['200MP'] }],
+          ),
 
-    // Xiaomi Watch - 40 products
-    ...generateProducts(
-      xiaomiWatch.id,
-      brands.xiaomi.id,
-      'Xiaomi Watch 2 Pro',
-      'xiaomi-watch-2-pro',
-      'Премиальные смарт-часы с Wear OS.',
-      149990,
-      PRODUCT_IMAGES,
-      15,
-      [
-        { name: 'ОС', values: ['Wear OS'] },
-        { name: 'GPS', values: ['Да'] },
-      ],
-    ),
-    ...generateProducts(
-      xiaomiWatch.id,
-      brands.xiaomi.id,
-      'Xiaomi Watch S3',
-      'xiaomi-watch-s3',
-      'Стильные смарт-часы со сменными безелями.',
-      99990,
-      PRODUCT_IMAGES,
-      15,
-      [{ name: 'Безель', values: ['Сменный'] }],
-    ),
-    ...generateProducts(
-      xiaomiWatch.id,
-      brands.xiaomi.id,
-      'Xiaomi Smart Band 8',
-      'xiaomi-smart-band-8',
-      'Доступный фитнес-браслет с AMOLED экраном.',
-      29990,
-      PRODUCT_IMAGES,
-      10,
-      [{ name: 'Тип', values: ['Фитнес-браслет'] }],
-    ),
+          // Xiaomi Watch - 40 products
+          ...generateProducts(
+            xiaomiWatch.id,
+            brands.xiaomi.id,
+            'Xiaomi Watch 2 Pro',
+            'xiaomi-watch-2-pro',
+            'Премиальные смарт-часы с Wear OS.',
+            149990,
+            PRODUCT_IMAGES,
+            15,
+            [
+              { name: 'ОС', values: ['Wear OS'] },
+              { name: 'GPS', values: ['Да'] },
+            ],
+          ),
+          ...generateProducts(
+            xiaomiWatch.id,
+            brands.xiaomi.id,
+            'Xiaomi Watch S3',
+            'xiaomi-watch-s3',
+            'Стильные смарт-часы со сменными безелями.',
+            99990,
+            PRODUCT_IMAGES,
+            15,
+            [{ name: 'Безель', values: ['Сменный'] }],
+          ),
+          ...generateProducts(
+            xiaomiWatch.id,
+            brands.xiaomi.id,
+            'Xiaomi Smart Band 8',
+            'xiaomi-smart-band-8',
+            'Доступный фитнес-браслет с AMOLED экраном.',
+            29990,
+            PRODUCT_IMAGES,
+            10,
+            [{ name: 'Тип', values: ['Фитнес-браслет'] }],
+          ),
 
-    // Xiaomi Buds - 40 products
-    ...generateProducts(
-      xiaomiBuds.id,
-      brands.xiaomi.id,
-      'Xiaomi Buds 4 Pro',
-      'xiaomi-buds-4-pro',
-      'Премиальные наушники с отличным шумоподавлением.',
-      89990,
-      PRODUCT_IMAGES,
-      15,
-      [
-        { name: 'Шумоподавление', values: ['Активное'] },
-        { name: 'Кодек', values: ['LDAC'] },
-      ],
-    ),
-    ...generateProducts(
-      xiaomiBuds.id,
-      brands.xiaomi.id,
-      'Xiaomi Buds 4',
-      'xiaomi-buds-4',
-      'Беспроводные наушники с хорошим звуком.',
-      49990,
-      PRODUCT_IMAGES,
-      15,
-      [],
-    ),
-    ...generateProducts(
-      xiaomiBuds.id,
-      brands.xiaomi.id,
-      'Redmi Buds 5 Pro',
-      'redmi-buds-5-pro',
-      'Доступные наушники с шумоподавлением.',
-      39990,
-      PRODUCT_IMAGES,
-      10,
-      [{ name: 'Шумоподавление', values: ['Активное'] }],
-    ),
+          // Xiaomi Buds - 40 products
+          ...generateProducts(
+            xiaomiBuds.id,
+            brands.xiaomi.id,
+            'Xiaomi Buds 4 Pro',
+            'xiaomi-buds-4-pro',
+            'Премиальные наушники с отличным шумоподавлением.',
+            89990,
+            PRODUCT_IMAGES,
+            15,
+            [
+              { name: 'Шумоподавление', values: ['Активное'] },
+              { name: 'Кодек', values: ['LDAC'] },
+            ],
+          ),
+          ...generateProducts(
+            xiaomiBuds.id,
+            brands.xiaomi.id,
+            'Xiaomi Buds 4',
+            'xiaomi-buds-4',
+            'Беспроводные наушники с хорошим звуком.',
+            49990,
+            PRODUCT_IMAGES,
+            15,
+            [],
+          ),
+          ...generateProducts(
+            xiaomiBuds.id,
+            brands.xiaomi.id,
+            'Redmi Buds 5 Pro',
+            'redmi-buds-5-pro',
+            'Доступные наушники с шумоподавлением.',
+            39990,
+            PRODUCT_IMAGES,
+            10,
+            [{ name: 'Шумоподавление', values: ['Активное'] }],
+          ),
 
-    // ==================== DYSON PRODUCTS ====================
-    // Dyson Vacuums - 40 products
-    ...generateProducts(
-      dysonVacuums.id,
-      brands.dyson.id,
-      'Dyson V15 Detect Absolute',
-      'dyson-v15-detect-absolute',
-      'Беспроводной пылесос с лазерной подсветкой пыли.',
-      449990,
-      PRODUCT_IMAGES,
-      15,
-      [
-        { name: 'Тип', values: ['Беспроводной'] },
-        { name: 'Мощность', values: ['230AW'] },
-        { name: 'Лазер', values: ['Да'] },
-      ],
-    ),
-    ...generateProducts(
-      dysonVacuums.id,
-      brands.dyson.id,
-      'Dyson V12 Detect Slim',
-      'dyson-v12-detect-slim',
-      'Лёгкий беспроводной пылесос с лазером.',
-      349990,
-      PRODUCT_IMAGES,
-      15,
-      [
-        { name: 'Тип', values: ['Беспроводной'] },
-        { name: 'Мощность', values: ['150AW'] },
-      ],
-    ),
-    ...generateProducts(
-      dysonVacuums.id,
-      brands.dyson.id,
-      'Dyson V8 Origin',
-      'dyson-v8-origin',
-      'Надёжный беспроводной пылесос.',
-      199990,
-      PRODUCT_IMAGES,
-      10,
-      [
-        { name: 'Тип', values: ['Беспроводной'] },
-        { name: 'Мощность', values: ['115AW'] },
-      ],
-    ),
+          // ==================== DYSON PRODUCTS ====================
+          // Dyson Vacuums - 40 products
+          ...generateProducts(
+            dysonVacuums.id,
+            brands.dyson.id,
+            'Dyson V15 Detect Absolute',
+            'dyson-v15-detect-absolute',
+            'Беспроводной пылесос с лазерной подсветкой пыли.',
+            449990,
+            PRODUCT_IMAGES,
+            15,
+            [
+              { name: 'Тип', values: ['Беспроводной'] },
+              { name: 'Мощность', values: ['230AW'] },
+              { name: 'Лазер', values: ['Да'] },
+            ],
+          ),
+          ...generateProducts(
+            dysonVacuums.id,
+            brands.dyson.id,
+            'Dyson V12 Detect Slim',
+            'dyson-v12-detect-slim',
+            'Лёгкий беспроводной пылесос с лазером.',
+            349990,
+            PRODUCT_IMAGES,
+            15,
+            [
+              { name: 'Тип', values: ['Беспроводной'] },
+              { name: 'Мощность', values: ['150AW'] },
+            ],
+          ),
+          ...generateProducts(
+            dysonVacuums.id,
+            brands.dyson.id,
+            'Dyson V8 Origin',
+            'dyson-v8-origin',
+            'Надёжный беспроводной пылесос.',
+            199990,
+            PRODUCT_IMAGES,
+            10,
+            [
+              { name: 'Тип', values: ['Беспроводной'] },
+              { name: 'Мощность', values: ['115AW'] },
+            ],
+          ),
 
-    // Dyson Aircare - 40 products
-    ...generateProducts(
-      dysonAircare.id,
-      brands.dyson.id,
-      'Dyson Purifier Hot+Cool',
-      'dyson-purifier-hot-cool',
-      'Очиститель воздуха с функцией обогрева и охлаждения.',
-      399990,
-      PRODUCT_IMAGES,
-      15,
-      [
-        { name: 'Функции', values: ['Очистка', 'Обогрев', 'Охлаждение'] },
-        { name: 'HEPA', values: ['H13'] },
-      ],
-    ),
-    ...generateProducts(
-      dysonAircare.id,
-      brands.dyson.id,
-      'Dyson Purifier Cool',
-      'dyson-purifier-cool',
-      'Очиститель воздуха с вентилятором.',
-      299990,
-      PRODUCT_IMAGES,
-      15,
-      [{ name: 'Функции', values: ['Очистка', 'Охлаждение'] }],
-    ),
-    ...generateProducts(
-      dysonAircare.id,
-      brands.dyson.id,
-      'Dyson Humidify+Cool',
-      'dyson-humidify-cool',
-      'Увлажнитель с функцией очистки воздуха.',
-      349990,
-      PRODUCT_IMAGES,
-      10,
-      [{ name: 'Функции', values: ['Увлажнение', 'Охлаждение'] }],
-    ),
+          // Dyson Aircare - 40 products
+          ...generateProducts(
+            dysonAircare.id,
+            brands.dyson.id,
+            'Dyson Purifier Hot+Cool',
+            'dyson-purifier-hot-cool',
+            'Очиститель воздуха с функцией обогрева и охлаждения.',
+            399990,
+            PRODUCT_IMAGES,
+            15,
+            [
+              { name: 'Функции', values: ['Очистка', 'Обогрев', 'Охлаждение'] },
+              { name: 'HEPA', values: ['H13'] },
+            ],
+          ),
+          ...generateProducts(
+            dysonAircare.id,
+            brands.dyson.id,
+            'Dyson Purifier Cool',
+            'dyson-purifier-cool',
+            'Очиститель воздуха с вентилятором.',
+            299990,
+            PRODUCT_IMAGES,
+            15,
+            [{ name: 'Функции', values: ['Очистка', 'Охлаждение'] }],
+          ),
+          ...generateProducts(
+            dysonAircare.id,
+            brands.dyson.id,
+            'Dyson Humidify+Cool',
+            'dyson-humidify-cool',
+            'Увлажнитель с функцией очистки воздуха.',
+            349990,
+            PRODUCT_IMAGES,
+            10,
+            [{ name: 'Функции', values: ['Увлажнение', 'Охлаждение'] }],
+          ),
 
-    // Dyson Haircare - 40 products
-    ...generateProducts(
-      dysonHaircare.id,
-      brands.dyson.id,
-      'Dyson Airwrap Complete Long',
-      'dyson-airwrap-complete-long',
-      'Стайлер для длинных волос с эффектом Коанда.',
-      299990,
-      PRODUCT_IMAGES,
-      15,
-      [
-        { name: 'Насадки', values: ['6 шт', '8 шт'] },
-        { name: 'Для волос', values: ['Длинные'] },
-      ],
-    ),
-    ...generateProducts(
-      dysonHaircare.id,
-      brands.dyson.id,
-      'Dyson Supersonic',
-      'dyson-supersonic',
-      'Профессиональный фен с интеллектуальным контролем температуры.',
-      249990,
-      PRODUCT_IMAGES,
-      15,
-      [
-        { name: 'Мощность', values: ['1600W'] },
-        { name: 'Насадки', values: ['5 шт'] },
-      ],
-    ),
-    ...generateProducts(
-      dysonHaircare.id,
-      brands.dyson.id,
-      'Dyson Corrale',
-      'dyson-corrale',
-      'Беспроводной выпрямитель с гибкими пластинами.',
-      249990,
-      PRODUCT_IMAGES,
-      10,
-      [
-        { name: 'Тип', values: ['Беспроводной'] },
-        { name: 'Пластины', values: ['Гибкие'] },
-      ],
-    ),
+          // Dyson Haircare - 40 products
+          ...generateProducts(
+            dysonHaircare.id,
+            brands.dyson.id,
+            'Dyson Airwrap Complete Long',
+            'dyson-airwrap-complete-long',
+            'Стайлер для длинных волос с эффектом Коанда.',
+            299990,
+            PRODUCT_IMAGES,
+            15,
+            [
+              { name: 'Насадки', values: ['6 шт', '8 шт'] },
+              { name: 'Для волос', values: ['Длинные'] },
+            ],
+          ),
+          ...generateProducts(
+            dysonHaircare.id,
+            brands.dyson.id,
+            'Dyson Supersonic',
+            'dyson-supersonic',
+            'Профессиональный фен с интеллектуальным контролем температуры.',
+            249990,
+            PRODUCT_IMAGES,
+            15,
+            [
+              { name: 'Мощность', values: ['1600W'] },
+              { name: 'Насадки', values: ['5 шт'] },
+            ],
+          ),
+          ...generateProducts(
+            dysonHaircare.id,
+            brands.dyson.id,
+            'Dyson Corrale',
+            'dyson-corrale',
+            'Беспроводной выпрямитель с гибкими пластинами.',
+            249990,
+            PRODUCT_IMAGES,
+            10,
+            [
+              { name: 'Тип', values: ['Беспроводной'] },
+              { name: 'Пластины', values: ['Гибкие'] },
+            ],
+          ),
 
-    // ==================== OTHER CATEGORIES ====================
-    // Smartphones (general) - 40 products
-    ...generateProducts(
-      smartphones.id,
-      brands.google.id,
-      'Google Pixel 8 Pro',
-      'google-pixel-8-pro',
-      'Флагман Google с лучшей камерой и AI функциями.',
-      499990,
-      PRODUCT_IMAGES,
-      20,
-      [
-        { name: 'Камера', values: ['50MP'] },
-        { name: 'AI', values: ['Gemini'] },
-      ],
-    ),
-    ...generateProducts(
-      smartphones.id,
-      brands.huawei.id,
-      'Huawei Mate 60 Pro',
-      'huawei-mate-60-pro',
-      'Флагман Huawei с передовыми технологиями.',
-      599990,
-      PRODUCT_IMAGES,
-      20,
-      [{ name: 'Камера', values: ['48MP'] }],
-    ),
+          // ==================== OTHER CATEGORIES ====================
+          // Smartphones (general) - 40 products
+          ...generateProducts(
+            smartphones.id,
+            brands.google.id,
+            'Google Pixel 8 Pro',
+            'google-pixel-8-pro',
+            'Флагман Google с лучшей камерой и AI функциями.',
+            499990,
+            PRODUCT_IMAGES,
+            20,
+            [
+              { name: 'Камера', values: ['50MP'] },
+              { name: 'AI', values: ['Gemini'] },
+            ],
+          ),
+          ...generateProducts(
+            smartphones.id,
+            brands.huawei.id,
+            'Huawei Mate 60 Pro',
+            'huawei-mate-60-pro',
+            'Флагман Huawei с передовыми технологиями.',
+            599990,
+            PRODUCT_IMAGES,
+            20,
+            [{ name: 'Камера', values: ['48MP'] }],
+          ),
 
-    // Laptops (general) - 40 products
-    ...generateProducts(
-      laptops.id,
-      brands.huawei.id,
-      'Huawei MateBook X Pro',
-      'huawei-matebook-x-pro',
-      'Премиальный ультрабук с OLED экраном.',
-      799990,
-      PRODUCT_IMAGES,
-      20,
-      [
-        { name: 'Диагональ', values: ['14.2"'] },
-        { name: 'Дисплей', values: ['OLED'] },
-      ],
-    ),
-    ...generateProducts(
-      laptops.id,
-      brands.huawei.id,
-      'Huawei MateBook 14',
-      'huawei-matebook-14',
-      'Тонкий ноутбук для работы и учёбы.',
-      499990,
-      PRODUCT_IMAGES,
-      20,
-      [{ name: 'Диагональ', values: ['14"'] }],
-    ),
+          // Laptops (general) - 40 products
+          ...generateProducts(
+            laptops.id,
+            brands.huawei.id,
+            'Huawei MateBook X Pro',
+            'huawei-matebook-x-pro',
+            'Премиальный ультрабук с OLED экраном.',
+            799990,
+            PRODUCT_IMAGES,
+            20,
+            [
+              { name: 'Диагональ', values: ['14.2"'] },
+              { name: 'Дисплей', values: ['OLED'] },
+            ],
+          ),
+          ...generateProducts(
+            laptops.id,
+            brands.huawei.id,
+            'Huawei MateBook 14',
+            'huawei-matebook-14',
+            'Тонкий ноутбук для работы и учёбы.',
+            499990,
+            PRODUCT_IMAGES,
+            20,
+            [{ name: 'Диагональ', values: ['14"'] }],
+          ),
 
-    // Smart Watches (general) - 40 products
-    ...generateProducts(
-      watches.id,
-      brands.huawei.id,
-      'Huawei Watch GT 4',
-      'huawei-watch-gt-4',
-      'Стильные смарт-часы с долгим временем работы.',
-      129990,
-      PRODUCT_IMAGES,
-      20,
-      [
-        { name: 'Автономность', values: ['14 дней'] },
-        { name: 'GPS', values: ['Да'] },
-      ],
-    ),
-    ...generateProducts(
-      watches.id,
-      brands.google.id,
-      'Google Pixel Watch 2',
-      'google-pixel-watch-2',
-      'Умные часы с Wear OS и интеграцией Fitbit.',
-      179990,
-      PRODUCT_IMAGES,
-      20,
-      [
-        { name: 'ОС', values: ['Wear OS'] },
-        { name: 'Fitbit', values: ['Да'] },
-      ],
-    ),
+          // Smart Watches (general) - 40 products
+          ...generateProducts(
+            watches.id,
+            brands.huawei.id,
+            'Huawei Watch GT 4',
+            'huawei-watch-gt-4',
+            'Стильные смарт-часы с долгим временем работы.',
+            129990,
+            PRODUCT_IMAGES,
+            20,
+            [
+              { name: 'Автономность', values: ['14 дней'] },
+              { name: 'GPS', values: ['Да'] },
+            ],
+          ),
+          ...generateProducts(
+            watches.id,
+            brands.google.id,
+            'Google Pixel Watch 2',
+            'google-pixel-watch-2',
+            'Умные часы с Wear OS и интеграцией Fitbit.',
+            179990,
+            PRODUCT_IMAGES,
+            20,
+            [
+              { name: 'ОС', values: ['Wear OS'] },
+              { name: 'Fitbit', values: ['Да'] },
+            ],
+          ),
 
-    // Headphones (general) - 40 products
-    ...generateProducts(
-      headphones.id,
-      brands.sony.id,
-      'Sony WH-1000XM5',
-      'sony-wh-1000xm5',
-      'Лучшие наушники с шумоподавлением в мире.',
-      199990,
-      PRODUCT_IMAGES,
-      15,
-      [
-        { name: 'Тип', values: ['Накладные'] },
-        { name: 'Шумоподавление', values: ['Активное'] },
-      ],
-    ),
-    ...generateProducts(
-      headphones.id,
-      brands.sony.id,
-      'Sony WF-1000XM5',
-      'sony-wf-1000xm5',
-      'Компактные TWS наушники с превосходным звуком.',
-      149990,
-      PRODUCT_IMAGES,
-      15,
-      [
-        { name: 'Тип', values: ['TWS'] },
-        { name: 'Шумоподавление', values: ['Активное'] },
-      ],
-    ),
-    ...generateProducts(
-      headphones.id,
-      brands.jbl.id,
-      'JBL Tour One M2',
-      'jbl-tour-one-m2',
-      'Накладные наушники с мощным басом.',
-      149990,
-      PRODUCT_IMAGES,
-      10,
-      [
-        { name: 'Тип', values: ['Накладные'] },
-        { name: 'Бас', values: ['JBL Pro Sound'] },
-      ],
-    ),
+          // Headphones (general) - 40 products
+          ...generateProducts(
+            headphones.id,
+            brands.sony.id,
+            'Sony WH-1000XM5',
+            'sony-wh-1000xm5',
+            'Лучшие наушники с шумоподавлением в мире.',
+            199990,
+            PRODUCT_IMAGES,
+            15,
+            [
+              { name: 'Тип', values: ['Накладные'] },
+              { name: 'Шумоподавление', values: ['Активное'] },
+            ],
+          ),
+          ...generateProducts(
+            headphones.id,
+            brands.sony.id,
+            'Sony WF-1000XM5',
+            'sony-wf-1000xm5',
+            'Компактные TWS наушники с превосходным звуком.',
+            149990,
+            PRODUCT_IMAGES,
+            15,
+            [
+              { name: 'Тип', values: ['TWS'] },
+              { name: 'Шумоподавление', values: ['Активное'] },
+            ],
+          ),
+          ...generateProducts(
+            headphones.id,
+            brands.jbl.id,
+            'JBL Tour One M2',
+            'jbl-tour-one-m2',
+            'Накладные наушники с мощным басом.',
+            149990,
+            PRODUCT_IMAGES,
+            10,
+            [
+              { name: 'Тип', values: ['Накладные'] },
+              { name: 'Бас', values: ['JBL Pro Sound'] },
+            ],
+          ),
 
-    // Gaming Consoles - 40 products
-    ...generateProducts(
-      gamingConsoles.id,
-      brands.sony.id,
-      'PlayStation 5',
-      'playstation-5',
-      'Игровая консоль нового поколения с ray tracing.',
-      349990,
-      PRODUCT_IMAGES,
-      15,
-      [
-        { name: 'SSD', values: ['825GB'] },
-        { name: 'Разрешение', values: ['4K'] },
-      ],
-    ),
-    ...generateProducts(
-      gamingConsoles.id,
-      brands.sony.id,
-      'PlayStation 5 Slim',
-      'playstation-5-slim',
-      'Компактная версия PlayStation 5.',
-      329990,
-      PRODUCT_IMAGES,
-      15,
-      [
-        { name: 'SSD', values: ['1TB'] },
-        { name: 'Тип', values: ['Slim'] },
-      ],
-    ),
-    ...generateProducts(
-      gamingConsoles.id,
-      brands.sony.id,
-      'PlayStation 5 Digital',
-      'playstation-5-digital',
-      'Цифровая версия PS5 без дисковода.',
-      299990,
-      PRODUCT_IMAGES,
-      10,
-      [{ name: 'Тип', values: ['Digital'] }],
-    ),
+          // Gaming Consoles - 40 products
+          ...generateProducts(
+            gamingConsoles.id,
+            brands.sony.id,
+            'PlayStation 5',
+            'playstation-5',
+            'Игровая консоль нового поколения с ray tracing.',
+            349990,
+            PRODUCT_IMAGES,
+            15,
+            [
+              { name: 'SSD', values: ['825GB'] },
+              { name: 'Разрешение', values: ['4K'] },
+            ],
+          ),
+          ...generateProducts(
+            gamingConsoles.id,
+            brands.sony.id,
+            'PlayStation 5 Slim',
+            'playstation-5-slim',
+            'Компактная версия PlayStation 5.',
+            329990,
+            PRODUCT_IMAGES,
+            15,
+            [
+              { name: 'SSD', values: ['1TB'] },
+              { name: 'Тип', values: ['Slim'] },
+            ],
+          ),
+          ...generateProducts(
+            gamingConsoles.id,
+            brands.sony.id,
+            'PlayStation 5 Digital',
+            'playstation-5-digital',
+            'Цифровая версия PS5 без дисковода.',
+            299990,
+            PRODUCT_IMAGES,
+            10,
+            [{ name: 'Тип', values: ['Digital'] }],
+          ),
 
-    // Accessories - 40 products
-    ...generateProducts(
-      accessories.id,
-      brands.apple.id,
-      'Apple MagSafe Charger',
-      'apple-magsafe-charger',
-      'Беспроводное зарядное устройство с магнитным креплением.',
-      24990,
-      PRODUCT_IMAGES,
-      10,
-      [{ name: 'Мощность', values: ['15W'] }],
-    ),
-    ...generateProducts(
-      accessories.id,
-      brands.apple.id,
-      'Apple Leather Case iPhone 15 Pro',
-      'apple-leather-case-iphone-15-pro',
-      'Кожаный чехол с MagSafe для iPhone 15 Pro.',
-      34990,
-      PRODUCT_IMAGES,
-      10,
-      [
-        { name: 'Материал', values: ['Кожа'] },
-        { name: 'MagSafe', values: ['Да'] },
-      ],
-    ),
-    ...generateProducts(
-      accessories.id,
-      brands.samsung.id,
-      'Samsung 45W Power Adapter',
-      'samsung-45w-power-adapter',
-      'Быстрое зарядное устройство для Samsung устройств.',
-      14990,
-      PRODUCT_IMAGES,
-      10,
-      [{ name: 'Мощность', values: ['45W'] }],
-    ),
-    ...generateProducts(
-      accessories.id,
-      brands.apple.id,
-      'Apple AirTag',
-      'apple-airtag',
-      'Трекер для поиска вещей.',
-      14990,
-      PRODUCT_IMAGES,
-      10,
-      [{ name: 'В комплекте', values: ['1 шт', '4 шт'] }],
-    ),
-  ];
+          // Accessories - 40 products
+          ...generateProducts(
+            accessories.id,
+            brands.apple.id,
+            'Apple MagSafe Charger',
+            'apple-magsafe-charger',
+            'Беспроводное зарядное устройство с магнитным креплением.',
+            24990,
+            PRODUCT_IMAGES,
+            10,
+            [{ name: 'Мощность', values: ['15W'] }],
+          ),
+          ...generateProducts(
+            accessories.id,
+            brands.apple.id,
+            'Apple Leather Case iPhone 15 Pro',
+            'apple-leather-case-iphone-15-pro',
+            'Кожаный чехол с MagSafe для iPhone 15 Pro.',
+            34990,
+            PRODUCT_IMAGES,
+            10,
+            [
+              { name: 'Материал', values: ['Кожа'] },
+              { name: 'MagSafe', values: ['Да'] },
+            ],
+          ),
+          ...generateProducts(
+            accessories.id,
+            brands.samsung.id,
+            'Samsung 45W Power Adapter',
+            'samsung-45w-power-adapter',
+            'Быстрое зарядное устройство для Samsung устройств.',
+            14990,
+            PRODUCT_IMAGES,
+            10,
+            [{ name: 'Мощность', values: ['45W'] }],
+          ),
+          ...generateProducts(
+            accessories.id,
+            brands.apple.id,
+            'Apple AirTag',
+            'apple-airtag',
+            'Трекер для поиска вещей.',
+            14990,
+            PRODUCT_IMAGES,
+            10,
+            [{ name: 'В комплекте', values: ['1 шт', '4 шт'] }],
+          ),
+        ];
 
   for (const productData of productsData) {
     const { images, attributes, ...data } = productData;

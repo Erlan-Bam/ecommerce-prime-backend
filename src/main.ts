@@ -20,6 +20,7 @@ async function bootstrap() {
     origin: [
       'http://localhost:3000',
       'https://e-commerce-production-bf09.up.railway.app',
+      'https://ecommerce-prime-backend-production.up.railway.app',
     ],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: [
