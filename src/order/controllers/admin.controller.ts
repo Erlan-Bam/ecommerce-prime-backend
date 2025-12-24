@@ -13,9 +13,9 @@ import {
   ApiOperation,
   ApiResponse,
 } from '@nestjs/swagger';
-import { OrderService } from './order.service';
-import { AdminGuard } from '../shared/guards/admin.guard';
-import { UpdateOrderStatusDto } from './dto';
+import { OrderService } from '../order.service';
+import { AdminGuard } from '../../shared/guards/admin.guard';
+import { UpdateOrderStatusDto } from '../dto';
 
 @ApiTags('Admin Orders')
 @Controller('admin/orders')

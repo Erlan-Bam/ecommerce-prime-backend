@@ -774,7 +774,6 @@ export class OrderService {
             pickupPoint: {
               select: {
                 id: true,
-                name: true,
                 address: true,
               },
             },
