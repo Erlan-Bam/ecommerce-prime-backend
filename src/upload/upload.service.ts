@@ -8,7 +8,9 @@ export class UploadService {
 
   constructor(private configService: ConfigService) {
     cloudinary.config({
-      cloudinary_url: this.configService.get<string>('CLOUDINARY_URL'),
+      api_key: this.configService.get<string>('CLOUDINARY_API_KEY'),
+      api_secret: this.configService.get<string>('CLOUDINARY_API_SECRET'),
+      cloud_name: this.configService.get<string>('CLOUDINARY_CLOUD_NAME'),
     });
   }
 
