@@ -13,9 +13,7 @@ async function bootstrap() {
   const NODE_ENV = process.env.NODE_ENV;
   const app = await NestFactory.create(AppModule);
   const logger = new Logger('Bootstrap');
-  if (NODE_ENV !== 'production') {
-    app.setGlobalPrefix('api');
-  }
+  app.setGlobalPrefix('api');
   app.enableCors({
     origin: [
       'http://localhost:3000',
