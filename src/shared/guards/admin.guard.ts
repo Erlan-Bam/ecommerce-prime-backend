@@ -33,10 +33,12 @@ export class AdminGuard extends AuthGuard('jwt') {
     context: ExecutionContext,
     status?: any,
   ) {
+    // If there's an error or no user, it's an authentication issue (401)
     if (err || !user) {
-      throw err || new HttpException('Access denied', HttpStatus.FORBIDDEN);
+      throw err || new HttpException('Unauthorized', HttpStatus.UNAUTHORIZED);
     }
 
+    // If user is authenticated but not an admin, it's a permission issue (403)
     if (user.role !== 'ADMIN') {
       throw new HttpException(
         'Access denied: Admins only',
