@@ -9,6 +9,11 @@ import {
 import { Prisma } from '@prisma/client';
 
 export class CreatePickupPointDto {
+  @ApiProperty({ description: 'Pickup point name' })
+  @IsString()
+  @IsNotEmpty()
+  name: string;
+
   @ApiProperty({ description: 'Pickup point address' })
   @IsString()
   @IsNotEmpty()

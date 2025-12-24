@@ -6,7 +6,12 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { PrismaService } from '../shared/services/prisma.service';
-import { AddOrderItemDto, SelectPickupDto } from './dto';
+import {
+  AddOrderItemDto,
+  SelectPickupDto,
+  ApplyCouponDto,
+  UpdateOrderStatusDto,
+} from './dto';
 import { OrderCacheService } from './services/cache.service';
 
 @Injectable()
@@ -321,11 +326,13 @@ export class OrderService {
           return sum + price;
         }, 0);
 
-        // Create the order
+        // Create the order with finalTotal equal to total (no discount yet)
         const newOrder = await tx.order.create({
           data: {
             userId,
             total,
+            discount: 0,
+            finalTotal: total,
             status: 'PENDING',
           },
         });
@@ -721,6 +728,286 @@ export class OrderService {
     return { windowStart, windowEnd };
   }
 
+  /**
+   * Apply a coupon to an order with price deduction.
+   * Validates the coupon, calculates discount, and updates the order total.
+   * All operations are wrapped in a transaction.
+   */
+  async applyCoupon(userId: string, orderId: string, dto: ApplyCouponDto) {
+    try {
+      this.logger.log(
+        `Applying coupon ${dto.code} to order ${orderId} for user ${userId}`,
+      );
+
+      const result = await this.prisma.$transaction(async (tx) => {
+        // 1. Verify order exists and belongs to user
+        const order = await tx.order.findFirst({
+          where: {
+            id: orderId,
+            userId,
+          },
+          include: {
+            coupon: true,
+          },
+        });
+
+        if (!order) {
+          this.logger.warn(`Order ${orderId} not found for user ${userId}`);
+          throw new HttpException('Order not found', HttpStatus.NOT_FOUND);
+        }
+
+        // 2. Check if order is in a valid state for coupon application
+        if (order.status !== 'PENDING') {
+          this.logger.warn(
+            `Order ${orderId} is not in PENDING status: ${order.status}`,
+          );
+          throw new HttpException(
+            'Coupon can only be applied to pending orders',
+            HttpStatus.BAD_REQUEST,
+          );
+        }
+
+        // 3. Check if order already has a coupon applied
+        if (order.couponId) {
+          this.logger.warn(
+            `Order ${orderId} already has coupon ${order.couponId} applied`,
+          );
+          throw new HttpException(
+            'Order already has a coupon applied. Remove it first to apply a new one.',
+            HttpStatus.CONFLICT,
+          );
+        }
+
+        // 4. Find and validate the coupon
+        const normalizedCode = dto.code.toUpperCase().trim();
+        const coupon = await tx.coupon.findUnique({
+          where: { code: normalizedCode },
+        });
+
+        if (!coupon) {
+          this.logger.warn(`Coupon ${normalizedCode} not found`);
+          throw new HttpException('Coupon not found', HttpStatus.NOT_FOUND);
+        }
+
+        const now = new Date();
+
+        if (!coupon.isActive) {
+          throw new HttpException(
+            'Coupon is not active',
+            HttpStatus.BAD_REQUEST,
+          );
+        }
+
+        if (now < new Date(coupon.validFrom)) {
+          throw new HttpException(
+            'Coupon is not yet valid',
+            HttpStatus.BAD_REQUEST,
+          );
+        }
+
+        if (now > new Date(coupon.validTo)) {
+          throw new HttpException('Coupon has expired', HttpStatus.BAD_REQUEST);
+        }
+
+        if (coupon.usageLimit > 0 && coupon.usageCount >= coupon.usageLimit) {
+          throw new HttpException(
+            'Coupon usage limit reached',
+            HttpStatus.BAD_REQUEST,
+          );
+        }
+
+        // 5. Calculate the discount
+        const orderTotal = order.total.toNumber();
+        let discount: number;
+
+        if (coupon.type === 'PERCENTAGE') {
+          // Percentage discount
+          discount = (orderTotal * coupon.value.toNumber()) / 100;
+        } else {
+          // Fixed discount
+          discount = coupon.value.toNumber();
+        }
+
+        // Ensure discount doesn't exceed order total
+        discount = Math.min(discount, orderTotal);
+
+        // Round to 2 decimal places
+        discount = Math.round(discount * 100) / 100;
+
+        const finalTotal = Math.round((orderTotal - discount) * 100) / 100;
+
+        this.logger.log(
+          `Calculated discount: ${discount}, final total: ${finalTotal} for order ${orderId}`,
+        );
+
+        // 6. Update the coupon usage count
+        await tx.coupon.update({
+          where: { id: coupon.id },
+          data: {
+            usageCount: { increment: 1 },
+          },
+        });
+
+        // 7. Update the order with coupon and new totals
+        const updatedOrder = await tx.order.update({
+          where: { id: orderId },
+          data: {
+            couponId: coupon.id,
+            discount: discount,
+            finalTotal: finalTotal,
+          },
+          include: {
+            items: {
+              include: {
+                product: {
+                  select: {
+                    id: true,
+                    name: true,
+                    slug: true,
+                  },
+                },
+              },
+            },
+            coupon: {
+              select: {
+                id: true,
+                code: true,
+                type: true,
+                value: true,
+              },
+            },
+          },
+        });
+
+        return updatedOrder;
+      });
+
+      // Invalidate caches
+      await this.cacheService.invalidateUserOrders(userId);
+      await this.cacheService.invalidateOrder(userId, orderId);
+
+      this.logger.log(
+        `Coupon ${dto.code} applied successfully to order ${orderId}. Discount: ${result.discount}`,
+      );
+
+      return {
+        ...result,
+        message: 'Coupon applied successfully',
+      };
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      this.logger.error(
+        `Error applying coupon to order ${orderId}: ${error.message}`,
+        error.stack,
+      );
+      throw new InternalServerErrorException('Failed to apply coupon');
+    }
+  }
+
+  /**
+   * Remove a coupon from an order and restore the original total.
+   * All operations are wrapped in a transaction.
+   */
+  async removeCoupon(userId: string, orderId: string) {
+    try {
+      this.logger.log(
+        `Removing coupon from order ${orderId} for user ${userId}`,
+      );
+
+      const result = await this.prisma.$transaction(async (tx) => {
+        // 1. Verify order exists and belongs to user
+        const order = await tx.order.findFirst({
+          where: {
+            id: orderId,
+            userId,
+          },
+          include: {
+            coupon: true,
+          },
+        });
+
+        if (!order) {
+          this.logger.warn(`Order ${orderId} not found for user ${userId}`);
+          throw new HttpException('Order not found', HttpStatus.NOT_FOUND);
+        }
+
+        // 2. Check if order is in a valid state
+        if (order.status !== 'PENDING') {
+          this.logger.warn(
+            `Order ${orderId} is not in PENDING status: ${order.status}`,
+          );
+          throw new HttpException(
+            'Coupon can only be removed from pending orders',
+            HttpStatus.BAD_REQUEST,
+          );
+        }
+
+        // 3. Check if order has a coupon
+        if (!order.couponId) {
+          throw new HttpException(
+            'Order does not have a coupon applied',
+            HttpStatus.BAD_REQUEST,
+          );
+        }
+
+        // 4. Decrement coupon usage count
+        await tx.coupon.update({
+          where: { id: order.couponId },
+          data: {
+            usageCount: { decrement: 1 },
+          },
+        });
+
+        // 5. Update order to remove coupon and restore original total
+        const updatedOrder = await tx.order.update({
+          where: { id: orderId },
+          data: {
+            couponId: null,
+            discount: 0,
+            finalTotal: order.total,
+          },
+          include: {
+            items: {
+              include: {
+                product: {
+                  select: {
+                    id: true,
+                    name: true,
+                    slug: true,
+                  },
+                },
+              },
+            },
+          },
+        });
+
+        return updatedOrder;
+      });
+
+      // Invalidate caches
+      await this.cacheService.invalidateUserOrders(userId);
+      await this.cacheService.invalidateOrder(userId, orderId);
+
+      this.logger.log(`Coupon removed successfully from order ${orderId}`);
+
+      return {
+        ...result,
+        message: 'Coupon removed successfully',
+      };
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      this.logger.error(
+        `Error removing coupon from order ${orderId}: ${error.message}`,
+        error.stack,
+      );
+      throw new InternalServerErrorException('Failed to remove coupon');
+    }
+  }
+
   // Admin methods
   async getAllOrders(filters: {
     page: number;
@@ -774,6 +1061,7 @@ export class OrderService {
             pickupPoint: {
               select: {
                 id: true,
+                name: true,
                 address: true,
               },
             },
@@ -781,8 +1069,8 @@ export class OrderService {
               select: {
                 id: true,
                 code: true,
-                discountType: true,
-                discountValue: true,
+                type: true,
+                value: true,
               },
             },
           },
@@ -822,7 +1110,7 @@ export class OrderService {
                   images: true,
                   slug: true,
                   price: true,
-                  salePrice: true,
+                  oldPrice: true,
                 },
               },
             },
@@ -840,15 +1128,14 @@ export class OrderService {
               id: true,
               name: true,
               address: true,
-              phone: true,
             },
           },
           coupon: {
             select: {
               id: true,
               code: true,
-              discountType: true,
-              discountValue: true,
+              type: true,
+              value: true,
             },
           },
         },
@@ -871,7 +1158,7 @@ export class OrderService {
     }
   }
 
-  async updateOrderStatus(orderId: string, dto: { status: string }) {
+  async updateOrderStatus(orderId: string, dto: UpdateOrderStatusDto) {
     try {
       const order = await this.prisma.order.findUnique({
         where: { id: orderId },
@@ -912,6 +1199,14 @@ export class OrderService {
               address: true,
             },
           },
+          coupon: {
+            select: {
+              id: true,
+              code: true,
+              type: true,
+              value: true,
+            },
+          },
         },
       });
 
@@ -943,9 +1238,7 @@ export class OrderService {
         deliveredOrders,
         totalRevenue,
       ] = await Promise.all([
-        this.prisma.order.count({
-          where: { status: { not: 'CART' } },
-        }),
+        this.prisma.order.count({}),
         this.prisma.order.count({
           where: { status: 'PENDING' },
         }),
@@ -956,8 +1249,8 @@ export class OrderService {
           where: { status: 'DELIVERED' },
         }),
         this.prisma.order.aggregate({
-          where: { status: { in: ['PAID', 'PROCESSING', 'DELIVERED'] } },
-          _sum: { totalPrice: true },
+          where: { status: { in: ['DELIVERED', 'SHIPPED'] } },
+          _sum: { finalTotal: true },
         }),
       ]);
 
@@ -966,7 +1259,7 @@ export class OrderService {
         pendingOrders,
         processingOrders,
         deliveredOrders,
-        totalRevenue: totalRevenue._sum.totalPrice || 0,
+        totalRevenue: totalRevenue._sum.finalTotal || 0,
       };
     } catch (error) {
       this.logger.error(

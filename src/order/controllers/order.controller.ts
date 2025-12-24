@@ -19,6 +19,7 @@ import {
   CheckoutResponseDto,
   SelectPickupDto,
   SelectPickupResponseDto,
+  ApplyCouponDto,
 } from '../dto';
 import { UserGuard } from '../../shared/guards/user.guard';
 import { User } from '../../shared/decorator/user.decorator';
@@ -130,6 +131,56 @@ export class OrderController {
     @Body() dto: SelectPickupDto,
   ) {
     return this.orderService.selectPickup(userId, orderId, dto);
+  }
+
+  // Apply coupon endpoint
+  @Post(':id/coupon')
+  @ApiOperation({
+    summary: 'Apply a coupon to an order',
+    description:
+      'Validates and applies a coupon code to a pending order. Calculates the discount based on coupon type (percentage or fixed) and updates the order total.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Coupon applied successfully',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad request - Invalid coupon or order state',
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 404, description: 'Order or coupon not found' })
+  @ApiResponse({
+    status: 409,
+    description: 'Order already has a coupon applied',
+  })
+  applyCoupon(
+    @User('id') userId: string,
+    @Param('id') orderId: string,
+    @Body() dto: ApplyCouponDto,
+  ) {
+    return this.orderService.applyCoupon(userId, orderId, dto);
+  }
+
+  // Remove coupon endpoint
+  @Delete(':id/coupon')
+  @ApiOperation({
+    summary: 'Remove a coupon from an order',
+    description:
+      'Removes the applied coupon from a pending order and restores the original total.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Coupon removed successfully',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad request - Order does not have a coupon or invalid state',
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 404, description: 'Order not found' })
+  removeCoupon(@User('id') userId: string, @Param('id') orderId: string) {
+    return this.orderService.removeCoupon(userId, orderId);
   }
 
   // Order endpoints

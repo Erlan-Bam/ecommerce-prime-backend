@@ -1,24 +1,17 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsEnum, IsNotEmpty } from 'class-validator';
-
-export enum OrderStatus {
-  CART = 'CART',
-  PENDING = 'PENDING',
-  PAID = 'PAID',
-  PROCESSING = 'PROCESSING',
-  SHIPPED = 'SHIPPED',
-  DELIVERED = 'DELIVERED',
-  CANCELLED = 'CANCELLED',
-  REFUNDED = 'REFUNDED',
-}
+import { OrderStatus } from '@prisma/client';
 
 export class UpdateOrderStatusDto {
   @ApiProperty({
     description: 'New order status',
     enum: OrderStatus,
     example: OrderStatus.PROCESSING,
+    enumName: 'OrderStatus',
   })
-  @IsEnum(OrderStatus)
+  @IsEnum(OrderStatus, {
+    message: 'Status must be one of: PENDING, PROCESSING, SHIPPED, DELIVERED, CANCELLED',
+  })
   @IsNotEmpty()
   status: OrderStatus;
 }

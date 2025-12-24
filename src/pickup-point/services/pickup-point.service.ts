@@ -24,6 +24,7 @@ export class PickupPointService {
 
       const pickupPoint = await this.prisma.pickupPoint.create({
         data: {
+          name: dto.name,
           address: dto.address,
           coords: dto.coords,
           workingSchedule: dto.workingSchedule,
