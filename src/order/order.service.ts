@@ -720,4 +720,261 @@ export class OrderService {
 
     return { windowStart, windowEnd };
   }
+
+  // Admin methods
+  async getAllOrders(filters: {
+    page: number;
+    limit: number;
+    status?: string;
+    userId?: string;
+  }) {
+    try {
+      const { page, limit, status, userId } = filters;
+      const skip = (page - 1) * limit;
+
+      const where: any = {
+        status: { not: 'CART' },
+      };
+
+      if (status) {
+        where.status = status;
+      }
+
+      if (userId) {
+        where.userId = userId;
+      }
+
+      const [orders, total] = await Promise.all([
+        this.prisma.order.findMany({
+          where,
+          skip,
+          take: limit,
+          orderBy: { createdAt: 'desc' },
+          include: {
+            items: {
+              include: {
+                product: {
+                  select: {
+                    id: true,
+                    name: true,
+                    images: true,
+                    slug: true,
+                  },
+                },
+              },
+            },
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                phone: true,
+              },
+            },
+            pickupPoint: {
+              select: {
+                id: true,
+                name: true,
+                address: true,
+              },
+            },
+            coupon: {
+              select: {
+                id: true,
+                code: true,
+                discountType: true,
+                discountValue: true,
+              },
+            },
+          },
+        }),
+        this.prisma.order.count({ where }),
+      ]);
+
+      return {
+        data: orders,
+        meta: {
+          total,
+          page,
+          limit,
+          totalPages: Math.ceil(total / limit),
+        },
+      };
+    } catch (error) {
+      this.logger.error(
+        `Error getting all orders: ${error.message}`,
+        error.stack,
+      );
+      throw new InternalServerErrorException('Failed to get orders');
+    }
+  }
+
+  async getOrderByIdAdmin(orderId: string) {
+    try {
+      const order = await this.prisma.order.findUnique({
+        where: { id: orderId },
+        include: {
+          items: {
+            include: {
+              product: {
+                select: {
+                  id: true,
+                  name: true,
+                  images: true,
+                  slug: true,
+                  price: true,
+                  salePrice: true,
+                },
+              },
+            },
+          },
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              phone: true,
+            },
+          },
+          pickupPoint: {
+            select: {
+              id: true,
+              name: true,
+              address: true,
+              phone: true,
+            },
+          },
+          coupon: {
+            select: {
+              id: true,
+              code: true,
+              discountType: true,
+              discountValue: true,
+            },
+          },
+        },
+      });
+
+      if (!order) {
+        throw new HttpException('Order not found', HttpStatus.NOT_FOUND);
+      }
+
+      return order;
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      this.logger.error(
+        `Error getting order ${orderId}: ${error.message}`,
+        error.stack,
+      );
+      throw new InternalServerErrorException('Failed to get order');
+    }
+  }
+
+  async updateOrderStatus(orderId: string, dto: { status: string }) {
+    try {
+      const order = await this.prisma.order.findUnique({
+        where: { id: orderId },
+      });
+
+      if (!order) {
+        throw new HttpException('Order not found', HttpStatus.NOT_FOUND);
+      }
+
+      const updatedOrder = await this.prisma.order.update({
+        where: { id: orderId },
+        data: { status: dto.status },
+        include: {
+          items: {
+            include: {
+              product: {
+                select: {
+                  id: true,
+                  name: true,
+                  images: true,
+                  slug: true,
+                },
+              },
+            },
+          },
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              phone: true,
+            },
+          },
+          pickupPoint: {
+            select: {
+              id: true,
+              name: true,
+              address: true,
+            },
+          },
+        },
+      });
+
+      // Invalidate cache
+      await this.cacheService.invalidateUserOrders(order.userId);
+      await this.cacheService.invalidateOrder(order.userId, orderId);
+
+      this.logger.log(`Order ${orderId} status updated to ${dto.status}`);
+
+      return updatedOrder;
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      this.logger.error(
+        `Error updating order status ${orderId}: ${error.message}`,
+        error.stack,
+      );
+      throw new InternalServerErrorException('Failed to update order status');
+    }
+  }
+
+  async getOrderStats() {
+    try {
+      const [
+        totalOrders,
+        pendingOrders,
+        processingOrders,
+        deliveredOrders,
+        totalRevenue,
+      ] = await Promise.all([
+        this.prisma.order.count({
+          where: { status: { not: 'CART' } },
+        }),
+        this.prisma.order.count({
+          where: { status: 'PENDING' },
+        }),
+        this.prisma.order.count({
+          where: { status: 'PROCESSING' },
+        }),
+        this.prisma.order.count({
+          where: { status: 'DELIVERED' },
+        }),
+        this.prisma.order.aggregate({
+          where: { status: { in: ['PAID', 'PROCESSING', 'DELIVERED'] } },
+          _sum: { totalPrice: true },
+        }),
+      ]);
+
+      return {
+        totalOrders,
+        pendingOrders,
+        processingOrders,
+        deliveredOrders,
+        totalRevenue: totalRevenue._sum.totalPrice || 0,
+      };
+    } catch (error) {
+      this.logger.error(
+        `Error getting order stats: ${error.message}`,
+        error.stack,
+      );
+      throw new InternalServerErrorException('Failed to get order stats');
+    }
+  }
 }
