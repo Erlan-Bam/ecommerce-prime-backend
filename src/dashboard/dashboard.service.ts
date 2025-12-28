@@ -163,7 +163,7 @@ export class DashboardService {
       });
 
       return orders.map((order) => ({
-        id: order.orderNumber,
+        id: order.id,
         customer: order.user.name || order.user.email,
         amount: order.finalTotal.toNumber(),
         status: this.mapStatus(order.status),
