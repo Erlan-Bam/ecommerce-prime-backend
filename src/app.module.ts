@@ -18,6 +18,7 @@ import { CouponModule } from './coupon/coupon.module';
 import { OrderModule } from './order/order.module';
 import { FavoriteModule } from './favorite/favorite.module';
 import { BlogModule } from './blog/blog.module';
+import { DashboardModule } from './dashboard/dashboard.module';
 
 @Module({
   imports: [
@@ -56,6 +57,7 @@ import { BlogModule } from './blog/blog.module';
     OrderModule,
     FavoriteModule,
     BlogModule,
+    DashboardModule,
   ],
   controllers: [AppController],
   providers: [],
