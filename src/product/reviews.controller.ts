@@ -10,7 +10,7 @@ import {
   DefaultValuePipe,
 } from '@nestjs/common';
 import { ReviewsService } from './reviews.service';
-import { AdminGuard } from '../auth/guards/admin.guard';
+import { AdminGuard } from '../shared/guards/admin.guard';
 import { ApiTags, ApiQuery, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 
 @ApiTags('Reviews')
