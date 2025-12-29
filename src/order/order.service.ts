@@ -1019,9 +1019,7 @@ export class OrderService {
       const { page, limit, status, userId } = filters;
       const skip = (page - 1) * limit;
 
-      const where: any = {
-        status: { not: 'CART' },
-      };
+      const where: any = {};
 
       if (status) {
         where.status = status;
