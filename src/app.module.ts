@@ -19,6 +19,7 @@ import { OrderModule } from './order/order.module';
 import { FavoriteModule } from './favorite/favorite.module';
 import { BlogModule } from './blog/blog.module';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { UsersModule } from './users/users.module';
 
 @Module({
   imports: [
@@ -58,6 +59,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
     FavoriteModule,
     BlogModule,
     DashboardModule,
+    UsersModule,
   ],
   controllers: [AppController],
   providers: [],
