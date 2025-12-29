@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../shared/services/prisma.service';
 import { UpdateUserDto } from './dto';
-import { Prisma } from '@prisma/client';
+import { Prisma, Role } from '@prisma/client';
 
 @Injectable()
 export class UsersService {
@@ -23,7 +23,7 @@ export class UsersService {
     const where: Prisma.UserWhereInput = {};
 
     if (params.role) {
-      where.role = params.role;
+      where.role = params.role as Role;
     }
 
     if (params.isBanned !== undefined) {
