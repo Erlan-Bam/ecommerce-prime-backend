@@ -20,6 +20,7 @@ import { FavoriteModule } from './favorite/favorite.module';
 import { BlogModule } from './blog/blog.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { UsersModule } from './users/users.module';
+import { ReviewsModule } from './reviews/reviews.module';
 
 @Module({
   imports: [
@@ -60,6 +61,7 @@ import { UsersModule } from './users/users.module';
     BlogModule,
     DashboardModule,
     UsersModule,
+    ReviewsModule,
   ],
   controllers: [AppController],
   providers: [],
