@@ -100,7 +100,6 @@ async function main() {
     console.log('✅ Test user created:', testUser.email);
   }
 
-  /* COMMENTED OUT - NOT SEEDING BRANDS
   // Create Brands
   console.log('🏷️ Creating brands...');
   const brandsData = [
@@ -118,16 +117,7 @@ async function main() {
   for (const brand of brandsData) {
     brands[brand.slug] = await prisma.brand.create({ data: brand });
   }
-  */
 
-  // Get existing brands and categories from database
-  const brands: Record<string, any> = {};
-  const existingBrands = await prisma.brand.findMany();
-  for (const brand of existingBrands) {
-    brands[brand.slug] = brand;
-  }
-
-  /* COMMENTED OUT - NOT SEEDING CATEGORIES
   // Create Categories
   console.log('📁 Creating categories...');
 
@@ -395,39 +385,12 @@ async function main() {
       sortOrder: 3,
     },
   });
-  */
 
-  // Get existing categories from database
-  const categories = await prisma.category.findMany();
-  const iphoneCategory = categories.find((c) => c.slug === 'iphone');
-  const appleWatch = categories.find((c) => c.slug === 'apple-watch');
-  const airpods = categories.find((c) => c.slug === 'airpods');
-  const imac = categories.find((c) => c.slug === 'imac');
-  const ipad = categories.find((c) => c.slug === 'ipad');
-  const macbook = categories.find((c) => c.slug === 'macbook');
-  const macMini = categories.find((c) => c.slug === 'mac-mini');
-  const samsungPhones = categories.find((c) => c.slug === 'samsung-galaxy');
-  const samsungWatch = categories.find((c) => c.slug === 'samsung-watch');
-  const galaxyBuds = categories.find((c) => c.slug === 'galaxy-buds');
-  const samsungTablets = categories.find((c) => c.slug === 'samsung-tablets');
-  const xiaomiPhones = categories.find((c) => c.slug === 'xiaomi-phones');
-  const xiaomiWatch = categories.find((c) => c.slug === 'xiaomi-watch');
-  const xiaomiBuds = categories.find((c) => c.slug === 'xiaomi-buds');
-  const dysonVacuums = categories.find((c) => c.slug === 'dyson-vacuums');
-  const dysonAircare = categories.find((c) => c.slug === 'dyson-aircare');
-  const dysonHaircare = categories.find((c) => c.slug === 'dyson-haircare');
-  const smartphones = categories.find((c) => c.slug === 'smartphones');
-  const laptops = categories.find((c) => c.slug === 'laptops');
-  const watches = categories.find((c) => c.slug === 'smart-watches');
-  const headphones = categories.find((c) => c.slug === 'headphones');
-  const gamingConsoles = categories.find((c) => c.slug === 'gaming-consoles');
-  const accessories = categories.find((c) => c.slug === 'accessories');
-
-  /* COMMENTED OUT - NOT SEEDING PICKUP POINTS
   // Create Pickup Points
   console.log('📍 Creating pickup points...');
   const pickupPoint1 = await prisma.pickupPoint.create({
     data: {
+      name: 'ТРЦ Мега Алматы',
       address: 'ул. Абая 150, ТРЦ Мега, Алматы',
       coords: '43.2380,76.9450',
       workingSchedule: {
@@ -444,6 +407,7 @@ async function main() {
 
   const pickupPoint2 = await prisma.pickupPoint.create({
     data: {
+      name: 'ТЦ Керуен Астана',
       address: 'пр. Достык 5, ТЦ Керуен, Астана',
       coords: '51.1280,71.4300',
       workingSchedule: {
@@ -457,12 +421,6 @@ async function main() {
       },
     },
   });
-  */
-
-  // Get existing pickup points from database
-  const pickupPoints = await prisma.pickupPoint.findMany();
-  const pickupPoint1 = pickupPoints[0];
-  const pickupPoint2 = pickupPoints[1];
 
   // Create Products
   console.log('📦 Creating products...');
@@ -1741,7 +1699,6 @@ async function main() {
     }
   }
 
-  /* COMMENTED OUT - NOT SEEDING REVIEWS
   // Create some reviews
   console.log('⭐ Creating reviews...');
   const products = await prisma.product.findMany({ take: 50 });
@@ -1763,9 +1720,7 @@ async function main() {
         .catch(() => {}); // Skip if duplicate
     }
   }
-  */
 
-  /* COMMENTED OUT - NOT SEEDING COUPONS
   // Create coupons
   console.log('🎟️ Creating coupons...');
   await prisma.coupon.createMany({
@@ -1788,7 +1743,6 @@ async function main() {
       },
     ],
   });
-  */
 
   console.log('📊 Seed summary:');
   console.log(`   - Users: ${await prisma.user.count()}`);
