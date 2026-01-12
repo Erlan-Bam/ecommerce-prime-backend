@@ -706,7 +706,7 @@ async function main() {
       ? []
       : [
           // ==================== APPLE PRODUCTS ====================
-          // iPhones - 40 products
+          // iPhones - 1 product for testing
           ...generateProducts(
             iphoneCategory.id,
             brands.apple.id,
@@ -715,13 +715,14 @@ async function main() {
             'Самый мощный iPhone с чипом A17 Pro, титановым корпусом и продвинутой камерой.',
             699990,
             PRODUCT_IMAGES, // Using custom images
-            10,
+            1,
             [
               { name: 'Процессор', values: ['A17 Pro'] },
               { name: 'Диагональ', values: ['6.7"'] },
               { name: 'Камера', values: ['48MP'] },
             ],
           ),
+          /* COMMENTED OUT - OTHER PRODUCTS
           ...generateProducts(
             iphoneCategory.id,
             brands.apple.id,
@@ -1688,6 +1689,7 @@ async function main() {
             10,
             [{ name: 'В комплекте', values: ['1 шт', '4 шт'] }],
           ),
+          */
         ];
 
   for (const productData of productsData) {
