@@ -98,7 +98,12 @@ export class CronService {
         'category:all:page:1:limit:10',
         {
           data: categories,
-          meta: { total, page: 1, limit: 10, totalPages: Math.ceil(total / 10) },
+          meta: {
+            total,
+            page: 1,
+            limit: 10,
+            totalPages: Math.ceil(total / 10),
+          },
         },
         this.CACHE_TTL.categories,
       );
@@ -148,7 +153,12 @@ export class CronService {
         'brand:all:page:1:limit:20',
         {
           data: brands,
-          meta: { total, page: 1, limit: 20, totalPages: Math.ceil(total / 20) },
+          meta: {
+            total,
+            page: 1,
+            limit: 20,
+            totalPages: Math.ceil(total / 20),
+          },
         },
         this.CACHE_TTL.brands,
       );
@@ -188,12 +198,19 @@ export class CronService {
         'pickup-point:all:page:1:limit:20',
         {
           data: pickupPoints,
-          meta: { total, page: 1, limit: 20, totalPages: Math.ceil(total / 20) },
+          meta: {
+            total,
+            page: 1,
+            limit: 20,
+            totalPages: Math.ceil(total / 20),
+          },
         },
         this.CACHE_TTL.pickupPoints,
       );
 
-      this.logger.log(`Pickup point cache warmed: ${pickupPoints.length} points`);
+      this.logger.log(
+        `Pickup point cache warmed: ${pickupPoints.length} points`,
+      );
     } catch (error) {
       this.logger.error('Error warming pickup point cache:', error);
     }
