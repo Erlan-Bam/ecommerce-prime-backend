@@ -18,7 +18,7 @@ const prisma = new PrismaClient({
 });
 
 // Base URL for static images
-const BASE_URL = 'https://ecommerce-prime-backend-production.up.railway.app';
+const BASE_URL = 'https://api.prime-electronics.ru';
 
 // Product images - using the 4 provided images
 const PRODUCT_IMAGES = [
@@ -115,15 +115,25 @@ async function main() {
 
   const brands: Record<string, any> = {};
   for (const brand of brandsData) {
-    brands[brand.slug] = await prisma.brand.create({ data: brand });
+    brands[brand.slug] = await prisma.brand.upsert({
+      where: { name: brand.name },
+      update: brand,
+      create: brand,
+    });
   }
 
   // Create Categories
   console.log('📁 Creating categories...');
 
   // Parent categories
-  const apple = await prisma.category.create({
-    data: {
+  const apple = await prisma.category.upsert({
+    where: { slug: 'apple' },
+    update: {
+      title: 'Apple',
+      image: `${BASE_URL}/images/categories/apple.png`,
+      sortOrder: 1,
+    },
+    create: {
       title: 'Apple',
       slug: 'apple',
       image: `${BASE_URL}/images/categories/apple.png`,
@@ -131,8 +141,14 @@ async function main() {
     },
   });
 
-  const samsung = await prisma.category.create({
-    data: {
+  const samsung = await prisma.category.upsert({
+    where: { slug: 'samsung' },
+    update: {
+      title: 'Samsung',
+      image: `${BASE_URL}/images/categories/samsung.png`,
+      sortOrder: 2,
+    },
+    create: {
       title: 'Samsung',
       slug: 'samsung',
       image: `${BASE_URL}/images/categories/samsung.png`,
@@ -140,8 +156,14 @@ async function main() {
     },
   });
 
-  const xiaomi = await prisma.category.create({
-    data: {
+  const xiaomi = await prisma.category.upsert({
+    where: { slug: 'xiaomi' },
+    update: {
+      title: 'Xiaomi',
+      image: `${BASE_URL}/images/categories/xiaomi.png`,
+      sortOrder: 3,
+    },
+    create: {
       title: 'Xiaomi',
       slug: 'xiaomi',
       image: `${BASE_URL}/images/categories/xiaomi.png`,
@@ -149,8 +171,14 @@ async function main() {
     },
   });
 
-  const dyson = await prisma.category.create({
-    data: {
+  const dyson = await prisma.category.upsert({
+    where: { slug: 'dyson' },
+    update: {
+      title: 'Dyson',
+      image: `${BASE_URL}/images/categories/dyson.png`,
+      sortOrder: 4,
+    },
+    create: {
       title: 'Dyson',
       slug: 'dyson',
       image: `${BASE_URL}/images/categories/dyson.png`,
@@ -158,8 +186,14 @@ async function main() {
     },
   });
 
-  const smartphones = await prisma.category.create({
-    data: {
+  const smartphones = await prisma.category.upsert({
+    where: { slug: 'smartphones' },
+    update: {
+      title: 'Смартфоны',
+      image: `${BASE_URL}/images/categories/smartphones.png`,
+      sortOrder: 5,
+    },
+    create: {
       title: 'Смартфоны',
       slug: 'smartphones',
       image: `${BASE_URL}/images/categories/smartphones.png`,
@@ -167,8 +201,14 @@ async function main() {
     },
   });
 
-  const laptops = await prisma.category.create({
-    data: {
+  const laptops = await prisma.category.upsert({
+    where: { slug: 'laptops' },
+    update: {
+      title: 'Ноутбуки',
+      image: `${BASE_URL}/images/categories/laptops.png`,
+      sortOrder: 6,
+    },
+    create: {
       title: 'Ноутбуки',
       slug: 'laptops',
       image: `${BASE_URL}/images/categories/laptops.png`,
@@ -176,8 +216,14 @@ async function main() {
     },
   });
 
-  const watches = await prisma.category.create({
-    data: {
+  const watches = await prisma.category.upsert({
+    where: { slug: 'smart-watches' },
+    update: {
+      title: 'Умные часы',
+      image: `${BASE_URL}/images/categories/smart-watches.png`,
+      sortOrder: 7,
+    },
+    create: {
       title: 'Умные часы',
       slug: 'smart-watches',
       image: `${BASE_URL}/images/categories/smart-watches.png`,
@@ -185,8 +231,14 @@ async function main() {
     },
   });
 
-  const headphones = await prisma.category.create({
-    data: {
+  const headphones = await prisma.category.upsert({
+    where: { slug: 'headphones' },
+    update: {
+      title: 'Наушники',
+      image: `${BASE_URL}/images/categories/headphones.png`,
+      sortOrder: 8,
+    },
+    create: {
       title: 'Наушники',
       slug: 'headphones',
       image: `${BASE_URL}/images/categories/headphones.png`,
@@ -194,8 +246,14 @@ async function main() {
     },
   });
 
-  const gamingConsoles = await prisma.category.create({
-    data: {
+  const gamingConsoles = await prisma.category.upsert({
+    where: { slug: 'gaming-consoles' },
+    update: {
+      title: 'Игровые приставки',
+      image: `${BASE_URL}/images/categories/playstations.png`,
+      sortOrder: 9,
+    },
+    create: {
       title: 'Игровые приставки',
       slug: 'gaming-consoles',
       image: `${BASE_URL}/images/categories/playstations.png`,
@@ -203,8 +261,14 @@ async function main() {
     },
   });
 
-  const accessories = await prisma.category.create({
-    data: {
+  const accessories = await prisma.category.upsert({
+    where: { slug: 'accessories' },
+    update: {
+      title: 'Аксессуары',
+      image: `${BASE_URL}/images/categories/accessories.png`,
+      sortOrder: 10,
+    },
+    create: {
       title: 'Аксессуары',
       slug: 'accessories',
       image: `${BASE_URL}/images/categories/accessories.png`,
@@ -213,8 +277,15 @@ async function main() {
   });
 
   // Subcategories for Apple
-  const iphoneCategory = await prisma.category.create({
-    data: {
+  const iphoneCategory = await prisma.category.upsert({
+    where: { slug: 'iphone' },
+    update: {
+      title: 'iPhone',
+      parentId: apple.id,
+      image: `${BASE_URL}/images/categories/smartphones.png`,
+      sortOrder: 1,
+    },
+    create: {
       title: 'iPhone',
       slug: 'iphone',
       parentId: apple.id,
@@ -223,8 +294,15 @@ async function main() {
     },
   });
 
-  const appleWatch = await prisma.category.create({
-    data: {
+  const appleWatch = await prisma.category.upsert({
+    where: { slug: 'apple-watch' },
+    update: {
+      title: 'Apple Watch',
+      parentId: apple.id,
+      image: `${BASE_URL}/images/categories/smart-watches.png`,
+      sortOrder: 2,
+    },
+    create: {
       title: 'Apple Watch',
       slug: 'apple-watch',
       parentId: apple.id,
@@ -233,8 +311,15 @@ async function main() {
     },
   });
 
-  const airpods = await prisma.category.create({
-    data: {
+  const airpods = await prisma.category.upsert({
+    where: { slug: 'airpods' },
+    update: {
+      title: 'AirPods',
+      parentId: apple.id,
+      image: `${BASE_URL}/images/categories/headphones.png`,
+      sortOrder: 3,
+    },
+    create: {
       title: 'AirPods',
       slug: 'airpods',
       parentId: apple.id,
@@ -243,8 +328,15 @@ async function main() {
     },
   });
 
-  const imac = await prisma.category.create({
-    data: {
+  const imac = await prisma.category.upsert({
+    where: { slug: 'imac' },
+    update: {
+      title: 'iMac',
+      parentId: apple.id,
+      image: `${BASE_URL}/images/categories/laptops.png`,
+      sortOrder: 4,
+    },
+    create: {
       title: 'iMac',
       slug: 'imac',
       parentId: apple.id,
@@ -253,8 +345,15 @@ async function main() {
     },
   });
 
-  const ipad = await prisma.category.create({
-    data: {
+  const ipad = await prisma.category.upsert({
+    where: { slug: 'ipad' },
+    update: {
+      title: 'iPad',
+      parentId: apple.id,
+      image: `${BASE_URL}/images/categories/laptops.png`,
+      sortOrder: 5,
+    },
+    create: {
       title: 'iPad',
       slug: 'ipad',
       parentId: apple.id,
@@ -263,8 +362,15 @@ async function main() {
     },
   });
 
-  const macbook = await prisma.category.create({
-    data: {
+  const macbook = await prisma.category.upsert({
+    where: { slug: 'macbook' },
+    update: {
+      title: 'MacBook',
+      parentId: apple.id,
+      image: `${BASE_URL}/images/categories/macbook.png`,
+      sortOrder: 6,
+    },
+    create: {
       title: 'MacBook',
       slug: 'macbook',
       parentId: apple.id,
@@ -273,8 +379,15 @@ async function main() {
     },
   });
 
-  const macMini = await prisma.category.create({
-    data: {
+  const macMini = await prisma.category.upsert({
+    where: { slug: 'mac-mini' },
+    update: {
+      title: 'Mac mini',
+      parentId: apple.id,
+      image: `${BASE_URL}/images/categories/laptops.png`,
+      sortOrder: 7,
+    },
+    create: {
       title: 'Mac mini',
       slug: 'mac-mini',
       parentId: apple.id,
@@ -284,8 +397,15 @@ async function main() {
   });
 
   // Subcategories for Samsung
-  const samsungPhones = await prisma.category.create({
-    data: {
+  const samsungPhones = await prisma.category.upsert({
+    where: { slug: 'samsung-galaxy' },
+    update: {
+      title: 'Samsung Galaxy',
+      parentId: samsung.id,
+      image: `${BASE_URL}/images/categories/smartphones.png`,
+      sortOrder: 1,
+    },
+    create: {
       title: 'Samsung Galaxy',
       slug: 'samsung-galaxy',
       parentId: samsung.id,
@@ -294,8 +414,15 @@ async function main() {
     },
   });
 
-  const samsungWatch = await prisma.category.create({
-    data: {
+  const samsungWatch = await prisma.category.upsert({
+    where: { slug: 'samsung-watch' },
+    update: {
+      title: 'Samsung Galaxy Watch',
+      parentId: samsung.id,
+      image: `${BASE_URL}/images/categories/smart-watches.png`,
+      sortOrder: 2,
+    },
+    create: {
       title: 'Samsung Galaxy Watch',
       slug: 'samsung-watch',
       parentId: samsung.id,
@@ -304,8 +431,15 @@ async function main() {
     },
   });
 
-  const galaxyBuds = await prisma.category.create({
-    data: {
+  const galaxyBuds = await prisma.category.upsert({
+    where: { slug: 'galaxy-buds' },
+    update: {
+      title: 'Galaxy Buds',
+      parentId: samsung.id,
+      image: `${BASE_URL}/images/categories/headphones.png`,
+      sortOrder: 3,
+    },
+    create: {
       title: 'Galaxy Buds',
       slug: 'galaxy-buds',
       parentId: samsung.id,
@@ -314,8 +448,15 @@ async function main() {
     },
   });
 
-  const samsungTablets = await prisma.category.create({
-    data: {
+  const samsungTablets = await prisma.category.upsert({
+    where: { slug: 'samsung-tablets' },
+    update: {
+      title: 'Samsung Tablets',
+      parentId: samsung.id,
+      image: `${BASE_URL}/images/categories/laptops.png`,
+      sortOrder: 4,
+    },
+    create: {
       title: 'Samsung Tablets',
       slug: 'samsung-tablets',
       parentId: samsung.id,
@@ -325,8 +466,15 @@ async function main() {
   });
 
   // Subcategories for Xiaomi
-  const xiaomiPhones = await prisma.category.create({
-    data: {
+  const xiaomiPhones = await prisma.category.upsert({
+    where: { slug: 'xiaomi-phones' },
+    update: {
+      title: 'Xiaomi Phones',
+      parentId: xiaomi.id,
+      image: `${BASE_URL}/images/categories/smartphones.png`,
+      sortOrder: 1,
+    },
+    create: {
       title: 'Xiaomi Phones',
       slug: 'xiaomi-phones',
       parentId: xiaomi.id,
@@ -335,8 +483,15 @@ async function main() {
     },
   });
 
-  const xiaomiWatch = await prisma.category.create({
-    data: {
+  const xiaomiWatch = await prisma.category.upsert({
+    where: { slug: 'xiaomi-watch' },
+    update: {
+      title: 'Xiaomi Watch',
+      parentId: xiaomi.id,
+      image: `${BASE_URL}/images/categories/smart-watches.png`,
+      sortOrder: 2,
+    },
+    create: {
       title: 'Xiaomi Watch',
       slug: 'xiaomi-watch',
       parentId: xiaomi.id,
@@ -345,8 +500,15 @@ async function main() {
     },
   });
 
-  const xiaomiBuds = await prisma.category.create({
-    data: {
+  const xiaomiBuds = await prisma.category.upsert({
+    where: { slug: 'xiaomi-buds' },
+    update: {
+      title: 'Xiaomi Buds',
+      parentId: xiaomi.id,
+      image: `${BASE_URL}/images/categories/headphones.png`,
+      sortOrder: 3,
+    },
+    create: {
       title: 'Xiaomi Buds',
       slug: 'xiaomi-buds',
       parentId: xiaomi.id,
@@ -356,8 +518,15 @@ async function main() {
   });
 
   // Subcategories for Dyson
-  const dysonVacuums = await prisma.category.create({
-    data: {
+  const dysonVacuums = await prisma.category.upsert({
+    where: { slug: 'dyson-vacuums' },
+    update: {
+      title: 'Dyson Vacuums',
+      parentId: dyson.id,
+      image: `${BASE_URL}/images/categories/dyson.png`,
+      sortOrder: 1,
+    },
+    create: {
       title: 'Dyson Vacuums',
       slug: 'dyson-vacuums',
       parentId: dyson.id,
@@ -366,8 +535,15 @@ async function main() {
     },
   });
 
-  const dysonAircare = await prisma.category.create({
-    data: {
+  const dysonAircare = await prisma.category.upsert({
+    where: { slug: 'dyson-aircare' },
+    update: {
+      title: 'Dyson Aircare',
+      parentId: dyson.id,
+      image: `${BASE_URL}/images/categories/dyson.png`,
+      sortOrder: 2,
+    },
+    create: {
       title: 'Dyson Aircare',
       slug: 'dyson-aircare',
       parentId: dyson.id,
@@ -376,8 +552,15 @@ async function main() {
     },
   });
 
-  const dysonHaircare = await prisma.category.create({
-    data: {
+  const dysonHaircare = await prisma.category.upsert({
+    where: { slug: 'dyson-haircare' },
+    update: {
+      title: 'Dyson Haircare',
+      parentId: dyson.id,
+      image: `${BASE_URL}/images/categories/dyson.png`,
+      sortOrder: 3,
+    },
+    create: {
       title: 'Dyson Haircare',
       slug: 'dyson-haircare',
       parentId: dyson.id,
@@ -388,39 +571,51 @@ async function main() {
 
   // Create Pickup Points
   console.log('📍 Creating pickup points...');
-  const pickupPoint1 = await prisma.pickupPoint.create({
-    data: {
-      name: 'ТРЦ Мега Алматы',
-      address: 'ул. Абая 150, ТРЦ Мега, Алматы',
-      coords: '43.2380,76.9450',
-      workingSchedule: {
-        Пн: { from: '10:00', to: '22:00' },
-        Вт: { from: '10:00', to: '22:00' },
-        Ср: { from: '10:00', to: '22:00' },
-        Чт: { from: '10:00', to: '22:00' },
-        Пт: { from: '10:00', to: '22:00' },
-        Сб: { from: '10:00', to: '22:00' },
-        Вс: { from: '10:00', to: '21:00' },
-      },
-    },
+  let pickupPoint1 = await prisma.pickupPoint.findFirst({
+    where: { name: 'ТРЦ Мега Алматы' },
   });
+  
+  if (!pickupPoint1) {
+    pickupPoint1 = await prisma.pickupPoint.create({
+      data: {
+        name: 'ТРЦ Мега Алматы',
+        address: 'ул. Абая 150, ТРЦ Мега, Алматы',
+        coords: '43.2380,76.9450',
+        workingSchedule: {
+          Пн: { from: '10:00', to: '22:00' },
+          Вт: { from: '10:00', to: '22:00' },
+          Ср: { from: '10:00', to: '22:00' },
+          Чт: { from: '10:00', to: '22:00' },
+          Пт: { from: '10:00', to: '22:00' },
+          Сб: { from: '10:00', to: '22:00' },
+          Вс: { from: '10:00', to: '21:00' },
+        },
+      },
+    });
+  }
 
-  const pickupPoint2 = await prisma.pickupPoint.create({
-    data: {
-      name: 'ТЦ Керуен Астана',
-      address: 'пр. Достык 5, ТЦ Керуен, Астана',
-      coords: '51.1280,71.4300',
-      workingSchedule: {
-        Пн: { from: '09:00', to: '21:00' },
-        Вт: { from: '09:00', to: '21:00' },
-        Ср: { from: '09:00', to: '21:00' },
-        Чт: { from: '09:00', to: '21:00' },
-        Пт: { from: '09:00', to: '21:00' },
-        Сб: { from: '10:00', to: '20:00' },
-        Вс: { from: '10:00', to: '20:00' },
-      },
-    },
+  let pickupPoint2 = await prisma.pickupPoint.findFirst({
+    where: { name: 'ТЦ Керуен Астана' },
   });
+  
+  if (!pickupPoint2) {
+    pickupPoint2 = await prisma.pickupPoint.create({
+      data: {
+        name: 'ТЦ Керуен Астана',
+        address: 'пр. Достык 5, ТЦ Керуен, Астана',
+        coords: '51.1280,71.4300',
+        workingSchedule: {
+          Пн: { from: '09:00', to: '21:00' },
+          Вт: { from: '09:00', to: '21:00' },
+          Ср: { from: '09:00', to: '21:00' },
+          Чт: { from: '09:00', to: '21:00' },
+          Пт: { from: '09:00', to: '21:00' },
+          Сб: { from: '10:00', to: '20:00' },
+          Вс: { from: '10:00', to: '20:00' },
+        },
+      },
+    });
+  }
 
   // Create Products
   console.log('📦 Creating products...');
@@ -1723,26 +1918,32 @@ async function main() {
 
   // Create coupons
   console.log('🎟️ Creating coupons...');
-  await prisma.coupon.createMany({
-    data: [
-      {
-        code: 'WELCOME10',
-        type: 'PERCENTAGE',
-        value: 10,
-        validFrom: new Date(),
-        validTo: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
-        usageLimit: 1000,
-      },
-      {
-        code: 'SAVE5000',
-        type: 'FIXED',
-        value: 5000,
-        validFrom: new Date(),
-        validTo: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-        usageLimit: 500,
-      },
-    ],
-  });
+  const couponsData = [
+    {
+      code: 'WELCOME10',
+      type: 'PERCENTAGE' as const,
+      value: 10,
+      validFrom: new Date(),
+      validTo: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+      usageLimit: 1000,
+    },
+    {
+      code: 'SAVE5000',
+      type: 'FIXED' as const,
+      value: 5000,
+      validFrom: new Date(),
+      validTo: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      usageLimit: 500,
+    },
+  ];
+  
+  for (const coupon of couponsData) {
+    await prisma.coupon.upsert({
+      where: { code: coupon.code },
+      update: coupon,
+      create: coupon,
+    });
+  }
 
   console.log('📊 Seed summary:');
   console.log(`   - Users: ${await prisma.user.count()}`);
