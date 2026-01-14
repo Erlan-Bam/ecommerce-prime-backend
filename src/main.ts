@@ -21,6 +21,7 @@ async function bootstrap() {
       'https://e-commerce-production-bf09.up.railway.app',
       'https://ecommerce-prime-backend-production.up.railway.app',
       'https://e-commerce-admin-production-9e9f.up.railway.app',
+      'https://prime-electronics.ru',
     ],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: [
