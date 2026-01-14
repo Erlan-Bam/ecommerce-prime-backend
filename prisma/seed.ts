@@ -574,7 +574,7 @@ async function main() {
   let pickupPoint1 = await prisma.pickupPoint.findFirst({
     where: { name: 'ТРЦ Мега Алматы' },
   });
-  
+
   if (!pickupPoint1) {
     pickupPoint1 = await prisma.pickupPoint.create({
       data: {
@@ -597,7 +597,7 @@ async function main() {
   let pickupPoint2 = await prisma.pickupPoint.findFirst({
     where: { name: 'ТЦ Керуен Астана' },
   });
-  
+
   if (!pickupPoint2) {
     pickupPoint2 = await prisma.pickupPoint.create({
       data: {
@@ -1936,7 +1936,7 @@ async function main() {
       usageLimit: 500,
     },
   ];
-  
+
   for (const coupon of couponsData) {
     await prisma.coupon.upsert({
       where: { code: coupon.code },
