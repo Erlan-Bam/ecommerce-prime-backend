@@ -49,6 +49,9 @@ async function copyImages(
 ): Promise<string[]> {
   const sourceDir = path.join(__dirname, '../src/content/17');
   const destDir = path.join(__dirname, '../public/images/products');
+  const BASE_URL =
+    process.env.BASE_URL ||
+    'https://ecommerce-prime-backend-production.up.railway.app';
 
   if (!fs.existsSync(destDir)) {
     fs.mkdirSync(destDir, { recursive: true });
@@ -69,7 +72,9 @@ async function copyImages(
 
     if (fs.existsSync(sourceFile)) {
       fs.copyFileSync(sourceFile, destFile);
-      copiedImages.push(`/images/products/${productSlug}-${i + 1}${ext}`);
+      copiedImages.push(
+        `${BASE_URL}/images/products/${productSlug}-${i + 1}${ext}`,
+      );
       console.log(
         `Скопировано: ${imageFiles[i]} -> ${productSlug}-${i + 1}${ext}`,
       );
