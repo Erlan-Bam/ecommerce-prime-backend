@@ -591,10 +591,20 @@ export class ProductService {
         const attrs = JSON.parse(filter.attributes);
         where.attributes = {
           some: {
-            OR: Object.entries(attrs).map(([name, value]) => ({
-              name,
-              value: value as string,
-            })),
+            OR: Object.entries(attrs).map(([name, values]) => {
+              // If values is an array, use 'in' operator
+              if (Array.isArray(values)) {
+                return {
+                  name,
+                  value: { in: values },
+                };
+              }
+              // If single value, use direct comparison
+              return {
+                name,
+                value: values as string,
+              };
+            }),
           },
         };
       } catch {
