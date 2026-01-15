@@ -5,6 +5,7 @@ import {
   IsOptional,
   IsBoolean,
   IsObject,
+  IsArray,
   Matches,
 } from 'class-validator';
 import { Prisma } from '@prisma/client';
@@ -37,6 +38,47 @@ export class CreateBlogDto {
       'Slug must be URL-friendly (lowercase letters, numbers, and hyphens only)',
   })
   slug: string;
+
+  @ApiPropertyOptional({
+    description: 'Short description for blog list',
+    example: 'A brief overview of our new store features...',
+  })
+  @IsOptional()
+  @IsString()
+  excerpt?: string;
+
+  @ApiPropertyOptional({
+    description: 'Featured image URL',
+    example: '/images/blog/welcome.jpg',
+  })
+  @IsOptional()
+  @IsString()
+  imageUrl?: string;
+
+  @ApiPropertyOptional({
+    description: 'Author name',
+    example: 'Редакция Prime',
+  })
+  @IsOptional()
+  @IsString()
+  author?: string;
+
+  @ApiPropertyOptional({
+    description: 'Estimated read time',
+    example: '5 мин',
+  })
+  @IsOptional()
+  @IsString()
+  readTime?: string;
+
+  @ApiPropertyOptional({
+    description: 'Tags for the blog post',
+    example: ['Apple', 'iPhone', 'Новинки'],
+  })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  tags?: string[];
 
   @ApiPropertyOptional({
     description: 'SEO meta data (description, keywords, ogImage)',

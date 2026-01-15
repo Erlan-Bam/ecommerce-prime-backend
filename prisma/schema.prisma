@@ -308,6 +308,11 @@ model Blog {
   title     String
   text      String
   slug      String   @unique
+  excerpt   String?  // Short description for blog list
+  imageUrl  String?  // Featured image URL
+  author    String   @default("Редакция Prime")
+  readTime  String   @default("5 мин")
+  tags      String[] @default([])
   meta      Json?    // SEO meta data: { description, keywords, ogImage, etc. }
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
