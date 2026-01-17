@@ -12,6 +12,7 @@ export class CronService {
     categories: 3600, // 1 hour
     brands: 3600, // 1 hour
     pickupPoints: 3600, // 1 hour
+    blog: 1800, // 30 minutes
   };
 
   constructor(
@@ -32,6 +33,7 @@ export class CronService {
         this.warmCategoryCache(),
         this.warmBrandCache(),
         this.warmPickupPointCache(),
+        this.warmBlogCache(),
       ]);
 
       this.logger.log('Cache warming cycle completed successfully');
@@ -213,6 +215,70 @@ export class CronService {
       );
     } catch (error) {
       this.logger.error('Error warming pickup point cache:', error);
+    }
+  }
+
+  /**
+   * Warm blog cache - active posts paginated list
+   */
+  private async warmBlogCache() {
+    try {
+      this.logger.log('Warming blog cache...');
+
+      // Clear existing blog cache
+      await this.redisService.clearByPattern('blog:*');
+
+      // Cache first page of active blog posts (most commonly accessed)
+      const [posts, total] = await Promise.all([
+        this.prisma.blog.findMany({
+          where: { isActive: true },
+          orderBy: { createdAt: 'desc' },
+          take: 10,
+          select: {
+            id: true,
+            title: true,
+            text: true,
+            slug: true,
+            excerpt: true,
+            imageUrl: true,
+            author: true,
+            readTime: true,
+            tags: true,
+            meta: true,
+            isActive: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        }),
+        this.prisma.blog.count({ where: { isActive: true } }),
+      ]);
+
+      await this.redisService.set(
+        'blog:list:active:1:10',
+        {
+          data: posts,
+          meta: {
+            total,
+            page: 1,
+            limit: 10,
+            totalPages: Math.ceil(total / 10),
+          },
+        },
+        this.CACHE_TTL.blog,
+      );
+
+      // Also cache individual posts by slug for quick access
+      for (const post of posts) {
+        await this.redisService.set(
+          `blog:slug:${post.slug}`,
+          post,
+          this.CACHE_TTL.blog,
+        );
+      }
+
+      this.logger.log(`Blog cache warmed: ${posts.length} posts`);
+    } catch (error) {
+      this.logger.error('Error warming blog cache:', error);
     }
   }
 
