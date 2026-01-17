@@ -12,6 +12,8 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(RedisService.name);
   private client: Redis;
 
+  private readonly DEFAULT_TTL = 3600;
+
   constructor(private readonly configService: ConfigService) {}
 
   async onModuleInit() {
@@ -55,11 +57,9 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   async set(key: string, value: any, ttl?: number): Promise<void> {
     try {
       const serialized = JSON.stringify(value);
-      if (ttl) {
-        await this.client.setex(key, ttl, serialized);
-      } else {
-        await this.client.set(key, serialized);
-      }
+      // Always use TTL - either provided or default to ensure no data lives forever
+      const effectiveTtl = ttl ?? this.DEFAULT_TTL;
+      await this.client.setex(key, effectiveTtl, serialized);
     } catch (error) {
       this.logger.error(`Error setting key ${key}:`, error);
       throw error;
