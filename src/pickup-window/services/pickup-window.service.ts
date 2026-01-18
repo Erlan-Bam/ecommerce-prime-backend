@@ -1,18 +1,27 @@
 import {
   Injectable,
+  Logger,
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../../shared/services/prisma.service';
 import { CreatePickupWindowDto, UpdatePickupWindowDto } from '../dto';
 import { PaginationDto } from '../../shared/dto/pagination.dto';
+import { PickupWindowCacheService } from './cache.service';
 
 @Injectable()
 export class PickupWindowService {
-  constructor(private prisma: PrismaService) {}
+  private readonly logger = new Logger(PickupWindowService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly cacheService: PickupWindowCacheService,
+  ) {}
 
   async create(dto: CreatePickupWindowDto) {
     const { pointId, startTime, endTime, capacity } = dto;
+
+    this.logger.log(`Creating pickup window for point: ${pointId}`);
 
     // Validate pickup point exists
     const pickupPoint = await this.prisma.pickupPoint.findUnique({
@@ -55,7 +64,7 @@ export class PickupWindowService {
       );
     }
 
-    return this.prisma.pickupWindow.create({
+    const window = await this.prisma.pickupWindow.create({
       data: {
         pointId,
         startTime: start,
@@ -72,6 +81,11 @@ export class PickupWindowService {
         },
       },
     });
+
+    await this.cacheService.invalidateByPointId(pointId);
+    this.logger.log(`Created pickup window ${window.id}, cache invalidated`);
+
+    return window;
   }
 
   async findAll(
@@ -84,6 +98,18 @@ export class PickupWindowService {
   ) {
     const { page = 1, limit = 50 } = paginationDto;
     const skip = (page - 1) * limit;
+
+    this.logger.log(
+      `Finding all pickup windows with pagination: ${JSON.stringify(paginationDto)}`,
+    );
+
+    const cacheKey = `pickup-window:all:page:${page}:limit:${limit}:point:${filters?.pointId || 'all'}:start:${filters?.startDate || 'none'}:end:${filters?.endDate || 'none'}`;
+
+    const cached = await this.cacheService.getCachedPickupWindows(cacheKey);
+    if (cached) {
+      this.logger.log(`Cache hit for ${cacheKey}`);
+      return cached;
+    }
 
     const where: any = {};
 
@@ -120,7 +146,7 @@ export class PickupWindowService {
       this.prisma.pickupWindow.count({ where }),
     ]);
 
-    return {
+    const result = {
       data,
       meta: {
         total,
@@ -129,9 +155,22 @@ export class PickupWindowService {
         totalPages: Math.ceil(total / limit),
       },
     };
+
+    await this.cacheService.cachePickupWindows(cacheKey, result);
+    this.logger.log(`Cached result for ${cacheKey}`);
+
+    return result;
   }
 
   async findOne(id: string) {
+    this.logger.log(`Finding pickup window: ${id}`);
+
+    const cached = await this.cacheService.getCachedPickupWindow(id);
+    if (cached) {
+      this.logger.log(`Cache hit for pickup window ${id}`);
+      return cached;
+    }
+
     const window = await this.prisma.pickupWindow.findUnique({
       where: { id },
       include: {
@@ -149,10 +188,21 @@ export class PickupWindowService {
       throw new NotFoundException('Pickup window not found');
     }
 
+    await this.cacheService.cachePickupWindow(id, window);
     return window;
   }
 
   async findAvailable(pointId: string, startDate?: string, endDate?: string) {
+    this.logger.log(`Finding available windows for point: ${pointId}`);
+
+    const cacheKey = `pickup-window:available:point:${pointId}:start:${startDate || 'none'}:end:${endDate || 'none'}`;
+
+    const cached = await this.cacheService.getCachedPickupWindows(cacheKey);
+    if (cached) {
+      this.logger.log(`Cache hit for ${cacheKey}`);
+      return cached;
+    }
+
     const where: any = {
       pointId,
     };
@@ -172,7 +222,7 @@ export class PickupWindowService {
       orderBy: { startTime: 'asc' },
     });
 
-    return windows.map((window) => ({
+    const result = windows.map((window) => ({
       id: window.id,
       startTime: window.startTime,
       endTime: window.endTime,
@@ -181,10 +231,15 @@ export class PickupWindowService {
       available: window.capacity - window.reserved,
       isFull: window.reserved >= window.capacity,
     }));
+
+    await this.cacheService.cachePickupWindows(cacheKey, result);
+    this.logger.log(`Cached result for ${cacheKey}`);
+
+    return result;
   }
 
   async update(id: string, dto: UpdatePickupWindowDto) {
-    await this.findOne(id); // Check if exists
+    const existingWindow = await this.findOne(id); // Check if exists
 
     const { startTime, endTime, capacity, reserved } = dto;
 
@@ -205,7 +260,7 @@ export class PickupWindowService {
       }
     }
 
-    return this.prisma.pickupWindow.update({
+    const window = await this.prisma.pickupWindow.update({
       where: { id },
       data: {
         ...(startTime && { startTime: new Date(startTime) }),
@@ -223,10 +278,16 @@ export class PickupWindowService {
         },
       },
     });
+
+    await this.cacheService.invalidatePickupWindow(id);
+    await this.cacheService.invalidateByPointId(existingWindow.pickupPoint.id);
+    this.logger.log(`Updated pickup window ${id}, cache invalidated`);
+
+    return window;
   }
 
   async remove(id: string) {
-    await this.findOne(id); // Check if exists
+    const existingWindow = await this.findOne(id); // Check if exists
 
     // Check if there are orders using this window
     const ordersCount = await this.prisma.order.count({
@@ -239,9 +300,15 @@ export class PickupWindowService {
       );
     }
 
-    return this.prisma.pickupWindow.delete({
+    const result = await this.prisma.pickupWindow.delete({
       where: { id },
     });
+
+    await this.cacheService.invalidatePickupWindow(id);
+    await this.cacheService.invalidateByPointId(existingWindow.pickupPoint.id);
+    this.logger.log(`Deleted pickup window ${id}, cache invalidated`);
+
+    return result;
   }
 
   async incrementReserved(id: string) {
@@ -251,10 +318,15 @@ export class PickupWindowService {
       throw new BadRequestException('Pickup window is full');
     }
 
-    return this.prisma.pickupWindow.update({
+    const updated = await this.prisma.pickupWindow.update({
       where: { id },
       data: { reserved: { increment: 1 } },
     });
+
+    await this.cacheService.invalidatePickupWindow(id);
+    await this.cacheService.invalidateByPointId(window.pickupPoint.id);
+
+    return updated;
   }
 
   async decrementReserved(id: string) {
@@ -264,9 +336,14 @@ export class PickupWindowService {
       throw new BadRequestException('Reserved count is already 0');
     }
 
-    return this.prisma.pickupWindow.update({
+    const updated = await this.prisma.pickupWindow.update({
       where: { id },
       data: { reserved: { decrement: 1 } },
     });
+
+    await this.cacheService.invalidatePickupWindow(id);
+    await this.cacheService.invalidateByPointId(window.pickupPoint.id);
+
+    return updated;
   }
 }

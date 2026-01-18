@@ -14,6 +14,7 @@ import { BrandModule } from './brand/brand.module';
 import { SearchModule } from './search/search.module';
 import { UploadModule } from './upload/upload.module';
 import { PickupPointModule } from './pickup-point/pickup-point.module';
+import { PickupWindowModule } from './pickup-window/pickup-window.module';
 import { CouponModule } from './coupon/coupon.module';
 import { OrderModule } from './order/order.module';
 import { FavoriteModule } from './favorite/favorite.module';
@@ -55,6 +56,7 @@ import { ReviewsModule } from './reviews/reviews.module';
     SearchModule,
     UploadModule,
     PickupPointModule,
+    PickupWindowModule,
     CouponModule,
     OrderModule,
     FavoriteModule,
