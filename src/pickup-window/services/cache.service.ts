@@ -35,7 +35,9 @@ export class PickupWindowCacheService {
     try {
       const pattern = `${this.CACHE_PREFIX}:*`;
       const cleared = await this.redisService.clearByPattern(pattern);
-      this.cacheLogger.log(`Invalidated ${cleared} pickup-window cache entries`);
+      this.cacheLogger.log(
+        `Invalidated ${cleared} pickup-window cache entries`,
+      );
     } catch (error) {
       this.cacheLogger.error('Error invalidating pickup-window caches:', error);
     }
@@ -60,7 +62,9 @@ export class PickupWindowCacheService {
       const pattern = `${this.CACHE_PREFIX}:*point:${pointId}*`;
       await this.redisService.clearByPattern(pattern);
       await this.redisService.clearByPattern(`${this.CACHE_PREFIX}:all:*`);
-      this.cacheLogger.log(`Invalidated cache for pickup-windows of point ${pointId}`);
+      this.cacheLogger.log(
+        `Invalidated cache for pickup-windows of point ${pointId}`,
+      );
     } catch (error) {
       this.cacheLogger.error(
         `Error invalidating cache for pickup-windows of point ${pointId}:`,
