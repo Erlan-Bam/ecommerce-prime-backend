@@ -862,20 +862,56 @@ async function main() {
       ? []
       : [
           // ==================== APPLE PRODUCTS ====================
-          // iPhones - 1 product for testing
+          // iPhones - Real iPhone 17 products
           ...generateProducts(
-            iphoneCategory.id,
+            [apple.id, iphoneCategory.id, smartphones.id],
             brands.apple.id,
-            'iPhone 15 Pro Max',
-            'iphone-15-pro-max',
-            'Самый мощный iPhone с чипом A17 Pro, титановым корпусом и продвинутой камерой.',
-            699990,
-            PRODUCT_IMAGES, // Using custom images
-            1,
+            'iPhone 17 Pro Max 512 ГБ',
+            'iphone-17-pro-max-512',
+            'Смартфон Apple iPhone 17 Pro Max с 512 ГБ памяти, Deep Blue, Dual: 2 eSim',
+            899990,
+            PRODUCT_IMAGES,
+            3,
             [
-              { name: 'Процессор', values: ['A17 Pro'] },
-              { name: 'Диагональ', values: ['6.7"'] },
-              { name: 'Камера', values: ['48MP'] },
+              { name: 'Процессор', values: ['A18 Pro'] },
+              { name: 'Диагональ экрана', values: ['6.9"'] },
+              { name: 'Объем памяти', values: ['512 ГБ'] },
+              { name: 'SIM-карта', values: ['Dual: 2 eSim'] },
+              { name: 'Цвет', values: ['Deep Blue', 'Cosmic Orange', 'Silver'] },
+            ],
+          ),
+          ...generateProducts(
+            [apple.id, iphoneCategory.id, smartphones.id],
+            brands.apple.id,
+            'iPhone 17 Pro Max 256 ГБ',
+            'iphone-17-pro-max-256',
+            'Смартфон Apple iPhone 17 Pro Max с 256 ГБ памяти, Deep Blue, Dual: 2 eSim',
+            799990,
+            PRODUCT_IMAGES,
+            3,
+            [
+              { name: 'Процессор', values: ['A18 Pro'] },
+              { name: 'Диагональ экрана', values: ['6.9"'] },
+              { name: 'Объем памяти', values: ['256 ГБ'] },
+              { name: 'SIM-карта', values: ['Dual: 2 eSim'] },
+              { name: 'Цвет', values: ['Deep Blue', 'Cosmic Orange', 'Silver'] },
+            ],
+          ),
+          ...generateProducts(
+            [apple.id, iphoneCategory.id, smartphones.id],
+            brands.apple.id,
+            'iPhone 17 Pro 256 ГБ',
+            'iphone-17-pro-256',
+            'Смартфон Apple iPhone 17 Pro с 256 ГБ памяти, Deep Blue, Dual: 2 eSim',
+            699990,
+            PRODUCT_IMAGES,
+            3,
+            [
+              { name: 'Процессор', values: ['A18 Pro'] },
+              { name: 'Диагональ экрана', values: ['6.3"'] },
+              { name: 'Объем памяти', values: ['256 ГБ'] },
+              { name: 'SIM-карта', values: ['Dual: 2 eSim'] },
+              { name: 'Цвет', values: ['Deep Blue', 'Cosmic Orange', 'Silver'] },
             ],
           ),
           /* COMMENTED OUT - OTHER PRODUCTS
