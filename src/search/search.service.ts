@@ -138,7 +138,13 @@ export class SearchService {
                 },
               },
               { brand: { name: { contains: q, mode: 'insensitive' } } },
-              { categories: { some: { category: { title: { contains: q, mode: 'insensitive' } } } } },
+              {
+                categories: {
+                  some: {
+                    category: { title: { contains: q, mode: 'insensitive' } },
+                  },
+                },
+              },
             ],
           },
           include: {

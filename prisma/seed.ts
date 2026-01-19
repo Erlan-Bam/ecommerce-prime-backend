@@ -806,7 +806,9 @@ async function main() {
     count: number = 40,
     attributesTemplate: { name: string; values: string[] }[] = [],
   ) => {
-    const categoryIdsArray = Array.isArray(categoryIds) ? categoryIds : [categoryIds];
+    const categoryIdsArray = Array.isArray(categoryIds)
+      ? categoryIds
+      : [categoryIds];
     const products = [];
     const colors = [
       'Black',
@@ -1853,10 +1855,12 @@ async function main() {
       data: {
         ...data,
         categories: {
-          create: (categoryIds as string[]).map((catId: string, idx: number) => ({
-            categoryId: catId,
-            isPrimary: idx === 0, // First category is primary
-          })),
+          create: (categoryIds as string[]).map(
+            (catId: string, idx: number) => ({
+              categoryId: catId,
+              isPrimary: idx === 0, // First category is primary
+            }),
+          ),
         },
         images: {
           create: images.map(

@@ -383,7 +383,9 @@ export class ProductService {
 
       // Handle categories update (many-to-many)
       if (dto.categoryIds?.length) {
-        await this.prisma.productCategory.deleteMany({ where: { productId: id } });
+        await this.prisma.productCategory.deleteMany({
+          where: { productId: id },
+        });
         await this.prisma.productCategory.createMany({
           data: dto.categoryIds.map((catId, idx) => ({
             productId: id,
@@ -586,7 +588,8 @@ export class ProductService {
       // Filter by parent category OR any of its subcategories using many-to-many
       where.categories = {
         some: {
-          categoryId: categoryIds.length > 1 ? { in: categoryIds } : filter.categoryId,
+          categoryId:
+            categoryIds.length > 1 ? { in: categoryIds } : filter.categoryId,
         },
       };
     }

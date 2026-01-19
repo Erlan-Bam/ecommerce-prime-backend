@@ -20,9 +20,13 @@ async function main() {
   console.log('🔧 Fixing product categories...\n');
 
   // Get the iphone and smartphones categories
-  const iphone = await prisma.category.findUnique({ where: { slug: 'iphone' } });
-  const smartphones = await prisma.category.findUnique({ where: { slug: 'smartphones' } });
-  
+  const iphone = await prisma.category.findUnique({
+    where: { slug: 'iphone' },
+  });
+  const smartphones = await prisma.category.findUnique({
+    where: { slug: 'smartphones' },
+  });
+
   if (!iphone) {
     console.log('❌ iphone category not found');
     return;
@@ -40,40 +44,70 @@ async function main() {
     where: {
       name: { contains: 'iPhone' },
       categories: {
-        none: { categoryId: iphone.id }
-      }
+        none: { categoryId: iphone.id },
+      },
     },
-    select: { id: true, name: true, categories: { select: { categoryId: true } } }
+    select: {
+      id: true,
+      name: true,
+      categories: { select: { categoryId: true } },
+    },
   });
 
-  console.log(`\n📦 Found ${iphoneProducts.length} iPhone products not in iPhone category`);
+  console.log(
+    `\n📦 Found ${iphoneProducts.length} iPhone products not in iPhone category`,
+  );
 
   if (iphoneProducts.length > 0) {
     // Add iPhone and Smartphones categories to all iPhone products
     for (const product of iphoneProducts) {
       // Add iPhone category (primary)
       await prisma.productCategory.upsert({
-        where: { productId_categoryId: { productId: product.id, categoryId: iphone.id } },
+        where: {
+          productId_categoryId: {
+            productId: product.id,
+            categoryId: iphone.id,
+          },
+        },
         update: { isPrimary: true },
-        create: { productId: product.id, categoryId: iphone.id, isPrimary: true }
+        create: {
+          productId: product.id,
+          categoryId: iphone.id,
+          isPrimary: true,
+        },
       });
-      
+
       // Add Smartphones category (secondary)
       await prisma.productCategory.upsert({
-        where: { productId_categoryId: { productId: product.id, categoryId: smartphones.id } },
+        where: {
+          productId_categoryId: {
+            productId: product.id,
+            categoryId: smartphones.id,
+          },
+        },
         update: {},
-        create: { productId: product.id, categoryId: smartphones.id, isPrimary: false }
+        create: {
+          productId: product.id,
+          categoryId: smartphones.id,
+          isPrimary: false,
+        },
       });
     }
-    console.log(`✅ Added ${iphoneProducts.length} products to iphone and smartphones categories`);
+    console.log(
+      `✅ Added ${iphoneProducts.length} products to iphone and smartphones categories`,
+    );
   }
 
   // Count products in iPhone category
-  const count = await prisma.productCategory.count({ where: { categoryId: iphone.id } });
+  const count = await prisma.productCategory.count({
+    where: { categoryId: iphone.id },
+  });
   console.log(`\n📊 iPhone category now has ${count} products`);
 
   // Count products in Smartphones category
-  const smartphonesCount = await prisma.productCategory.count({ where: { categoryId: smartphones.id } });
+  const smartphonesCount = await prisma.productCategory.count({
+    where: { categoryId: smartphones.id },
+  });
   console.log(`📊 Smartphones category now has ${smartphonesCount} products`);
 
   console.log('\n🎉 Fix completed!');
@@ -81,8 +115,8 @@ async function main() {
 
 main()
   .then(() => prisma.$disconnect())
-  .catch(e => { 
-    console.error('❌ Error:', e); 
-    prisma.$disconnect(); 
-    process.exit(1); 
+  .catch((e) => {
+    console.error('❌ Error:', e);
+    prisma.$disconnect();
+    process.exit(1);
   });
