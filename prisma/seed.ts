@@ -1928,6 +1928,11 @@ async function main() {
             }
           : undefined,
       },
+      include: {
+        categories: true,
+        images: true,
+        attributes: true,
+      },
     });
 
     // Add stock to pickup points
