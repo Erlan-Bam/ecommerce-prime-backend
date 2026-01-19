@@ -54,8 +54,7 @@ async function main() {
 
   // Create admin user
   console.log('👤 Creating admin user...');
-  const hashedPassword =
-    '$2b$10$Z7V9qKvRz1J5H8X6wY3bw.Q2pL1mN4dK8R9sT2vU5xW6yZ7aB1cD';
+  const hashedPassword = 'Prime_MSK25$@';
 
   // Check if admin already exists
   const existingAdmin = await prisma.user.findUnique({
