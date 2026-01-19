@@ -108,21 +108,26 @@ async function main() {
 
   console.log(`Найдено ${data.length} товаров для импорта\n`);
 
-  // Получаем или создаем категорию "Смартфоны"
-  let category = await prisma.category.findUnique({
-    where: { slug: 'smartfony' },
+  // Получаем категории "iPhone" и "Смартфоны"
+  const iphoneCategory = await prisma.category.findUnique({
+    where: { slug: 'iphone' },
   });
 
-  if (!category) {
-    category = await prisma.category.create({
-      data: {
-        title: 'Смартфоны',
-        slug: 'smartfony',
-        isActive: true,
-      },
-    });
-    console.log('Создана категория: Смартфоны\n');
+  const smartphonesCategory = await prisma.category.findUnique({
+    where: { slug: 'smartphones' },
+  });
+
+  if (!iphoneCategory) {
+    console.error('Категория iPhone не найдена! Сначала запустите seed.');
+    process.exit(1);
   }
+  console.log('Найдена категория iPhone:', iphoneCategory.id);
+
+  if (!smartphonesCategory) {
+    console.error('Категория Смартфоны не найдена! Сначала запустите seed.');
+    process.exit(1);
+  }
+  console.log('Найдена категория Смартфоны:', smartphonesCategory.id);
 
   // Получаем или создаем бренд Apple
   let brand = await prisma.brand.findUnique({
@@ -137,7 +142,9 @@ async function main() {
         isActive: true,
       },
     });
-    console.log('Создан бренд: Apple\n');
+    console.log('Создан бренд Apple:', brand.id);
+  } else {
+    console.log('Найден бренд Apple:', brand.id);
   }
 
   // Импортируем каждый товар
@@ -176,10 +183,9 @@ async function main() {
       continue;
     }
 
-    // Создаем товар
+    // Создаем товар с привязкой к обеим категориям (iPhone и Смартфоны)
     const product = await prisma.product.create({
       data: {
-        categoryId: category.id,
         brandId: brand.id,
         name,
         slug,
@@ -187,6 +193,12 @@ async function main() {
         price,
         isActive: true,
         isOnSale: false,
+        categories: {
+          create: [
+            { categoryId: iphoneCategory.id, isPrimary: true },
+            { categoryId: smartphonesCategory.id, isPrimary: false },
+          ],
+        },
       },
     });
 

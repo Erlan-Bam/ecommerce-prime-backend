@@ -16,7 +16,13 @@ export class FavoriteService {
               orderBy: { sortOrder: 'asc' },
               take: 1,
             },
-            category: true,
+            categories: {
+              include: {
+                category: true,
+              },
+              orderBy: { isPrimary: 'desc' },
+              take: 1,
+            },
             brand: true,
             productStock: true,
           },
@@ -25,36 +31,41 @@ export class FavoriteService {
       orderBy: { createdAt: 'desc' },
     });
 
-    return favorites.map((fav) => ({
-      id: fav.id,
-      productId: fav.productId,
-      product: {
-        id: fav.product.id,
-        name: fav.product.name,
-        slug: fav.product.slug,
-        price: fav.product.price.toString(),
-        oldPrice: fav.product.oldPrice?.toString() || null,
-        image: fav.product.images[0]?.url || null,
-        isActive: fav.product.isActive,
-        isOnSale: fav.product.isOnSale,
-        inStock:
-          fav.product.productStock.length > 0 &&
-          fav.product.productStock.some((stock) => stock.stockCount > 0),
-        category: {
-          id: fav.product.category.id,
-          title: fav.product.category.title,
-          slug: fav.product.category.slug,
+    return favorites.map((fav) => {
+      const primaryCategory = fav.product.categories[0]?.category;
+      return {
+        id: fav.id,
+        productId: fav.productId,
+        product: {
+          id: fav.product.id,
+          name: fav.product.name,
+          slug: fav.product.slug,
+          price: fav.product.price.toString(),
+          oldPrice: fav.product.oldPrice?.toString() || null,
+          image: fav.product.images[0]?.url || null,
+          isActive: fav.product.isActive,
+          isOnSale: fav.product.isOnSale,
+          inStock:
+            fav.product.productStock.length > 0 &&
+            fav.product.productStock.some((stock) => stock.stockCount > 0),
+          category: primaryCategory
+            ? {
+                id: primaryCategory.id,
+                title: primaryCategory.title,
+                slug: primaryCategory.slug,
+              }
+            : null,
+          brand: fav.product.brand
+            ? {
+                id: fav.product.brand.id,
+                name: fav.product.brand.name,
+                slug: fav.product.brand.slug,
+              }
+            : null,
         },
-        brand: fav.product.brand
-          ? {
-              id: fav.product.brand.id,
-              name: fav.product.brand.name,
-              slug: fav.product.brand.slug,
-            }
-          : null,
-      },
-      createdAt: fav.createdAt,
-    }));
+        createdAt: fav.createdAt,
+      };
+    });
   }
 
   // Add product to favorites

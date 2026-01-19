@@ -138,11 +138,17 @@ export class SearchService {
                 },
               },
               { brand: { name: { contains: q, mode: 'insensitive' } } },
-              { category: { title: { contains: q, mode: 'insensitive' } } },
+              { categories: { some: { category: { title: { contains: q, mode: 'insensitive' } } } } },
             ],
           },
           include: {
-            category: { select: { id: true, title: true, slug: true } },
+            categories: {
+              include: {
+                category: { select: { id: true, title: true, slug: true } },
+              },
+              orderBy: { isPrimary: 'desc' },
+              take: 1,
+            },
             brand: { select: { id: true, name: true, slug: true } },
             images: { take: 1, orderBy: { sortOrder: 'asc' } },
             reviews: { select: { rating: true } },
@@ -177,9 +183,11 @@ export class SearchService {
           (sum, s) => sum + s.stockCount,
           0,
         );
-        const { reviews, productStock, ...rest } = product;
+        const { reviews, productStock, categories, ...rest } = product;
+        const primaryCategory = categories[0]?.category;
         return {
           ...rest,
+          category: primaryCategory || null,
           rating: Math.round(avgRating * 10) / 10,
           reviewCount: ratings.length,
           totalStock,

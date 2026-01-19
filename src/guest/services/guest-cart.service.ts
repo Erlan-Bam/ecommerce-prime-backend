@@ -35,8 +35,12 @@ export class GuestCartService {
                 orderBy: { sortOrder: 'asc' },
                 take: 1,
               },
-              category: {
-                select: { id: true, title: true, slug: true },
+              categories: {
+                include: {
+                  category: { select: { id: true, title: true, slug: true } },
+                },
+                orderBy: { isPrimary: 'desc' },
+                take: 1,
               },
             },
           },
@@ -44,21 +48,24 @@ export class GuestCartService {
         orderBy: { createdAt: 'desc' },
       });
 
-      const items = cartItems.map((item) => ({
-        id: item.id,
-        productId: item.productId,
-        quantity: item.quantity,
-        product: {
-          id: item.product.id,
-          name: item.product.name,
-          slug: item.product.slug,
-          price: item.product.price,
-          oldPrice: item.product.oldPrice,
-          image: item.product.images[0]?.url || null,
-          category: item.product.category,
-        },
-        subtotal: Number(item.price),
-      }));
+      const items = cartItems.map((item) => {
+        const primaryCategory = item.product.categories[0]?.category;
+        return {
+          id: item.id,
+          productId: item.productId,
+          quantity: item.quantity,
+          product: {
+            id: item.product.id,
+            name: item.product.name,
+            slug: item.product.slug,
+            price: item.product.price,
+            oldPrice: item.product.oldPrice,
+            image: item.product.images[0]?.url || null,
+            category: primaryCategory || null,
+          },
+          subtotal: Number(item.price),
+        };
+      });
 
       const total = items.reduce((sum, item) => sum + item.subtotal, 0);
 

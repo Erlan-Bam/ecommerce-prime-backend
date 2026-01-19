@@ -298,7 +298,7 @@ export class CategoryService {
 
       await this.findOne(id);
 
-      const productsCount = await this.prisma.product.count({
+      const productsCount = await this.prisma.productCategory.count({
         where: { categoryId: id },
       });
 

@@ -34,7 +34,6 @@ export class ProductService {
 
       const product = await this.prisma.product.create({
         data: {
-          categoryId: dto.categoryId,
           brandId: dto.brandId,
           name: dto.name,
           slug,
@@ -43,6 +42,12 @@ export class ProductService {
           oldPrice: dto.oldPrice,
           isActive: dto.isActive ?? true,
           isOnSale: dto.isOnSale ?? false,
+          categories: {
+            create: dto.categoryIds.map((catId, idx) => ({
+              categoryId: catId,
+              isPrimary: idx === 0,
+            })),
+          },
           images: dto.images
             ? {
                 create: dto.images.map((img, idx) => ({
@@ -62,7 +67,12 @@ export class ProductService {
             : undefined,
         },
         include: {
-          category: true,
+          categories: {
+            include: {
+              category: true,
+            },
+            orderBy: { isPrimary: 'desc' },
+          },
           brand: true,
           images: { orderBy: { sortOrder: 'asc' } },
           attributes: true,
@@ -119,7 +129,12 @@ export class ProductService {
           take: limit,
           orderBy,
           include: {
-            category: { select: { id: true, title: true, slug: true } },
+            categories: {
+              include: {
+                category: { select: { id: true, title: true, slug: true } },
+              },
+              orderBy: { isPrimary: 'desc' },
+            },
             brand: { select: { id: true, name: true, slug: true } },
             images: { orderBy: { sortOrder: 'asc' }, take: 1 },
             reviews: { select: { rating: true } },
@@ -192,7 +207,12 @@ export class ProductService {
       const product = await this.prisma.product.findUnique({
         where: { id },
         include: {
-          category: true,
+          categories: {
+            include: {
+              category: true,
+            },
+            orderBy: { isPrimary: 'desc' },
+          },
           brand: true,
           images: { orderBy: { sortOrder: 'asc' } },
           attributes: true,
@@ -273,7 +293,12 @@ export class ProductService {
       const product = await this.prisma.product.findUnique({
         where: { slug },
         include: {
-          category: true,
+          categories: {
+            include: {
+              category: true,
+            },
+            orderBy: { isPrimary: 'desc' },
+          },
           brand: true,
           images: { orderBy: { sortOrder: 'asc' } },
           attributes: true,
@@ -347,9 +372,6 @@ export class ProductService {
       await this.findOne(id);
 
       const updateData: any = {
-        ...(dto.categoryId && {
-          category: { connect: { id: dto.categoryId } },
-        }),
         ...(dto.brandId && { brand: { connect: { id: dto.brandId } } }),
         ...(dto.name && { name: dto.name, slug: this.generateSlug(dto.name) }),
         ...(dto.description !== undefined && { description: dto.description }),
@@ -358,6 +380,18 @@ export class ProductService {
         ...(dto.isActive !== undefined && { isActive: dto.isActive }),
         ...(dto.isOnSale !== undefined && { isOnSale: dto.isOnSale }),
       };
+
+      // Handle categories update (many-to-many)
+      if (dto.categoryIds?.length) {
+        await this.prisma.productCategory.deleteMany({ where: { productId: id } });
+        await this.prisma.productCategory.createMany({
+          data: dto.categoryIds.map((catId, idx) => ({
+            productId: id,
+            categoryId: catId,
+            isPrimary: idx === 0,
+          })),
+        });
+      }
 
       // Handle images update
       if (dto.images) {
@@ -390,7 +424,12 @@ export class ProductService {
         where: { id },
         data: updateData,
         include: {
-          category: true,
+          categories: {
+            include: {
+              category: true,
+            },
+            orderBy: { isPrimary: 'desc' },
+          },
           brand: true,
           images: { orderBy: { sortOrder: 'asc' } },
           attributes: true,
@@ -456,7 +495,11 @@ export class ProductService {
 
       const where: any = {
         isActive: true,
-        ...(categoryId && { categoryId }),
+        ...(categoryId && {
+          categories: {
+            some: { categoryId },
+          },
+        }),
       };
 
       const [brands, priceRange, attributes] = await Promise.all([
@@ -540,12 +583,12 @@ export class ProductService {
       // Get all subcategory IDs recursively
       const categoryIds = await this.getAllSubcategoryIds(filter.categoryId);
 
-      // Filter by parent category OR any of its subcategories
-      if (categoryIds.length > 1) {
-        where.categoryId = { in: categoryIds };
-      } else {
-        where.categoryId = filter.categoryId;
-      }
+      // Filter by parent category OR any of its subcategories using many-to-many
+      where.categories = {
+        some: {
+          categoryId: categoryIds.length > 1 ? { in: categoryIds } : filter.categoryId,
+        },
+      };
     }
 
     if (filter.brandIds?.length) {

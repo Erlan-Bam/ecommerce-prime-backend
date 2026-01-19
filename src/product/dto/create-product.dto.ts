@@ -41,10 +41,11 @@ class ProductAttributeDto {
 }
 
 export class CreateProductDto {
-  @ApiProperty({ description: 'Category ID' })
-  @IsString()
-  @IsNotEmpty()
-  categoryId: string;
+  @ApiProperty({ description: 'Category IDs (first one is primary)', type: [String] })
+  @IsArray()
+  @IsString({ each: true })
+  @IsNotEmpty({ each: true })
+  categoryIds: string[];
 
   @ApiPropertyOptional({ description: 'Brand ID' })
   @IsOptional()

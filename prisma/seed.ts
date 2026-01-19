@@ -794,9 +794,9 @@ async function main() {
     ],
   }; */
 
-  // Helper function to generate products for a category
+  // Helper function to generate products for a category (supports multiple categories)
   const generateProducts = (
-    categoryId: string,
+    categoryIds: string | string[], // Can be single categoryId or array of categoryIds
     brandId: string,
     baseName: string,
     baseSlug: string,
@@ -806,6 +806,7 @@ async function main() {
     count: number = 40,
     attributesTemplate: { name: string; values: string[] }[] = [],
   ) => {
+    const categoryIdsArray = Array.isArray(categoryIds) ? categoryIds : [categoryIds];
     const products = [];
     const colors = [
       'Black',
@@ -836,7 +837,7 @@ async function main() {
       }
 
       products.push({
-        categoryId,
+        categoryIds: categoryIdsArray,
         brandId,
         name: `${baseName} ${storage} ${color}`,
         slug: `${baseSlug}-${storage.toLowerCase()}-${color.toLowerCase()}-${i}`,
@@ -1846,11 +1847,17 @@ async function main() {
         ];
 
   for (const productData of productsData) {
-    const { images, attributes, ...data } = productData;
+    const { images, attributes, categoryIds, ...data } = productData;
 
     const product = await prisma.product.create({
       data: {
         ...data,
+        categories: {
+          create: (categoryIds as string[]).map((catId: string, idx: number) => ({
+            categoryId: catId,
+            isPrimary: idx === 0, // First category is primary
+          })),
+        },
         images: {
           create: images.map(
             (img: { url: string; alt: string }, idx: number) => ({

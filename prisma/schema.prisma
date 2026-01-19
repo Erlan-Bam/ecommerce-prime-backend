@@ -61,7 +61,7 @@ model Category {
 
   parent    Category?  @relation("CategoryChildren", fields: [parentId], references: [id])
   children  Category[] @relation("CategoryChildren")
-  products  Product[]
+  products  ProductCategory[]
 
   @@index([parentId])
   @@index([slug])
@@ -83,7 +83,6 @@ model Brand {
 
 model Product {
   id          String   @id @default(uuid())
-  categoryId  String
   brandId     String?
   name        String
   slug        String   @unique
@@ -97,8 +96,8 @@ model Product {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  category    Category  @relation(fields: [categoryId], references: [id])
   brand       Brand?    @relation(fields: [brandId], references: [id])
+  categories  ProductCategory[]
   images      ProductImage[]
   attributes  ProductAttribute[]
   reviews     Review[]
@@ -106,12 +105,26 @@ model Product {
   orderItems  OrderItem[]
   favorites   Favorite[]
 
-  @@index([categoryId])
   @@index([brandId])
   @@index([slug])
   @@index([price])
   @@index([createdAt])
   @@index([isActive, isOnSale])
+}
+
+model ProductCategory {
+  id         String   @id @default(uuid())
+  productId  String
+  categoryId String
+  isPrimary  Boolean  @default(false) 
+  createdAt  DateTime @default(now())
+
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, categoryId])
+  @@index([productId])
+  @@index([categoryId])
 }
 
 model ProductImage {
