@@ -877,7 +877,10 @@ async function main() {
               { name: 'Диагональ экрана', values: ['6.9"'] },
               { name: 'Объем памяти', values: ['512 ГБ'] },
               { name: 'SIM-карта', values: ['Dual: 2 eSim'] },
-              { name: 'Цвет', values: ['Deep Blue', 'Cosmic Orange', 'Silver'] },
+              {
+                name: 'Цвет',
+                values: ['Deep Blue', 'Cosmic Orange', 'Silver'],
+              },
             ],
           ),
           ...generateProducts(
@@ -894,7 +897,10 @@ async function main() {
               { name: 'Диагональ экрана', values: ['6.9"'] },
               { name: 'Объем памяти', values: ['256 ГБ'] },
               { name: 'SIM-карта', values: ['Dual: 2 eSim'] },
-              { name: 'Цвет', values: ['Deep Blue', 'Cosmic Orange', 'Silver'] },
+              {
+                name: 'Цвет',
+                values: ['Deep Blue', 'Cosmic Orange', 'Silver'],
+              },
             ],
           ),
           ...generateProducts(
@@ -911,7 +917,10 @@ async function main() {
               { name: 'Диагональ экрана', values: ['6.3"'] },
               { name: 'Объем памяти', values: ['256 ГБ'] },
               { name: 'SIM-карта', values: ['Dual: 2 eSim'] },
-              { name: 'Цвет', values: ['Deep Blue', 'Cosmic Orange', 'Silver'] },
+              {
+                name: 'Цвет',
+                values: ['Deep Blue', 'Cosmic Orange', 'Silver'],
+              },
             ],
           ),
           /* COMMENTED OUT - OTHER PRODUCTS
