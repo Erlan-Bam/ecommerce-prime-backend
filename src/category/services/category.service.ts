@@ -143,7 +143,11 @@ export class CategoryService {
               children: {
                 where: { isActive: true },
                 orderBy: { sortOrder: 'asc' },
+                include: {
+                  _count: { select: { products: true } },
+                },
               },
+              _count: { select: { products: true } },
             },
             orderBy: { sortOrder: 'asc' },
           },
