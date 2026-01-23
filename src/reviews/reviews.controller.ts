@@ -14,7 +14,7 @@ import {
 } from '@nestjs/common';
 import { ReviewsService } from './services/reviews.service';
 import { AdminGuard } from '../shared/guards/admin.guard';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { UserGuard } from '../shared/guards/user.guard';
 import { CreateReviewDto } from './dto';
 import { ApiTags, ApiQuery, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 
@@ -24,7 +24,7 @@ export class ReviewsController {
   constructor(private readonly reviewsService: ReviewsService) {}
 
   @Post()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(UserGuard)
   @ApiBearerAuth()
   @ApiResponse({ status: 201, description: 'Review created successfully' })
   @ApiResponse({
