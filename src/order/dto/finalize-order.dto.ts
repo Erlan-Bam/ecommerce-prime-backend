@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { DeliveryMethod } from '@prisma/client';
+import { DeliveryMethod, PaymentMethod } from '@prisma/client';
 import {
   IsNotEmpty,
   IsString,
@@ -77,9 +77,18 @@ export class FinalizeOrderDto {
   address?: string;
 
   // Payment options
+  @ApiProperty({
+    description: 'Payment method',
+    enum: PaymentMethod,
+    example: 'CASH',
+  })
+  @IsNotEmpty()
+  @IsEnum(PaymentMethod)
+  paymentMethod: PaymentMethod;
+
   @ApiPropertyOptional({
     description:
-      'Pay later option - if true, payment will be collected on delivery/pickup',
+      'Pay later option - if true, payment will be collected on delivery/pickup. Only available with CASH payment method.',
     example: false,
     default: false,
   })
@@ -97,6 +106,9 @@ export class FinalizeOrderResponseDto {
 
   @ApiProperty({ description: 'Delivery method' })
   deliveryMethod: string;
+
+  @ApiProperty({ description: 'Payment method' })
+  paymentMethod: string;
 
   @ApiProperty({ description: 'Total order price' })
   total: number;

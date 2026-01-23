@@ -222,6 +222,7 @@ model Order {
   buyer        String?
   status       OrderStatus @default(PENDING)
   deliveryMethod DeliveryMethod @default(DELIVERY)
+  paymentMethod  PaymentMethod @default(CASH)
   address      String?
   pointId      String?
   windowId     String?

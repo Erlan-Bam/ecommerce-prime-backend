@@ -716,9 +716,18 @@ export class OrderService {
           );
         }
 
+        // Validate payLater can only be used with CASH payment method
+        if (dto.payLater && dto.paymentMethod !== 'CASH') {
+          throw new HttpException(
+            'Pay later option is only available with CASH payment method',
+            HttpStatus.BAD_REQUEST,
+          );
+        }
+
         // Prepare common update data
         const updateData: any = {
           deliveryMethod: dto.deliveryMethod,
+          paymentMethod: dto.paymentMethod,
           buyer: dto.buyer,
           email: dto.email,
           phone: dto.phone,
