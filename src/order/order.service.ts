@@ -9,6 +9,7 @@ import { PrismaService } from '../shared/services/prisma.service';
 import {
   AddOrderItemDto,
   SelectPickupDto,
+  FinalizeOrderDto,
   ApplyCouponDto,
   UpdateOrderStatusDto,
   QuickBuyDto,
@@ -335,6 +336,7 @@ export class OrderService {
             discount: 0,
             finalTotal: total,
             status: 'PENDING',
+            deliveryMethod: 'PICKUP',
           },
         });
 
@@ -675,6 +677,258 @@ export class OrderService {
         error.stack,
       );
       throw new InternalServerErrorException('Failed to select pickup');
+    }
+  }
+
+  /**
+   * Finalize an order with delivery details.
+   * For PICKUP: assigns pickup point and time window
+   * For DELIVERY: assigns delivery address
+   * Always requires: buyer info, email, phone
+   */
+  async finalizeOrder(userId: string, orderId: number, dto: FinalizeOrderDto) {
+    try {
+      this.logger.log(
+        `Finalizing order ${orderId} for user ${userId} with delivery method ${dto.deliveryMethod}`,
+      );
+
+      const result = await this.prisma.$transaction(async (tx) => {
+        // 1. Verify order exists and belongs to user
+        const order = await tx.order.findFirst({
+          where: {
+            id: orderId,
+            userId,
+          },
+        });
+
+        if (!order) {
+          this.logger.warn(`Order ${orderId} not found for user ${userId}`);
+          throw new HttpException('Order not found', HttpStatus.NOT_FOUND);
+        }
+
+        if (order.status !== 'PENDING') {
+          this.logger.warn(
+            `Order ${orderId} is not in PENDING status: ${order.status}`,
+          );
+          throw new HttpException(
+            'Order is not in a state that allows finalization',
+            HttpStatus.BAD_REQUEST,
+          );
+        }
+
+        // Prepare common update data
+        const updateData: any = {
+          deliveryMethod: dto.deliveryMethod,
+          buyer: dto.buyer,
+          email: dto.email,
+          phone: dto.phone,
+          payLater: dto.payLater ?? false,
+        };
+
+        let pickupWindow = null;
+        let pickupPoint = null;
+
+        if (dto.deliveryMethod === 'PICKUP') {
+          // Validate PICKUP specific fields
+          if (!dto.pointId || !dto.pickupTime) {
+            throw new HttpException(
+              'Pickup point ID and pickup time are required for pickup delivery',
+              HttpStatus.BAD_REQUEST,
+            );
+          }
+
+          // 2. Verify pickup point exists and is active
+          pickupPoint = await tx.pickupPoint.findUnique({
+            where: { id: dto.pointId },
+          });
+
+          if (!pickupPoint) {
+            this.logger.warn(`Pickup point ${dto.pointId} not found`);
+            throw new HttpException(
+              'Pickup point not found',
+              HttpStatus.NOT_FOUND,
+            );
+          }
+
+          if (!pickupPoint.isActive) {
+            this.logger.warn(`Pickup point ${dto.pointId} is not active`);
+            throw new HttpException(
+              'Pickup point is not available',
+              HttpStatus.BAD_REQUEST,
+            );
+          }
+
+          // 3. Calculate the pickup window based on the requested time
+          const { windowStart, windowEnd } = this.calculatePickupWindow(
+            dto.pickupTime,
+          );
+
+          // 4. Find or create the pickup window
+          pickupWindow = await tx.pickupWindow.findUnique({
+            where: {
+              pointId_startTime: {
+                pointId: dto.pointId,
+                startTime: windowStart,
+              },
+            },
+          });
+
+          if (pickupWindow) {
+            // Check if capacity is available
+            if (pickupWindow.capacity <= 0) {
+              this.logger.warn(
+                `Pickup window ${pickupWindow.id} is full for point ${dto.pointId}`,
+              );
+              throw new HttpException(
+                'This pickup window is fully booked. Please select a different time.',
+                HttpStatus.CONFLICT,
+              );
+            }
+
+            // Update existing window: decrease capacity, increase reserved
+            pickupWindow = await tx.pickupWindow.update({
+              where: { id: pickupWindow.id },
+              data: {
+                capacity: { decrement: 1 },
+                reserved: { increment: 1 },
+              },
+            });
+
+            this.logger.log(
+              `Reserved slot in existing window ${pickupWindow.id}. Remaining capacity: ${pickupWindow.capacity}`,
+            );
+          } else {
+            // Create new window with capacity = 23 (24 - 1), reserved = 1
+            pickupWindow = await tx.pickupWindow.create({
+              data: {
+                pointId: dto.pointId,
+                startTime: windowStart,
+                endTime: windowEnd,
+                capacity: 23, // 24 - 1 for this reservation
+                reserved: 1,
+              },
+            });
+
+            this.logger.log(
+              `Created new pickup window ${pickupWindow.id} for point ${dto.pointId}`,
+            );
+          }
+
+          // 5. If order already had a window, release the old slot
+          if (order.windowId) {
+            await tx.pickupWindow.update({
+              where: { id: order.windowId },
+              data: {
+                capacity: { increment: 1 },
+                reserved: { decrement: 1 },
+              },
+            });
+            this.logger.log(
+              `Released slot from previous window ${order.windowId}`,
+            );
+          }
+
+          // Add pickup-specific update data
+          updateData.pointId = dto.pointId;
+          updateData.windowId = pickupWindow.id;
+          updateData.address = null; // Clear address for pickup
+        } else {
+          // DELIVERY
+          if (!dto.address) {
+            throw new HttpException(
+              'Address is required for delivery',
+              HttpStatus.BAD_REQUEST,
+            );
+          }
+
+          // If order previously had a pickup window, release the slot
+          if (order.windowId) {
+            await tx.pickupWindow.update({
+              where: { id: order.windowId },
+              data: {
+                capacity: { increment: 1 },
+                reserved: { decrement: 1 },
+              },
+            });
+            this.logger.log(
+              `Released slot from previous window ${order.windowId}`,
+            );
+          }
+
+          // Add delivery-specific update data
+          updateData.address = dto.address;
+          updateData.pointId = null; // Clear pickup point for delivery
+          updateData.windowId = null; // Clear pickup window for delivery
+        }
+
+        // 6. Update the order
+        const updatedOrder = await tx.order.update({
+          where: { id: orderId },
+          data: updateData,
+          include: {
+            items: {
+              include: {
+                product: {
+                  select: {
+                    id: true,
+                    name: true,
+                    slug: true,
+                    images: {
+                      take: 1,
+                      orderBy: { sortOrder: 'asc' },
+                    },
+                  },
+                },
+              },
+            },
+            pickupPoint:
+              dto.deliveryMethod === 'PICKUP'
+                ? {
+                    select: {
+                      id: true,
+                      name: true,
+                      address: true,
+                    },
+                  }
+                : false,
+            pickupWindow:
+              dto.deliveryMethod === 'PICKUP'
+                ? {
+                    select: {
+                      id: true,
+                      startTime: true,
+                      endTime: true,
+                    },
+                  }
+                : false,
+            coupon: true,
+          },
+        });
+
+        return updatedOrder;
+      });
+
+      // Invalidate orders cache
+      await this.cacheService.invalidateUserOrders(userId);
+      await this.cacheService.invalidateOrder(userId, orderId);
+
+      this.logger.log(
+        `Order ${orderId} finalized successfully with ${dto.deliveryMethod} delivery`,
+      );
+
+      return {
+        ...result,
+        message: 'Order finalized successfully',
+      };
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      this.logger.error(
+        `Error finalizing order ${orderId}: ${error.message}`,
+        error.stack,
+      );
+      throw new InternalServerErrorException('Failed to finalize order');
     }
   }
 

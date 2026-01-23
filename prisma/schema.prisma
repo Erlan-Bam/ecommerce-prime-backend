@@ -42,6 +42,11 @@ enum OrderStatus {
   CANCELLED
 }
 
+enum DeliveryMethod {
+  PICKUP
+  DELIVERY
+}
+
 model User {
   id        String   @id @default(uuid())
   email     String   @unique
@@ -207,18 +212,26 @@ model OrderItem {
 
 model Order {
   id           Int         @id @default(autoincrement())
-  userId       String
+  userId       String?
+  sessionId    String?
   total        Decimal     @db.Decimal(10, 2)
   discount     Decimal     @default(0) @db.Decimal(10, 2)
   finalTotal   Decimal     @db.Decimal(10, 2)
+  email        String?
+  phone        String?
+  buyer        String?
   status       OrderStatus @default(PENDING)
+  deliveryMethod DeliveryMethod @default(DELIVERY)
+  address      String?
   pointId      String?
   windowId     String?
+  payLater     Boolean     @default(false)
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
   couponId     String?
 
-  user         User          @relation(fields: [userId], references: [id])
+  user         User?          @relation(fields: [userId], references: [id])
+  session      GuestSession? @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   items        OrderItem[]
   pickupPoint  PickupPoint?  @relation(fields: [pointId], references: [id])
   pickupWindow PickupWindow? @relation(fields: [windowId], references: [id])
@@ -226,6 +239,7 @@ model Order {
   payment      Payment?
 
   @@index([userId])
+  @@index([sessionId])
   @@index([status])
   @@index([pointId])
   @@index([windowId])
@@ -339,6 +353,7 @@ model GuestSession {
   updatedAt     DateTime @updatedAt
 
   cartItems     OrderItem[]
+  orders        Order[]
 
   @@index([fingerprint])
   @@index([lastActiveAt])

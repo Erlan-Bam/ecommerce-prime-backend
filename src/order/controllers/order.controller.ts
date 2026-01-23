@@ -20,6 +20,8 @@ import {
   CheckoutResponseDto,
   SelectPickupDto,
   SelectPickupResponseDto,
+  FinalizeOrderDto,
+  FinalizeOrderResponseDto,
   ApplyCouponDto,
   QuickBuyDto,
   QuickBuyResponseDto,
@@ -157,6 +159,33 @@ export class OrderController {
     @Body() dto: SelectPickupDto,
   ) {
     return this.orderService.selectPickup(userId, orderId, dto);
+  }
+
+  // Finalize order endpoint - includes delivery method, contact info, and address/pickup details
+  @Post(':id/finalize')
+  @ApiOperation({
+    summary: 'Finalize order with delivery details and contact information',
+    description:
+      'Finalizes a pending order with delivery method (PICKUP or DELIVERY), contact information (buyer name, email, phone), and delivery details. For PICKUP: requires pointId and pickupTime. For DELIVERY: requires address. Windows are hourly slots from 10:00 to 21:00 Moscow time, each with a capacity of 24 orders.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Order finalized successfully',
+    type: FinalizeOrderResponseDto,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad request - Invalid data or order state',
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 404, description: 'Order or pickup point not found' })
+  @ApiResponse({ status: 409, description: 'Pickup window is fully booked' })
+  finalizeOrder(
+    @User('id') userId: string,
+    @Param('id', ParseIntPipe) orderId: number,
+    @Body() dto: FinalizeOrderDto,
+  ) {
+    return this.orderService.finalizeOrder(userId, orderId, dto);
   }
 
   // Apply coupon endpoint
