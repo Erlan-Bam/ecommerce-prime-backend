@@ -7,6 +7,7 @@ import {
 import { AuthGuard } from '@nestjs/passport';
 import { Reflector } from '@nestjs/core';
 import { IS_PUBLIC_KEY } from '../decorator/public.decorator';
+import { Role } from '@prisma/client';
 
 @Injectable()
 export class AdminGuard extends AuthGuard('jwt') {
@@ -39,7 +40,7 @@ export class AdminGuard extends AuthGuard('jwt') {
     }
 
     // If user is authenticated but not an admin, it's a permission issue (403)
-    if (user.role !== 'ADMIN') {
+    if (user.role !== Role.ADMIN) {
       throw new HttpException(
         'Access denied: Admins only',
         HttpStatus.FORBIDDEN,
