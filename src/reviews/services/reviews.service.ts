@@ -8,7 +8,7 @@ import {
 import { PrismaService } from '../../shared/services/prisma.service';
 import { ReviewsCacheService } from './cache.service';
 import { Prisma } from '@prisma/client';
-import { CreateReviewDto } from '../dto';
+import { CreateReviewDto, CreateGuestReviewDto } from '../dto';
 
 @Injectable()
 export class ReviewsService {
@@ -75,6 +75,50 @@ export class ReviewsService {
     );
 
     return review;
+  }
+
+  async createGuestReview(dto: CreateGuestReviewDto) {
+    // Check if product exists
+    const product = await this.prisma.product.findUnique({
+      where: { id: dto.productId },
+    });
+
+    if (!product) {
+      throw new NotFoundException('Product not found');
+    }
+
+    // Create the guest review
+    const review = await this.prisma.review.create({
+      data: {
+        productId: dto.productId,
+        userId: null,
+        guestName: 'Гость',
+        rating: dto.rating,
+        comment: dto.comment,
+        isActive: true,
+      },
+      include: {
+        product: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+    });
+
+    // Invalidate caches
+    await this.cacheService.invalidateAllCaches();
+    this.logger.log(`Created guest review for product ${dto.productId}`);
+
+    // Return with simulated user object for consistency
+    return {
+      ...review,
+      user: {
+        id: 'guest',
+        name: 'Гость',
+      },
+    };
   }
 
   async findAll(params: {

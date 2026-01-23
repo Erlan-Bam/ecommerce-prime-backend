@@ -15,7 +15,7 @@ import {
 import { ReviewsService } from './services/reviews.service';
 import { AdminGuard } from '../shared/guards/admin.guard';
 import { UserGuard } from '../shared/guards/user.guard';
-import { CreateReviewDto } from './dto';
+import { CreateReviewDto, CreateGuestReviewDto } from './dto';
 import { ApiTags, ApiQuery, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 
 @ApiTags('Reviews')
@@ -33,6 +33,15 @@ export class ReviewsController {
   })
   async create(@Request() req: any, @Body() dto: CreateReviewDto) {
     return this.reviewsService.create(req.user.id, dto);
+  }
+
+  @Post('guest')
+  @ApiResponse({
+    status: 201,
+    description: 'Guest review created successfully',
+  })
+  async createGuestReview(@Body() dto: CreateGuestReviewDto) {
+    return this.reviewsService.createGuestReview(dto);
   }
 
   @Get()
