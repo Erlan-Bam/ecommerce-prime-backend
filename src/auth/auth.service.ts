@@ -9,6 +9,7 @@ import {
 } from './dto';
 import * as bcrypt from 'bcryptjs';
 import { ConfigService } from '@nestjs/config';
+import { Role } from '@prisma/client';
 
 @Injectable()
 export class AuthService {
@@ -45,7 +46,7 @@ export class AuthService {
           phone: dto.phone,
           name: dto.name,
           password: hashedPassword,
-          role: 'USER',
+          role: Role.USER,
         },
       });
 
@@ -138,7 +139,7 @@ export class AuthService {
         throw new HttpException('Invalid credentials', HttpStatus.UNAUTHORIZED);
       }
 
-      if (admin.role !== 'ADMIN') {
+      if (admin.role !== Role.ADMIN) {
         throw new HttpException(
           'Access denied: Admins only',
           HttpStatus.FORBIDDEN,
