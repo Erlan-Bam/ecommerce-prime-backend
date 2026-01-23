@@ -164,7 +164,7 @@ export class DashboardService {
 
       return orders.map((order) => ({
         id: order.id,
-        customer: order.user.name || order.user.email,
+        customer: order.email,
         amount: order.finalTotal.toNumber(),
         status: this.mapStatus(order.status),
         statusType: this.getStatusType(order.status),
@@ -179,10 +179,7 @@ export class DashboardService {
     }
   }
 
-  private calculatePercentageChange(
-    current: number,
-    previous: number,
-  ): number {
+  private calculatePercentageChange(current: number, previous: number): number {
     if (previous === 0) return current > 0 ? 100 : 0;
     return Number((((current - previous) / previous) * 100).toFixed(1));
   }
@@ -204,17 +201,16 @@ export class DashboardService {
   private getStatusType(
     status: string,
   ): 'success' | 'warning' | 'info' | 'danger' {
-    const typeMap: Record<string, 'success' | 'warning' | 'info' | 'danger'> =
-      {
-        PENDING: 'warning',
-        PROCESSING: 'warning',
-        CONFIRMED: 'info',
-        SHIPPED: 'info',
-        DELIVERED: 'success',
-        CANCELLED: 'danger',
-        PICKUP_READY: 'info',
-        PICKED_UP: 'success',
-      };
+    const typeMap: Record<string, 'success' | 'warning' | 'info' | 'danger'> = {
+      PENDING: 'warning',
+      PROCESSING: 'warning',
+      CONFIRMED: 'info',
+      SHIPPED: 'info',
+      DELIVERED: 'success',
+      CANCELLED: 'danger',
+      PICKUP_READY: 'info',
+      PICKED_UP: 'success',
+    };
     return typeMap[status] || 'info';
   }
 }
