@@ -12,11 +12,11 @@ import {
 export class QuickBuyDto {
   @ApiProperty({
     description: 'Product ID',
-    example: 1,
+    example: 'clxxxxxx',
   })
-  @IsInt()
+  @IsString()
   @IsNotEmpty()
-  productId: number;
+  productId: string;
 
   @ApiPropertyOptional({
     description: 'Quantity (default: 1)',

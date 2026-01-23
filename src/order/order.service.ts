@@ -1323,6 +1323,9 @@ export class OrderService {
         .join('\n');
 
       // Create order with item in a transaction
+      // Note: Customer info is logged for manual processing
+      this.logger.log(`Quick buy customer info:\n${customerInfo}`);
+
       const result = await this.prisma.$transaction(async (tx) => {
         // Create the order
         // If userId is provided (authenticated user), use it; otherwise use a guest placeholder
@@ -1333,7 +1336,6 @@ export class OrderService {
             discount: 0,
             finalTotal: itemPrice,
             status: 'PENDING',
-            comment: customerInfo,
           },
         });
 
