@@ -11,6 +11,7 @@ import {
   SelectPickupDto,
   ApplyCouponDto,
   UpdateOrderStatusDto,
+  QuickBuyDto,
 } from './dto';
 import { OrderCacheService } from './services/cache.service';
 
@@ -1265,6 +1266,125 @@ export class OrderService {
         error.stack,
       );
       throw new InternalServerErrorException('Failed to get order stats');
+    }
+  }
+
+  /**
+   * Quick buy (1-click purchase)
+   * Creates an order with a single product without requiring authentication
+   * Customer info is stored in the order comment for manual processing
+   */
+  async quickBuy(dto: QuickBuyDto, userId?: string) {
+    try {
+      this.logger.log(
+        `Quick buy initiated for product ${dto.productId}, customer: ${dto.name}`,
+      );
+
+      // Verify product exists and is active
+      const product = await this.prisma.product.findUnique({
+        where: { id: dto.productId },
+        select: {
+          id: true,
+          name: true,
+          price: true,
+          isActive: true,
+          images: {
+            take: 1,
+            orderBy: { sortOrder: 'asc' },
+          },
+        },
+      });
+
+      if (!product) {
+        this.logger.warn(`Product ${dto.productId} not found`);
+        throw new HttpException('Product not found', HttpStatus.NOT_FOUND);
+      }
+
+      if (!product.isActive) {
+        this.logger.warn(`Product ${dto.productId} is not active`);
+        throw new HttpException(
+          'Product is not available',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      const quantity = dto.quantity || 1;
+      const itemPrice = product.price.toNumber() * quantity;
+
+      // Create customer info comment
+      const customerInfo = [
+        `[QUICK BUY / КУПИТЬ В 1 КЛИК]`,
+        `Имя: ${dto.name}`,
+        `Телефон: ${dto.phone}`,
+        dto.email ? `Email: ${dto.email}` : null,
+        dto.comment ? `Комментарий: ${dto.comment}` : null,
+      ]
+        .filter(Boolean)
+        .join('\n');
+
+      // Create order with item in a transaction
+      const result = await this.prisma.$transaction(async (tx) => {
+        // Create the order
+        // If userId is provided (authenticated user), use it; otherwise use a guest placeholder
+        const order = await tx.order.create({
+          data: {
+            userId: userId || 'guest-quick-buy',
+            total: itemPrice,
+            discount: 0,
+            finalTotal: itemPrice,
+            status: 'PENDING',
+            comment: customerInfo,
+          },
+        });
+
+        // Create the order item
+        await tx.orderItem.create({
+          data: {
+            orderId: order.id,
+            userId: userId || 'guest-quick-buy',
+            productId: dto.productId,
+            quantity,
+            price: itemPrice,
+          },
+        });
+
+        return order;
+      });
+
+      this.logger.log(
+        `Quick buy order created successfully: ${result.id} for ${dto.name}`,
+      );
+
+      return {
+        orderId: result.id,
+        status: result.status,
+        total: result.finalTotal,
+        customer: {
+          name: dto.name,
+          phone: dto.phone,
+          email: dto.email,
+        },
+        product: {
+          id: product.id,
+          name: product.name,
+          price: product.price.toNumber(),
+          quantity,
+          image: product.images[0]?.url || null,
+        },
+        message:
+          'Заказ создан! Наш менеджер свяжется с вами для подтверждения.',
+      };
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      this.logger.error(
+        `Error during quick buy for product ${dto.productId}: ${error.message}`,
+        error.stack,
+      );
+      throw new InternalServerErrorException(
+        'Failed to create quick buy order',
+      );
     }
   }
 }

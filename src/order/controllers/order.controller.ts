@@ -21,9 +21,12 @@ import {
   SelectPickupDto,
   SelectPickupResponseDto,
   ApplyCouponDto,
+  QuickBuyDto,
+  QuickBuyResponseDto,
 } from '../dto';
 import { UserGuard } from '../../shared/guards/user.guard';
 import { User } from '../../shared/decorator/user.decorator';
+import { Public } from '../../shared/decorator/public.decorator';
 
 @ApiTags('Orders')
 @Controller('orders')
@@ -31,6 +34,28 @@ import { User } from '../../shared/decorator/user.decorator';
 @ApiBearerAuth('JWT')
 export class OrderController {
   constructor(private readonly orderService: OrderService) {}
+
+  // Quick buy (1-click purchase) - public endpoint
+  @Public()
+  @Post('quick-buy')
+  @ApiOperation({
+    summary: 'Quick buy - One-click purchase without authentication',
+    description:
+      'Creates an order with a single product. Customer contact info is stored for manual callback. No authentication required.',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Quick buy order created successfully',
+    type: QuickBuyResponseDto,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad request - Product not available',
+  })
+  @ApiResponse({ status: 404, description: 'Product not found' })
+  quickBuy(@Body() dto: QuickBuyDto) {
+    return this.orderService.quickBuy(dto);
+  }
 
   // Cart endpoints
   @Post('cart/items')

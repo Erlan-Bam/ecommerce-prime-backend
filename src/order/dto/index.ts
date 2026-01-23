@@ -4,3 +4,4 @@ export * from './checkout.dto';
 export * from './select-pickup.dto';
 export * from './update-order-status.dto';
 export * from './apply-coupon.dto';
+export * from './quick-buy.dto';
