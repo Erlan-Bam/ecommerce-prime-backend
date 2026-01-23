@@ -1,7 +1,14 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  BadRequestException,
+  ConflictException,
+} from '@nestjs/common';
 import { PrismaService } from '../../shared/services/prisma.service';
 import { ReviewsCacheService } from './cache.service';
 import { Prisma } from '@prisma/client';
+import { CreateReviewDto } from '../dto';
 
 @Injectable()
 export class ReviewsService {
@@ -11,6 +18,64 @@ export class ReviewsService {
     private readonly prisma: PrismaService,
     private readonly cacheService: ReviewsCacheService,
   ) {}
+
+  async create(userId: string, dto: CreateReviewDto) {
+    // Check if product exists
+    const product = await this.prisma.product.findUnique({
+      where: { id: dto.productId },
+    });
+
+    if (!product) {
+      throw new NotFoundException('Product not found');
+    }
+
+    // Check if user already reviewed this product
+    const existingReview = await this.prisma.review.findUnique({
+      where: {
+        productId_userId: {
+          productId: dto.productId,
+          userId,
+        },
+      },
+    });
+
+    if (existingReview) {
+      throw new ConflictException('You have already reviewed this product');
+    }
+
+    // Create the review
+    const review = await this.prisma.review.create({
+      data: {
+        productId: dto.productId,
+        userId,
+        rating: dto.rating,
+        comment: dto.comment,
+        isActive: true, // Auto-approve for now, can change to false for moderation
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        product: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+    });
+
+    // Invalidate caches
+    await this.cacheService.invalidateAllCaches();
+    this.logger.log(
+      `Created review for product ${dto.productId} by user ${userId}`,
+    );
+
+    return review;
+  }
 
   async findAll(params: {
     page?: number;

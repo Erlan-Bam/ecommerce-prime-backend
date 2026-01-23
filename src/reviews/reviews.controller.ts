@@ -1,22 +1,39 @@
 import {
   Controller,
   Get,
+  Post,
   Patch,
   Delete,
   Param,
   Query,
+  Body,
   UseGuards,
   ParseIntPipe,
   DefaultValuePipe,
+  Request,
 } from '@nestjs/common';
 import { ReviewsService } from './services/reviews.service';
 import { AdminGuard } from '../shared/guards/admin.guard';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { CreateReviewDto } from './dto';
 import { ApiTags, ApiQuery, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 
 @ApiTags('Reviews')
 @Controller('reviews')
 export class ReviewsController {
   constructor(private readonly reviewsService: ReviewsService) {}
+
+  @Post()
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiResponse({ status: 201, description: 'Review created successfully' })
+  @ApiResponse({
+    status: 409,
+    description: 'You have already reviewed this product',
+  })
+  async create(@Request() req: any, @Body() dto: CreateReviewDto) {
+    return this.reviewsService.create(req.user.id, dto);
+  }
 
   @Get()
   @UseGuards(AdminGuard)
