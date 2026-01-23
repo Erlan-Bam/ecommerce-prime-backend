@@ -6,6 +6,7 @@ import {
   Query,
   Body,
   UseGuards,
+  ParseIntPipe,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -67,7 +68,7 @@ export class AdminOrderController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden - Admin only' })
   @ApiResponse({ status: 404, description: 'Order not found' })
-  getOrderByIdAdmin(@Param('id') orderId: string) {
+  getOrderByIdAdmin(@Param('id', ParseIntPipe) orderId: number) {
     return this.orderService.getOrderByIdAdmin(orderId);
   }
 
@@ -81,7 +82,7 @@ export class AdminOrderController {
   @ApiResponse({ status: 403, description: 'Forbidden - Admin only' })
   @ApiResponse({ status: 404, description: 'Order not found' })
   updateOrderStatus(
-    @Param('id') orderId: string,
+    @Param('id', ParseIntPipe) orderId: number,
     @Body() dto: UpdateOrderStatusDto,
   ) {
     return this.orderService.updateOrderStatus(orderId, dto);

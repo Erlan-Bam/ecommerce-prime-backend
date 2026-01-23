@@ -17,6 +17,7 @@ import { PickupPointModule } from './pickup-point/pickup-point.module';
 import { PickupWindowModule } from './pickup-window/pickup-window.module';
 import { CouponModule } from './coupon/coupon.module';
 import { OrderModule } from './order/order.module';
+import { PaymentModule } from './payment/payment.module';
 import { FavoriteModule } from './favorite/favorite.module';
 import { BlogModule } from './blog/blog.module';
 import { DashboardModule } from './dashboard/dashboard.module';
@@ -59,6 +60,7 @@ import { ReviewsModule } from './reviews/reviews.module';
     PickupWindowModule,
     CouponModule,
     OrderModule,
+    PaymentModule,
     FavoriteModule,
     BlogModule,
     DashboardModule,

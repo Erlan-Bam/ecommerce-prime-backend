@@ -39,13 +39,13 @@ export class OrderCacheService {
   }
 
   // Order cache methods
-  private getOrderCacheKey(userId: string, orderId?: string): string {
+  private getOrderCacheKey(userId: string, orderId?: number): string {
     return orderId
       ? `${this.CACHE_PREFIX}:${userId}:${orderId}`
       : `${this.CACHE_PREFIX}:${userId}:all`;
   }
 
-  async getCachedOrder(userId: string, orderId: string): Promise<any | null> {
+  async getCachedOrder(userId: string, orderId: number): Promise<any | null> {
     const key = this.getOrderCacheKey(userId, orderId);
     return await this.redisService.get(key);
   }
@@ -55,7 +55,7 @@ export class OrderCacheService {
     return await this.redisService.get(key);
   }
 
-  async cacheOrder(userId: string, orderId: string, data: any): Promise<void> {
+  async cacheOrder(userId: string, orderId: number, data: any): Promise<void> {
     const key = this.getOrderCacheKey(userId, orderId);
     await this.redisService.set(key, data, this.CACHE_TTL);
   }
@@ -65,7 +65,7 @@ export class OrderCacheService {
     await this.redisService.set(key, data, this.CACHE_TTL);
   }
 
-  async invalidateOrder(userId: string, orderId: string): Promise<void> {
+  async invalidateOrder(userId: string, orderId: number): Promise<void> {
     try {
       const key = this.getOrderCacheKey(userId, orderId);
       await this.redisService.remove(key);

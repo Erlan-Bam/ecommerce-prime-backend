@@ -6,6 +6,7 @@ import {
   Body,
   Param,
   UseGuards,
+  ParseIntPipe,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -127,7 +128,7 @@ export class OrderController {
   @ApiResponse({ status: 409, description: 'Pickup window is fully booked' })
   selectPickup(
     @User('id') userId: string,
-    @Param('id') orderId: string,
+    @Param('id', ParseIntPipe) orderId: number,
     @Body() dto: SelectPickupDto,
   ) {
     return this.orderService.selectPickup(userId, orderId, dto);
@@ -156,7 +157,7 @@ export class OrderController {
   })
   applyCoupon(
     @User('id') userId: string,
-    @Param('id') orderId: string,
+    @Param('id', ParseIntPipe) orderId: number,
     @Body() dto: ApplyCouponDto,
   ) {
     return this.orderService.applyCoupon(userId, orderId, dto);
@@ -179,7 +180,10 @@ export class OrderController {
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 404, description: 'Order not found' })
-  removeCoupon(@User('id') userId: string, @Param('id') orderId: string) {
+  removeCoupon(
+    @User('id') userId: string,
+    @Param('id', ParseIntPipe) orderId: number,
+  ) {
     return this.orderService.removeCoupon(userId, orderId);
   }
 
@@ -203,7 +207,10 @@ export class OrderController {
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 404, description: 'Order not found' })
-  getOrderById(@User('id') userId: string, @Param('id') orderId: string) {
+  getOrderById(
+    @User('id') userId: string,
+    @Param('id', ParseIntPipe) orderId: number,
+  ) {
     return this.orderService.getOrderById(userId, orderId);
   }
 }

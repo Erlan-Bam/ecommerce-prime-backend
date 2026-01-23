@@ -440,7 +440,7 @@ export class OrderService {
     }
   }
 
-  async getOrderById(userId: string, orderId: string) {
+  async getOrderById(userId: string, orderId: number) {
     try {
       this.logger.log(`Fetching order ${orderId} for user ${userId}`);
 
@@ -504,7 +504,7 @@ export class OrderService {
    * Pickup windows are hourly slots from 10:00 to 21:00 Moscow time.
    * Each window has a capacity of 24 orders.
    */
-  async selectPickup(userId: string, orderId: string, dto: SelectPickupDto) {
+  async selectPickup(userId: string, orderId: number, dto: SelectPickupDto) {
     try {
       this.logger.log(
         `Selecting pickup for order ${orderId}, point ${dto.pointId}`,
@@ -631,7 +631,7 @@ export class OrderService {
           data: {
             pointId: dto.pointId,
             windowId: pickupWindow.id,
-            status: 'PROCESSING', // Move to processing after pickup selection
+            // Status remains PENDING until payment is created
           },
           include: {
             pickupPoint: {
@@ -733,7 +733,7 @@ export class OrderService {
    * Validates the coupon, calculates discount, and updates the order total.
    * All operations are wrapped in a transaction.
    */
-  async applyCoupon(userId: string, orderId: string, dto: ApplyCouponDto) {
+  async applyCoupon(userId: string, orderId: number, dto: ApplyCouponDto) {
     try {
       this.logger.log(
         `Applying coupon ${dto.code} to order ${orderId} for user ${userId}`,
@@ -910,7 +910,7 @@ export class OrderService {
    * Remove a coupon from an order and restore the original total.
    * All operations are wrapped in a transaction.
    */
-  async removeCoupon(userId: string, orderId: string) {
+  async removeCoupon(userId: string, orderId: number) {
     try {
       this.logger.log(
         `Removing coupon from order ${orderId} for user ${userId}`,
@@ -1094,7 +1094,7 @@ export class OrderService {
     }
   }
 
-  async getOrderByIdAdmin(orderId: string) {
+  async getOrderByIdAdmin(orderId: number) {
     try {
       const order = await this.prisma.order.findUnique({
         where: { id: orderId },
@@ -1156,7 +1156,7 @@ export class OrderService {
     }
   }
 
-  async updateOrderStatus(orderId: string, dto: UpdateOrderStatusDto) {
+  async updateOrderStatus(orderId: number, dto: UpdateOrderStatusDto) {
     try {
       const order = await this.prisma.order.findUnique({
         where: { id: orderId },
