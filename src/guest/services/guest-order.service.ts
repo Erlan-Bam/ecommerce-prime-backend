@@ -556,6 +556,7 @@ export class GuestOrderService {
           email: dto.email,
           phone: dto.phone,
           payLater: dto.payLater ?? false,
+          status: 'PROCESSING',
         };
 
         let pickupWindow = null;
