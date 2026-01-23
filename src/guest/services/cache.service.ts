@@ -72,7 +72,10 @@ export class GuestCacheService {
     await this.redisService.set(key, data, this.CACHE_TTL);
   }
 
-  async invalidateGuestOrder(sessionId: string, orderId: number): Promise<void> {
+  async invalidateGuestOrder(
+    sessionId: string,
+    orderId: number,
+  ): Promise<void> {
     try {
       const key = this.getOrderCacheKey(sessionId, orderId);
       await this.redisService.remove(key);
