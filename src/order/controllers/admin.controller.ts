@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Patch,
+  Post,
   Param,
   Query,
   Body,
@@ -16,7 +17,11 @@ import {
 } from '@nestjs/swagger';
 import { OrderService } from '../order.service';
 import { AdminGuard } from '../../shared/guards/admin.guard';
-import { UpdateOrderStatusDto } from '../dto';
+import {
+  UpdateOrderStatusDto,
+  AdminFinalizeOrderDto,
+  AdminFinalizeOrderResponseDto,
+} from '../dto';
 
 @ApiTags('Admin Orders')
 @Controller('admin/orders')
@@ -24,6 +29,51 @@ import { UpdateOrderStatusDto } from '../dto';
 @ApiBearerAuth('JWT')
 export class AdminOrderController {
   constructor(private readonly orderService: OrderService) {}
+
+  @Get('pending')
+  @ApiOperation({
+    summary: 'Get all pending orders (quick buy orders waiting for finalization)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Pending orders retrieved successfully',
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden - Admin only' })
+  getPendingOrders(
+    @Query('page') page = 1,
+    @Query('limit') limit = 10,
+  ) {
+    return this.orderService.getPendingOrders({
+      page: Number(page),
+      limit: Number(limit),
+    });
+  }
+
+  @Post(':id/finalize')
+  @ApiOperation({
+    summary: 'Finalize a pending order (Admin)',
+    description:
+      'Complete order details for quick buy orders. Set delivery method, payment method, pickup point/address, etc.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Order finalized successfully',
+    type: AdminFinalizeOrderResponseDto,
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden - Admin only' })
+  @ApiResponse({ status: 404, description: 'Order not found' })
+  @ApiResponse({
+    status: 400,
+    description: 'Order is not in PENDING status',
+  })
+  adminFinalizeOrder(
+    @Param('id', ParseIntPipe) orderId: number,
+    @Body() dto: AdminFinalizeOrderDto,
+  ) {
+    return this.orderService.adminFinalizeOrder(orderId, dto);
+  }
 
   @Get()
   @ApiOperation({ summary: 'Get all orders with filters (Admin)' })

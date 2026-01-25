@@ -13,6 +13,7 @@ import {
   ApplyCouponDto,
   UpdateOrderStatusDto,
   QuickBuyDto,
+  AdminFinalizeOrderDto,
 } from './dto';
 import { OrderCacheService } from './services/cache.service';
 
@@ -716,14 +717,6 @@ export class OrderService {
           );
         }
 
-        // Validate payLater can only be used with CASH payment method
-        if (dto.payLater && dto.paymentMethod !== 'CASH') {
-          throw new HttpException(
-            'Pay later option is only available with CASH payment method',
-            HttpStatus.BAD_REQUEST,
-          );
-        }
-
         // Prepare common update data
         const updateData: any = {
           deliveryMethod: dto.deliveryMethod,
@@ -731,7 +724,6 @@ export class OrderService {
           buyer: dto.buyer,
           email: dto.email,
           phone: dto.phone,
-          payLater: dto.payLater ?? false,
           status: 'PROCESSING',
         };
 
@@ -1534,109 +1526,412 @@ export class OrderService {
   }
 
   /**
+   * Get all pending orders (quick buy orders waiting for admin finalization)
+   */
+  async getPendingOrders(filters: { page: number; limit: number }) {
+    try {
+      const { page, limit } = filters;
+      const skip = (page - 1) * limit;
+
+      const [orders, total] = await Promise.all([
+        this.prisma.order.findMany({
+          where: {
+            status: 'PENDING',
+          },
+          skip,
+          take: limit,
+          orderBy: { createdAt: 'desc' },
+          include: {
+            items: {
+              include: {
+                product: {
+                  select: {
+                    id: true,
+                    name: true,
+                    images: true,
+                    slug: true,
+                    price: true,
+                  },
+                },
+              },
+            },
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                phone: true,
+              },
+            },
+            session: {
+              select: {
+                id: true,
+                fingerprint: true,
+              },
+            },
+          },
+        }),
+        this.prisma.order.count({
+          where: { status: 'PENDING' },
+        }),
+      ]);
+
+      return {
+        data: orders,
+        meta: {
+          total,
+          page,
+          limit,
+          totalPages: Math.ceil(total / limit),
+        },
+      };
+    } catch (error) {
+      this.logger.error(
+        `Error getting pending orders: ${error.message}`,
+        error.stack,
+      );
+      throw new InternalServerErrorException('Failed to get pending orders');
+    }
+  }
+
+  /**
+   * Admin finalize order - Complete order details for quick buy orders
+   */
+  async adminFinalizeOrder(orderId: number, dto: AdminFinalizeOrderDto) {
+    try {
+      this.logger.log(
+        `Admin finalizing order ${orderId} with delivery method ${dto.deliveryMethod}`,
+      );
+
+      const result = await this.prisma.$transaction(async (tx) => {
+        // 1. Verify order exists
+        const order = await tx.order.findUnique({
+          where: { id: orderId },
+          include: {
+            items: true,
+          },
+        });
+
+        if (!order) {
+          this.logger.warn(`Order ${orderId} not found`);
+          throw new HttpException('Order not found', HttpStatus.NOT_FOUND);
+        }
+
+        if (order.status !== 'PENDING') {
+          this.logger.warn(
+            `Order ${orderId} is not in PENDING status: ${order.status}`,
+          );
+          throw new HttpException(
+            'Order is not in a state that allows finalization',
+            HttpStatus.BAD_REQUEST,
+          );
+        }
+
+        // Prepare update data
+        const updateData: any = {
+          deliveryMethod: dto.deliveryMethod,
+          paymentMethod: dto.paymentMethod,
+          status: 'PROCESSING',
+        };
+
+        // Update optional fields if provided
+        if (dto.buyer) updateData.buyer = dto.buyer;
+        if (dto.email) updateData.email = dto.email;
+        if (dto.phone) updateData.phone = dto.phone;
+
+        let pickupWindow = null;
+        let pickupPoint = null;
+
+        if (dto.deliveryMethod === 'PICKUP') {
+          // Validate PICKUP specific fields
+          if (!dto.pointId || !dto.pickupTime) {
+            throw new HttpException(
+              'Pickup point ID and pickup time are required for pickup delivery',
+              HttpStatus.BAD_REQUEST,
+            );
+          }
+
+          // 2. Verify pickup point exists and is active
+          pickupPoint = await tx.pickupPoint.findUnique({
+            where: { id: dto.pointId },
+          });
+
+          if (!pickupPoint) {
+            this.logger.warn(`Pickup point ${dto.pointId} not found`);
+            throw new HttpException(
+              'Pickup point not found',
+              HttpStatus.NOT_FOUND,
+            );
+          }
+
+          if (!pickupPoint.isActive) {
+            this.logger.warn(`Pickup point ${dto.pointId} is not active`);
+            throw new HttpException(
+              'Pickup point is not available',
+              HttpStatus.BAD_REQUEST,
+            );
+          }
+
+          // 3. Calculate the pickup window based on the requested time
+          const { windowStart, windowEnd } = this.calculatePickupWindow(
+            dto.pickupTime,
+          );
+
+          // 4. Find or create the pickup window
+          pickupWindow = await tx.pickupWindow.findUnique({
+            where: {
+              pointId_startTime: {
+                pointId: dto.pointId,
+                startTime: windowStart,
+              },
+            },
+          });
+
+          if (pickupWindow) {
+            // Check if capacity is available
+            if (pickupWindow.capacity <= 0) {
+              this.logger.warn(
+                `Pickup window ${pickupWindow.id} is full for point ${dto.pointId}`,
+              );
+              throw new HttpException(
+                'This pickup window is fully booked. Please select a different time.',
+                HttpStatus.CONFLICT,
+              );
+            }
+
+            // Update existing window: decrease capacity, increase reserved
+            pickupWindow = await tx.pickupWindow.update({
+              where: { id: pickupWindow.id },
+              data: {
+                capacity: { decrement: 1 },
+                reserved: { increment: 1 },
+              },
+            });
+
+            this.logger.log(
+              `Reserved slot in existing window ${pickupWindow.id}. Remaining capacity: ${pickupWindow.capacity}`,
+            );
+          } else {
+            // Create new window with capacity = 23 (24 - 1), reserved = 1
+            pickupWindow = await tx.pickupWindow.create({
+              data: {
+                pointId: dto.pointId,
+                startTime: windowStart,
+                endTime: windowEnd,
+                capacity: 23,
+                reserved: 1,
+              },
+            });
+
+            this.logger.log(
+              `Created new pickup window ${pickupWindow.id} for point ${dto.pointId}`,
+            );
+          }
+
+          updateData.pointId = dto.pointId;
+          updateData.windowId = pickupWindow.id;
+        } else if (dto.deliveryMethod === 'DELIVERY') {
+          // Validate DELIVERY specific fields
+          if (!dto.address) {
+            throw new HttpException(
+              'Address is required for delivery',
+              HttpStatus.BAD_REQUEST,
+            );
+          }
+          updateData.address = dto.address;
+        }
+
+        // 5. Update the order
+        const updatedOrder = await tx.order.update({
+          where: { id: orderId },
+          data: updateData,
+          include: {
+            items: {
+              include: {
+                product: {
+                  select: {
+                    id: true,
+                    name: true,
+                    slug: true,
+                    images: true,
+                  },
+                },
+              },
+            },
+            pickupPoint: true,
+            pickupWindow: true,
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                phone: true,
+              },
+            },
+          },
+        });
+
+        return { updatedOrder, pickupPoint, pickupWindow };
+      });
+
+      // Invalidate caches
+      if (result.updatedOrder.userId) {
+        await this.cacheService.invalidateUserOrders(result.updatedOrder.userId);
+        await this.cacheService.invalidateOrder(result.updatedOrder.userId, orderId);
+      }
+
+      this.logger.log(`Admin finalized order ${orderId} successfully`);
+
+      return {
+        id: result.updatedOrder.id,
+        status: result.updatedOrder.status,
+        deliveryMethod: result.updatedOrder.deliveryMethod,
+        paymentMethod: result.updatedOrder.paymentMethod,
+        total: result.updatedOrder.total,
+        discount: result.updatedOrder.discount,
+        finalTotal: result.updatedOrder.finalTotal,
+        buyer: result.updatedOrder.buyer,
+        email: result.updatedOrder.email,
+        phone: result.updatedOrder.phone,
+        address: result.updatedOrder.address,
+        pickupPoint: result.pickupPoint
+          ? {
+              id: result.pickupPoint.id,
+              name: result.pickupPoint.name,
+              address: result.pickupPoint.address,
+            }
+          : undefined,
+        pickupWindow: result.pickupWindow
+          ? {
+              id: result.pickupWindow.id,
+              startTime: result.pickupWindow.startTime,
+              endTime: result.pickupWindow.endTime,
+            }
+          : undefined,
+        message: 'Order finalized successfully by admin',
+      };
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      this.logger.error(
+        `Error admin finalizing order ${orderId}: ${error.message}`,
+        error.stack,
+      );
+      throw new InternalServerErrorException('Failed to finalize order');
+    }
+  }
+
+  /**
    * Quick buy (1-click purchase)
    * Creates an order with a single product without requiring authentication
    * Customer info is stored in the order comment for manual processing
    */
-  async quickBuy(dto: QuickBuyDto, userId?: string) {
+  async quickBuy(userId: string, dto: QuickBuyDto) {
     try {
       this.logger.log(
-        `Quick buy initiated for product ${dto.productId}, customer: ${dto.name}`,
+        `Quick buy initiated for user ${userId}, customer: ${dto.buyer}`,
       );
 
-      // Verify product exists and is active
-      const product = await this.prisma.product.findUnique({
-        where: { id: dto.productId },
-        select: {
-          id: true,
-          name: true,
-          price: true,
-          isActive: true,
-          images: {
-            take: 1,
-            orderBy: { sortOrder: 'asc' },
+      // Get cart items for the user
+      const cartItems = await this.prisma.orderItem.findMany({
+        where: {
+          userId,
+          orderId: null, // Only cart items (not yet in an order)
+        },
+        include: {
+          product: {
+            select: {
+              id: true,
+              name: true,
+              price: true,
+              isActive: true,
+              images: {
+                take: 1,
+                orderBy: { sortOrder: 'asc' },
+              },
+            },
           },
         },
       });
 
-      if (!product) {
-        this.logger.warn(`Product ${dto.productId} not found`);
-        throw new HttpException('Product not found', HttpStatus.NOT_FOUND);
+      if (cartItems.length === 0) {
+        this.logger.warn(`Cart is empty for user ${userId}`);
+        throw new HttpException('Cart is empty', HttpStatus.BAD_REQUEST);
       }
 
-      if (!product.isActive) {
-        this.logger.warn(`Product ${dto.productId} is not active`);
+      // Check all products are active
+      const inactiveProducts = cartItems.filter(
+        (item) => !item.product.isActive,
+      );
+      if (inactiveProducts.length > 0) {
+        this.logger.warn(
+          `Some products in cart are inactive for user ${userId}`,
+        );
         throw new HttpException(
-          'Product is not available',
+          'Some products in your cart are no longer available',
           HttpStatus.BAD_REQUEST,
         );
       }
 
-      const quantity = dto.quantity || 1;
-      const itemPrice = product.price.toNumber() * quantity;
+      // Calculate total
+      const total = cartItems.reduce(
+        (sum, item) => sum + Number(item.price),
+        0,
+      );
 
-      // Create customer info comment
-      const customerInfo = [
-        `[QUICK BUY / КУПИТЬ В 1 КЛИК]`,
-        `Имя: ${dto.name}`,
-        `Телефон: ${dto.phone}`,
-        dto.email ? `Email: ${dto.email}` : null,
-        dto.comment ? `Комментарий: ${dto.comment}` : null,
-      ]
-        .filter(Boolean)
-        .join('\n');
-
-      // Create order with item in a transaction
-      // Note: Customer info is logged for manual processing
-      this.logger.log(`Quick buy customer info:\n${customerInfo}`);
-
+      // Create order with items in a transaction
       const result = await this.prisma.$transaction(async (tx) => {
         // Create the order
-        // If userId is provided (authenticated user), use it; otherwise use a guest placeholder
         const order = await tx.order.create({
           data: {
-            userId: userId || 'guest-quick-buy',
-            total: itemPrice,
+            userId,
+            total,
             discount: 0,
-            finalTotal: itemPrice,
+            finalTotal: total,
+            buyer: dto.buyer,
+            phone: dto.phone,
             status: 'PENDING',
           },
         });
 
-        // Create the order item
-        await tx.orderItem.create({
+        // Update cart items to belong to the order
+        await tx.orderItem.updateMany({
+          where: {
+            userId,
+            orderId: null,
+          },
           data: {
             orderId: order.id,
-            userId: userId || 'guest-quick-buy',
-            productId: dto.productId,
-            quantity,
-            price: itemPrice,
           },
         });
 
         return order;
       });
 
+      // Invalidate cart cache
+      await this.cacheService.invalidateCart(userId);
+
       this.logger.log(
-        `Quick buy order created successfully: ${result.id} for ${dto.name}`,
+        `Quick buy order created successfully: ${result.id} for ${dto.buyer}`,
       );
 
       return {
         orderId: result.id,
         status: result.status,
         total: result.finalTotal,
+        itemsCount: cartItems.length,
         customer: {
-          name: dto.name,
+          buyer: dto.buyer,
           phone: dto.phone,
-          email: dto.email,
         },
-        product: {
-          id: product.id,
-          name: product.name,
-          price: product.price.toNumber(),
-          quantity,
-          image: product.images[0]?.url || null,
-        },
+        items: cartItems.map((item) => ({
+          id: item.product.id,
+          name: item.product.name,
+          price: Number(item.price),
+          quantity: item.quantity,
+          image: item.product.images[0]?.url || null,
+        })),
         message:
           'Заказ создан! Наш менеджер свяжется с вами для подтверждения.',
       };
@@ -1645,7 +1940,7 @@ export class OrderService {
         throw error;
       }
       this.logger.error(
-        `Error during quick buy for product ${dto.productId}: ${error.message}`,
+        `Error during quick buy for user ${userId}: ${error.message}`,
         error.stack,
       );
       throw new InternalServerErrorException(

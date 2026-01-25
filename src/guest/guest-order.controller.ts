@@ -22,6 +22,8 @@ import {
   FinalizeOrderDto,
   FinalizeOrderResponseDto,
   ApplyCouponDto,
+  QuickBuyDto,
+  QuickBuyResponseDto,
 } from '../order/dto';
 import { GuestGuard } from '../shared/guards/guest.guard';
 import { Guest } from '../shared/decorator/guest.decorator';
@@ -31,6 +33,29 @@ import { Public } from '../shared/decorator/public.decorator';
 @Controller('guest/orders')
 export class GuestOrderController {
   constructor(private readonly guestOrderService: GuestOrderService) {}
+
+  // Quick buy (1-click purchase) for guest
+  @Public()
+  @UseGuards(GuestGuard)
+  @Post('quick-buy')
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Quick buy - One-click purchase from cart for guest',
+    description:
+      'Creates an order from all cart items for guest user. Customer contact info (buyer name and phone) is stored for manual callback.',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Quick buy order created successfully',
+    type: QuickBuyResponseDto,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad request - Cart is empty or contains inactive products',
+  })
+  quickBuy(@Guest('id') sessionId: string, @Body() dto: QuickBuyDto) {
+    return this.guestOrderService.quickBuy(sessionId, dto);
+  }
 
   // Init order endpoint
   @Public()

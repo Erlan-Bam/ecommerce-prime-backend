@@ -28,7 +28,6 @@ import {
 } from '../dto';
 import { UserGuard } from '../../shared/guards/user.guard';
 import { User } from '../../shared/decorator/user.decorator';
-import { Public } from '../../shared/decorator/public.decorator';
 
 @ApiTags('Orders')
 @Controller('orders')
@@ -37,13 +36,12 @@ import { Public } from '../../shared/decorator/public.decorator';
 export class OrderController {
   constructor(private readonly orderService: OrderService) {}
 
-  // Quick buy (1-click purchase) - public endpoint
-  @Public()
+  // Quick buy (1-click purchase) - requires authentication
   @Post('quick-buy')
   @ApiOperation({
-    summary: 'Quick buy - One-click purchase without authentication',
+    summary: 'Quick buy - One-click purchase from cart',
     description:
-      'Creates an order with a single product. Customer contact info is stored for manual callback. No authentication required.',
+      'Creates an order from all cart items. Customer contact info (buyer name and phone) is stored for manual callback. Requires authentication.',
   })
   @ApiResponse({
     status: 201,
@@ -52,11 +50,11 @@ export class OrderController {
   })
   @ApiResponse({
     status: 400,
-    description: 'Bad request - Product not available',
+    description: 'Bad request - Cart is empty or contains inactive products',
   })
-  @ApiResponse({ status: 404, description: 'Product not found' })
-  quickBuy(@Body() dto: QuickBuyDto) {
-    return this.orderService.quickBuy(dto);
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  quickBuy(@User('id') userId: string, @Body() dto: QuickBuyDto) {
+    return this.orderService.quickBuy(userId, dto);
   }
 
   // Cart endpoints

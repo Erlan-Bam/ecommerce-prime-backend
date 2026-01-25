@@ -1,39 +1,14 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import {
-  IsNotEmpty,
-  IsInt,
-  IsString,
-  IsEmail,
-  IsOptional,
-  Min,
-  Matches,
-} from 'class-validator';
+import { ApiProperty } from '@nestjs/swagger';
+import { IsNotEmpty, IsString, Matches } from 'class-validator';
 
 export class QuickBuyDto {
   @ApiProperty({
-    description: 'Product ID',
-    example: 'clxxxxxx',
-  })
-  @IsString()
-  @IsNotEmpty()
-  productId: string;
-
-  @ApiPropertyOptional({
-    description: 'Quantity (default: 1)',
-    example: 1,
-  })
-  @IsInt()
-  @Min(1)
-  @IsOptional()
-  quantity?: number = 1;
-
-  @ApiProperty({
-    description: 'Customer name',
+    description: 'Customer name (buyer)',
     example: 'Иван Иванов',
   })
   @IsString()
   @IsNotEmpty()
-  name: string;
+  buyer: string;
 
   @ApiProperty({
     description: 'Customer phone number',
@@ -45,22 +20,6 @@ export class QuickBuyDto {
     message: 'Phone must contain only digits, spaces, +, -, (, )',
   })
   phone: string;
-
-  @ApiPropertyOptional({
-    description: 'Customer email',
-    example: 'ivan@example.com',
-  })
-  @IsEmail()
-  @IsOptional()
-  email?: string;
-
-  @ApiPropertyOptional({
-    description: 'Comment to the order',
-    example: 'Перезвоните для уточнения деталей',
-  })
-  @IsString()
-  @IsOptional()
-  comment?: string;
 }
 
 export class QuickBuyResponseDto {
@@ -73,20 +32,23 @@ export class QuickBuyResponseDto {
   @ApiProperty({ description: 'Order total' })
   total: number;
 
+  @ApiProperty({ description: 'Number of items in order' })
+  itemsCount: number;
+
   @ApiProperty({ description: 'Customer info' })
   customer: {
-    name: string;
+    buyer: string;
     phone: string;
-    email?: string;
   };
 
-  @ApiProperty({ description: 'Product info' })
-  product: {
-    id: number;
+  @ApiProperty({ description: 'Order items' })
+  items: Array<{
+    id: string;
     name: string;
     price: number;
     quantity: number;
-  };
+    image?: string;
+  }>;
 
   @ApiProperty({ description: 'Message' })
   message: string;

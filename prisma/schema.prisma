@@ -226,7 +226,6 @@ model Order {
   address      String?
   pointId      String?
   windowId     String?
-  payLater     Boolean     @default(false)
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
   couponId     String?

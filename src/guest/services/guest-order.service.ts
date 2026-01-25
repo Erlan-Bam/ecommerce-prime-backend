@@ -11,6 +11,7 @@ import {
   FinalizeOrderDto,
   ApplyCouponDto,
   SelectPickupDto,
+  QuickBuyDto,
 } from '../../order/dto';
 
 @Injectable()
@@ -540,14 +541,6 @@ export class GuestOrderService {
           );
         }
 
-        // Validate payLater can only be used with CASH payment method
-        if (dto.payLater && dto.paymentMethod !== 'CASH') {
-          throw new HttpException(
-            'Pay later option is only available with CASH payment method',
-            HttpStatus.BAD_REQUEST,
-          );
-        }
-
         // Prepare common update data
         const updateData: any = {
           deliveryMethod: dto.deliveryMethod,
@@ -555,7 +548,6 @@ export class GuestOrderService {
           buyer: dto.buyer,
           email: dto.email,
           phone: dto.phone,
-          payLater: dto.payLater ?? false,
           status: 'PROCESSING',
         };
 
@@ -1092,6 +1084,132 @@ export class GuestOrderService {
         error.stack,
       );
       throw new InternalServerErrorException('Failed to remove coupon');
+    }
+  }
+
+  /**
+   * Quick buy (1-click purchase) - Creates order from all cart items for guest
+   */
+  async quickBuy(sessionId: string, dto: QuickBuyDto) {
+    try {
+      this.logger.log(
+        `Quick buy initiated for session ${sessionId}, customer: ${dto.buyer}`,
+      );
+
+      // Get cart items for the guest session
+      const cartItems = await this.prisma.orderItem.findMany({
+        where: {
+          sessionId,
+          orderId: null, // Only cart items (not yet in an order)
+        },
+        include: {
+          product: {
+            select: {
+              id: true,
+              name: true,
+              price: true,
+              isActive: true,
+              images: {
+                take: 1,
+                orderBy: { sortOrder: 'asc' },
+              },
+            },
+          },
+        },
+      });
+
+      if (cartItems.length === 0) {
+        this.logger.warn(`Cart is empty for session ${sessionId}`);
+        throw new HttpException('Cart is empty', HttpStatus.BAD_REQUEST);
+      }
+
+      // Check all products are active
+      const inactiveProducts = cartItems.filter(
+        (item) => !item.product.isActive,
+      );
+      if (inactiveProducts.length > 0) {
+        this.logger.warn(
+          `Some products in cart are inactive for session ${sessionId}`,
+        );
+        throw new HttpException(
+          'Some products in your cart are no longer available',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      // Calculate total
+      const total = cartItems.reduce(
+        (sum, item) => sum + Number(item.price),
+        0,
+      );
+
+      // Create order with items in a transaction
+      const result = await this.prisma.$transaction(async (tx) => {
+        // Create the order
+        const order = await tx.order.create({
+          data: {
+            sessionId,
+            total,
+            discount: 0,
+            finalTotal: total,
+            buyer: dto.buyer,
+            phone: dto.phone,
+            status: 'PENDING',
+          },
+        });
+
+        // Update cart items to belong to the order
+        await tx.orderItem.updateMany({
+          where: {
+            sessionId,
+            orderId: null,
+          },
+          data: {
+            orderId: order.id,
+          },
+        });
+
+        return order;
+      });
+
+      // Invalidate caches
+      await this.cacheService.invalidateGuestCart(sessionId);
+      await this.cacheService.invalidateGuestOrders(sessionId);
+
+      this.logger.log(
+        `Quick buy order created successfully: ${result.id} for ${dto.buyer}`,
+      );
+
+      return {
+        orderId: result.id,
+        status: result.status,
+        total: result.finalTotal,
+        itemsCount: cartItems.length,
+        customer: {
+          buyer: dto.buyer,
+          phone: dto.phone,
+        },
+        items: cartItems.map((item) => ({
+          id: item.product.id,
+          name: item.product.name,
+          price: Number(item.price),
+          quantity: item.quantity,
+          image: item.product.images[0]?.url || null,
+        })),
+        message:
+          'Заказ создан! Наш менеджер свяжется с вами для подтверждения.',
+      };
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      this.logger.error(
+        `Error during quick buy for session ${sessionId}: ${error.message}`,
+        error.stack,
+      );
+      throw new InternalServerErrorException(
+        'Failed to create quick buy order',
+      );
     }
   }
 }

@@ -6,3 +6,4 @@ export * from './finalize-order.dto';
 export * from './update-order-status.dto';
 export * from './apply-coupon.dto';
 export * from './quick-buy.dto';
+export * from './admin-finalize-order.dto';

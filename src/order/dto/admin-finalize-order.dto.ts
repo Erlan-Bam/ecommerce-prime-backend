@@ -8,11 +8,10 @@ import {
   IsOptional,
   IsUUID,
   IsDateString,
-  IsBoolean,
   ValidateIf,
 } from 'class-validator';
 
-export class FinalizeOrderDto {
+export class AdminFinalizeOrderDto {
   @ApiProperty({
     description: 'Delivery method',
     enum: DeliveryMethod,
@@ -22,29 +21,29 @@ export class FinalizeOrderDto {
   @IsEnum(DeliveryMethod)
   deliveryMethod: DeliveryMethod;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     description: 'Buyer full name (first, last, middle names)',
     example: 'Иванов Иван Иванович',
   })
-  @IsNotEmpty()
+  @IsOptional()
   @IsString()
-  buyer: string;
+  buyer?: string;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     description: 'Contact email',
     example: 'customer@example.com',
   })
-  @IsNotEmpty()
+  @IsOptional()
   @IsEmail()
-  email: string;
+  email?: string;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     description: 'Contact phone number',
     example: '+7 999 123 45 67',
   })
-  @IsNotEmpty()
+  @IsOptional()
   @IsString()
-  phone: string;
+  phone?: string;
 
   // PICKUP specific fields
   @ApiPropertyOptional({
@@ -87,7 +86,7 @@ export class FinalizeOrderDto {
   paymentMethod: PaymentMethod;
 }
 
-export class FinalizeOrderResponseDto {
+export class AdminFinalizeOrderResponseDto {
   @ApiProperty({ description: 'Order ID' })
   id: number;
 
@@ -109,14 +108,14 @@ export class FinalizeOrderResponseDto {
   @ApiProperty({ description: 'Final total after discount' })
   finalTotal: number;
 
-  @ApiProperty({ description: 'Buyer full name' })
-  buyer: string;
+  @ApiPropertyOptional({ description: 'Buyer full name' })
+  buyer?: string;
 
-  @ApiProperty({ description: 'Contact email' })
-  email: string;
+  @ApiPropertyOptional({ description: 'Contact email' })
+  email?: string;
 
-  @ApiProperty({ description: 'Contact phone' })
-  phone: string;
+  @ApiPropertyOptional({ description: 'Contact phone' })
+  phone?: string;
 
   @ApiPropertyOptional({
     description: 'Delivery address (for DELIVERY method)',
