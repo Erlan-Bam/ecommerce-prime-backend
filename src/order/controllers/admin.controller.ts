@@ -32,7 +32,8 @@ export class AdminOrderController {
 
   @Get('pending')
   @ApiOperation({
-    summary: 'Get all pending orders (quick buy orders waiting for finalization)',
+    summary:
+      'Get all pending orders (quick buy orders waiting for finalization)',
   })
   @ApiResponse({
     status: 200,
@@ -40,10 +41,7 @@ export class AdminOrderController {
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden - Admin only' })
-  getPendingOrders(
-    @Query('page') page = 1,
-    @Query('limit') limit = 10,
-  ) {
+  getPendingOrders(@Query('page') page = 1, @Query('limit') limit = 10) {
     return this.orderService.getPendingOrders({
       page: Number(page),
       limit: Number(limit),

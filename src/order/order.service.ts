@@ -1776,8 +1776,13 @@ export class OrderService {
 
       // Invalidate caches
       if (result.updatedOrder.userId) {
-        await this.cacheService.invalidateUserOrders(result.updatedOrder.userId);
-        await this.cacheService.invalidateOrder(result.updatedOrder.userId, orderId);
+        await this.cacheService.invalidateUserOrders(
+          result.updatedOrder.userId,
+        );
+        await this.cacheService.invalidateOrder(
+          result.updatedOrder.userId,
+          orderId,
+        );
       }
 
       this.logger.log(`Admin finalized order ${orderId} successfully`);
