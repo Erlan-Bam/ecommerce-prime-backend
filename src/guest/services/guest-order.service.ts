@@ -1173,7 +1173,7 @@ export class GuestOrderService {
       });
 
       // Invalidate caches
-      await this.cacheService.invalidateGuestCart(sessionId);
+      await this.cacheService.invalidateCart(sessionId);
       await this.cacheService.invalidateGuestOrders(sessionId);
 
       this.logger.log(
