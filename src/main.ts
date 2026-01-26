@@ -18,6 +18,7 @@ async function bootstrap() {
     origin: [
       'http://localhost:3000',
       'http://localhost:3001',
+      'http://localhost:4200',
       'https://e-commerce-production-bf09.up.railway.app',
       'https://ecommerce-prime-backend-production.up.railway.app',
       'https://e-commerce-admin-production-9e9f.up.railway.app',
