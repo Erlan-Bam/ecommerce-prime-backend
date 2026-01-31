@@ -6,7 +6,6 @@ import {
   Param,
   Query,
   UseGuards,
-  ParseBoolPipe,
   DefaultValuePipe,
   ParseIntPipe,
 } from '@nestjs/common';
@@ -17,16 +16,29 @@ import {
   ApiBearerAuth,
   ApiQuery,
 } from '@nestjs/swagger';
-import { UsersService } from './users.service';
-import { UpdateUserDto } from './dto';
-import { AdminGuard } from '../shared/guards/admin.guard';
+import { UsersService } from '../users.service';
+import { UpdateUserDto } from '../dto';
+import { AdminGuard } from '../../shared/guards/admin.guard';
+import { User } from '../../shared/decorator/user.decorator';
 
 @ApiTags('Admin - Users')
 @Controller('admin/users')
 @UseGuards(AdminGuard)
 @ApiBearerAuth()
-export class UsersController {
+export class AdminController {
   constructor(private readonly usersService: UsersService) {}
+
+  @Get('profile')
+  @ApiOperation({ summary: 'Get current admin profile' })
+  @ApiResponse({
+    status: 200,
+    description: 'Admin profile retrieved successfully',
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Access denied: Admins only' })
+  async getAdminProfile(@User('id') userId: string) {
+    return this.usersService.getProfile(userId);
+  }
 
   @Get()
   @ApiOperation({ summary: 'Get all users (Admin only)' })

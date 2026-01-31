@@ -2,21 +2,11 @@ import {
   Controller,
   Post,
   Body,
-  Get,
-  UseGuards,
   HttpCode,
   HttpStatus,
-  HttpException,
-  Req,
   Ip,
 } from '@nestjs/common';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiBearerAuth,
-  ApiBody,
-} from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBody } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import {
   RegisterUserDto,
@@ -26,13 +16,8 @@ import {
   RefreshResponseDto,
   GuestAuthDto,
   GuestAuthResponseDto,
-  ChangePasswordDto,
 } from './dto';
 import { Public } from '../shared/decorator/public.decorator';
-import { User } from '../shared/decorator/user.decorator';
-import { UserGuard } from '../shared/guards/user.guard';
-import { AdminGuard } from '../shared/guards/admin.guard';
-import { Request } from 'express';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -109,53 +94,6 @@ export class AuthController {
   @ApiResponse({ status: 401, description: 'Invalid refresh token' })
   async refreshTokens(@Body('refreshToken') refreshToken: string) {
     return this.authService.refreshTokens(refreshToken);
-  }
-
-  // ==================== PROFILE ENDPOINTS ====================
-
-  @UseGuards(UserGuard)
-  @Get('profile')
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get current user profile' })
-  @ApiResponse({ status: 200, description: 'Profile retrieved successfully' })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  async getProfile(@User('id') userId: string) {
-    return this.authService.getProfile(userId);
-  }
-
-  @UseGuards(UserGuard)
-  @Post('change-password')
-  @HttpCode(HttpStatus.OK)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Change user password' })
-  @ApiResponse({ status: 200, description: 'Password changed successfully' })
-  @ApiResponse({
-    status: 400,
-    description: 'Bad request - Passwords do not match',
-  })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  async changePassword(
-    @User('id') userId: string,
-    @Body() dto: ChangePasswordDto,
-  ) {
-    if (dto.newPassword !== dto.confirmPassword) {
-      throw new HttpException('Passwords do not match', HttpStatus.BAD_REQUEST);
-    }
-    return this.authService.changePassword(userId, dto.newPassword);
-  }
-
-  @UseGuards(AdminGuard)
-  @Get('admin/profile')
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get current admin profile' })
-  @ApiResponse({
-    status: 200,
-    description: 'Admin profile retrieved successfully',
-  })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({ status: 403, description: 'Access denied: Admins only' })
-  async getAdminProfile(@User('id') userId: string) {
-    return this.authService.getProfile(userId);
   }
 
   // ==================== GUEST AUTH ====================
