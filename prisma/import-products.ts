@@ -45,15 +45,72 @@ const prisma = new PrismaClient({
 function slugify(text: string): string {
   // Transliteration map for Cyrillic
   const map: Record<string, string> = {
-    а: 'a', б: 'b', в: 'v', г: 'g', д: 'd', е: 'e', ё: 'yo', ж: 'zh',
-    з: 'z', и: 'i', й: 'j', к: 'k', л: 'l', м: 'm', н: 'n', о: 'o',
-    п: 'p', р: 'r', с: 's', т: 't', у: 'u', ф: 'f', х: 'h', ц: 'ts',
-    ч: 'ch', ш: 'sh', щ: 'shch', ъ: '', ы: 'y', ь: '', э: 'e', ю: 'yu',
-    я: 'ya', А: 'A', Б: 'B', В: 'V', Г: 'G', Д: 'D', Е: 'E', Ё: 'Yo',
-    Ж: 'Zh', З: 'Z', И: 'I', Й: 'J', К: 'K', Л: 'L', М: 'M', Н: 'N',
-    О: 'O', П: 'P', Р: 'R', С: 'S', Т: 'T', У: 'U', Ф: 'F', Х: 'H',
-    Ц: 'Ts', Ч: 'Ch', Ш: 'Sh', Щ: 'Shch', Ъ: '', Ы: 'Y', Ь: '', Э: 'E',
-    Ю: 'Yu', Я: 'Ya',
+    а: 'a',
+    б: 'b',
+    в: 'v',
+    г: 'g',
+    д: 'd',
+    е: 'e',
+    ё: 'yo',
+    ж: 'zh',
+    з: 'z',
+    и: 'i',
+    й: 'j',
+    к: 'k',
+    л: 'l',
+    м: 'm',
+    н: 'n',
+    о: 'o',
+    п: 'p',
+    р: 'r',
+    с: 's',
+    т: 't',
+    у: 'u',
+    ф: 'f',
+    х: 'h',
+    ц: 'ts',
+    ч: 'ch',
+    ш: 'sh',
+    щ: 'shch',
+    ъ: '',
+    ы: 'y',
+    ь: '',
+    э: 'e',
+    ю: 'yu',
+    я: 'ya',
+    А: 'A',
+    Б: 'B',
+    В: 'V',
+    Г: 'G',
+    Д: 'D',
+    Е: 'E',
+    Ё: 'Yo',
+    Ж: 'Zh',
+    З: 'Z',
+    И: 'I',
+    Й: 'J',
+    К: 'K',
+    Л: 'L',
+    М: 'M',
+    Н: 'N',
+    О: 'O',
+    П: 'P',
+    Р: 'R',
+    С: 'S',
+    Т: 'T',
+    У: 'U',
+    Ф: 'F',
+    Х: 'H',
+    Ц: 'Ts',
+    Ч: 'Ch',
+    Ш: 'Sh',
+    Щ: 'Shch',
+    Ъ: '',
+    Ы: 'Y',
+    Ь: '',
+    Э: 'E',
+    Ю: 'Yu',
+    Я: 'Ya',
   };
 
   return text
@@ -75,7 +132,10 @@ function getCellValue(cell: any): string {
     if (cell.text) return String(cell.text).trim();
     if (cell.result) return String(cell.result).trim();
     if (cell.richText) {
-      return cell.richText.map((r: any) => r.text || '').join('').trim();
+      return cell.richText
+        .map((r: any) => r.text || '')
+        .join('')
+        .trim();
     }
     return JSON.stringify(cell);
   }
@@ -137,7 +197,9 @@ async function main() {
     workbook.read();
   });
 
-  console.log(`✅ Read ${rows.length} product rows with ${headers.length} columns`);
+  console.log(
+    `✅ Read ${rows.length} product rows with ${headers.length} columns`,
+  );
   console.log('');
 
   if (DRY_RUN) {
@@ -149,9 +211,13 @@ async function main() {
       console.log(`  SKU: ${row.get('Артикул')}`);
       console.log(`  Price: ${row.get('Цена')}`);
       console.log(`  OldPrice: ${row.get('Старая цена')}`);
-      console.log(`  Category: ${row.get('Категория')} > ${row.get('Подкатегория')} > ${row.get('Раздел')}`);
+      console.log(
+        `  Category: ${row.get('Категория')} > ${row.get('Подкатегория')} > ${row.get('Раздел')}`,
+      );
       console.log(`  Image: ${row.get('Изображения')?.substring(0, 80)}...`);
-      const attrCount = [...row.keys()].filter((k) => !PRODUCT_FIELD_COLUMNS.has(k)).length;
+      const attrCount = [...row.keys()].filter(
+        (k) => !PRODUCT_FIELD_COLUMNS.has(k),
+      ).length;
       console.log(`  Attributes: ${attrCount} fields`);
     }
     console.log('\n🛑 Dry run complete. Run without --dry-run to import.');
@@ -222,8 +288,13 @@ async function main() {
         let finalSlug = slug;
         let attempt = 0;
         while (true) {
-          const existing = await prisma.category.findUnique({ where: { slug: finalSlug } });
-          if (!existing || existing.parentId === (topName ? categoryMap.get(topName) : null)) {
+          const existing = await prisma.category.findUnique({
+            where: { slug: finalSlug },
+          });
+          if (
+            !existing ||
+            existing.parentId === (topName ? categoryMap.get(topName) : null)
+          ) {
             break;
           }
           attempt++;
@@ -256,7 +327,9 @@ async function main() {
         const parentId = parentKey ? categoryMap.get(parentKey) : undefined;
 
         while (true) {
-          const existing = await prisma.category.findUnique({ where: { slug: finalSlug } });
+          const existing = await prisma.category.findUnique({
+            where: { slug: finalSlug },
+          });
           if (!existing || existing.parentId === (parentId || null)) {
             break;
           }
@@ -281,7 +354,9 @@ async function main() {
   console.log(`✅ ${categoryMap.size} categories ready`);
 
   // ── Step 5: Import products in batches ──────────────────────────────────
-  console.log(`📦 Importing ${rows.length} products in batches of ${BATCH_SIZE}...`);
+  console.log(
+    `📦 Importing ${rows.length} products in batches of ${BATCH_SIZE}...`,
+  );
 
   const slugCounter = new Map<string, number>(); // track slug uniqueness
   let imported = 0;
@@ -301,10 +376,12 @@ async function main() {
 
         const sku = row.get('Артикул')?.trim() || '';
         const priceStr = row.get('Цена')?.trim() || '0';
-        const price = parseFloat(priceStr.replace(/[^\d.,]/g, '').replace(',', '.')) || 0;
+        const price =
+          parseFloat(priceStr.replace(/[^\d.,]/g, '').replace(',', '.')) || 0;
         const oldPriceStr = row.get('Старая цена')?.trim() || '';
         const oldPrice = oldPriceStr
-          ? parseFloat(oldPriceStr.replace(/[^\d.,]/g, '').replace(',', '.')) || null
+          ? parseFloat(oldPriceStr.replace(/[^\d.,]/g, '').replace(',', '.')) ||
+            null
           : null;
         const description = row.get('Описание')?.trim() || null;
         const availability = row.get('Наличие')?.trim() || '';
@@ -334,11 +411,13 @@ async function main() {
         }
         if (midName) {
           const midKey = `${topName}>${midName}`;
-          if (categoryMap.has(midKey)) categoryIds.push(categoryMap.get(midKey)!);
+          if (categoryMap.has(midKey))
+            categoryIds.push(categoryMap.get(midKey)!);
         }
         if (leafName) {
           const leafKey = `${topName}>${midName}>${leafName}`;
-          if (categoryMap.has(leafKey)) categoryIds.push(categoryMap.get(leafKey)!);
+          if (categoryMap.has(leafKey))
+            categoryIds.push(categoryMap.get(leafKey)!);
         }
 
         // Collect attributes — everything NOT in the direct-mapping set
@@ -393,7 +472,9 @@ async function main() {
         errors++;
         if (errors <= 10) {
           const name = row.get('Название') || 'unknown';
-          console.error(`   ❌ Error on "${name.substring(0, 60)}": ${err.message?.substring(0, 120)}`);
+          console.error(
+            `   ❌ Error on "${name.substring(0, 60)}": ${err.message?.substring(0, 120)}`,
+          );
         }
       }
     }
