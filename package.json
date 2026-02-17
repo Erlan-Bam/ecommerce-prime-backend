@@ -22,7 +22,9 @@
     "prisma:push": "prisma db push --config=./prisma/prisma.config.ts",
     "prisma:migrate": "prisma migrate dev --config=./prisma/prisma.config.ts",
     "prisma:studio": "prisma studio --config=./prisma/prisma.config.ts",
-    "prisma:seed": "ts-node prisma/seed.ts"
+    "prisma:seed": "ts-node prisma/seed.ts",
+    "prisma:import": "node --max-old-space-size=8192 -r ts-node/register prisma/import-products.ts",
+    "prisma:import:dry": "node --max-old-space-size=8192 -r ts-node/register prisma/import-products.ts --dry-run"
   },
   "dependencies": {
     "@nestjs/bull": "^11.0.4",
@@ -69,6 +71,7 @@
     "eslint": "^8.0.0",
     "eslint-config-prettier": "^9.0.0",
     "eslint-plugin-prettier": "^5.0.0",
+    "exceljs": "^4.4.0",
     "jest": "^29.5.0",
     "prettier": "^3.0.0",
     "prisma": "^7.1.0",
