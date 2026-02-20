@@ -175,6 +175,9 @@ export class ProductService {
             isActive: true,
             isOnSale: true,
             brandId: true,
+            description: true,
+            viewCount: true,
+            createdAt: true,
             brand: { select: { id: true, name: true, slug: true } },
             categories: {
               select: {
