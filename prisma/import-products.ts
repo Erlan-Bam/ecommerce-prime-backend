@@ -30,15 +30,82 @@ const PRODUCT_FIELD_COLUMNS = new Set([
   'Старая цена',
 ]);
 
-// ─── Prisma setup ──────────────────────────────────────────────────────────
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false },
-});
+// ─── Categories to skip during import ──────────────────────────────────────
+const SKIP_CATEGORIES = new Set(['Сервис и услуги']);
 
-const prisma = new PrismaClient({
-  adapter: new PrismaPg(pool),
-});
+// ─── Prisma setup ──────────────────────────────────────────────────────────
+const RETRY_ATTEMPTS = 5;
+const RETRY_BASE_DELAY = 2000; // ms
+const BATCH_DELAY = 300; // ms delay between batches to avoid overwhelming DB
+
+function createPool() {
+  return new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: { rejectUnauthorized: false },
+    max: 3, // low concurrency for remote DB
+    idleTimeoutMillis: 30_000,
+    connectionTimeoutMillis: 30_000,
+    keepAlive: true,
+    keepAliveInitialDelayMillis: 10_000,
+  });
+}
+
+function createPrisma(p: Pool) {
+  return new PrismaClient({
+    adapter: new PrismaPg(p),
+  });
+}
+
+let pool = createPool();
+let prisma = createPrisma(pool);
+
+async function reconnect() {
+  console.log('   🔄 Reconnecting to database...');
+  try {
+    await prisma.$disconnect();
+  } catch (_) {}
+  try {
+    await pool.end();
+  } catch (_) {}
+  pool = createPool();
+  prisma = createPrisma(pool);
+  // Verify connection
+  await prisma.$executeRawUnsafe('SELECT 1');
+  console.log('   ✅ Reconnected successfully');
+}
+
+async function withRetry<T>(fn: () => Promise<T>, label: string): Promise<T> {
+  for (let attempt = 1; attempt <= RETRY_ATTEMPTS; attempt++) {
+    try {
+      return await fn();
+    } catch (err: any) {
+      const msg = err.message || '';
+      const isConnectionError =
+        msg.includes('Connection terminated') ||
+        msg.includes('connection error') ||
+        msg.includes('not queryable') ||
+        msg.includes("Can't reach database") ||
+        err.code === 'P1001' ||
+        err.code === 'P1017' ||
+        err.code === 'ECONNRESET' ||
+        err.code === 'ECONNREFUSED';
+
+      if (isConnectionError && attempt < RETRY_ATTEMPTS) {
+        const delay = RETRY_BASE_DELAY * Math.pow(2, attempt - 1);
+        console.log(
+          `   ⚠️  Connection error (attempt ${attempt}/${RETRY_ATTEMPTS}), retrying in ${delay}ms...`,
+        );
+        await new Promise((r) => setTimeout(r, delay));
+        await reconnect();
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw new Error(`Failed after ${RETRY_ATTEMPTS} attempts: ${label}`);
+}
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -227,12 +294,32 @@ async function main() {
   // ── Step 2: Clean existing product data ─────────────────────────────────
   if (!SKIP_TRUNCATE) {
     console.log('🧹 Cleaning existing product data...');
-    await prisma.$executeRawUnsafe('TRUNCATE TABLE "ProductAttribute" CASCADE');
-    await prisma.$executeRawUnsafe('TRUNCATE TABLE "ProductImage" CASCADE');
-    await prisma.$executeRawUnsafe('TRUNCATE TABLE "ProductStock" CASCADE');
-    await prisma.$executeRawUnsafe('TRUNCATE TABLE "ProductCategory" CASCADE');
-    await prisma.$executeRawUnsafe('TRUNCATE TABLE "Favorite" CASCADE');
-    await prisma.$executeRawUnsafe('TRUNCATE TABLE "Product" CASCADE');
+    await withRetry(
+      () =>
+        prisma.$executeRawUnsafe('TRUNCATE TABLE "ProductAttribute" CASCADE'),
+      'truncate ProductAttribute',
+    );
+    await withRetry(
+      () => prisma.$executeRawUnsafe('TRUNCATE TABLE "ProductImage" CASCADE'),
+      'truncate ProductImage',
+    );
+    await withRetry(
+      () => prisma.$executeRawUnsafe('TRUNCATE TABLE "ProductStock" CASCADE'),
+      'truncate ProductStock',
+    );
+    await withRetry(
+      () =>
+        prisma.$executeRawUnsafe('TRUNCATE TABLE "ProductCategory" CASCADE'),
+      'truncate ProductCategory',
+    );
+    await withRetry(
+      () => prisma.$executeRawUnsafe('TRUNCATE TABLE "Favorite" CASCADE'),
+      'truncate Favorite',
+    );
+    await withRetry(
+      () => prisma.$executeRawUnsafe('TRUNCATE TABLE "Product" CASCADE'),
+      'truncate Product',
+    );
     console.log('✅ Cleaned');
   }
 
@@ -247,11 +334,15 @@ async function main() {
   const brandMap = new Map<string, string>(); // name → id
   for (const name of brandNames) {
     const slug = slugify(name);
-    const brand = await prisma.brand.upsert({
-      where: { slug },
-      update: { name },
-      create: { name, slug },
-    });
+    const brand = await withRetry(
+      () =>
+        prisma.brand.upsert({
+          where: { slug },
+          update: { name },
+          create: { name, slug },
+        }),
+      `brand upsert: ${name}`,
+    );
     brandMap.set(name, brand.id);
   }
   console.log(`✅ ${brandMap.size} brands ready`);
@@ -271,11 +362,15 @@ async function main() {
     // Top-level category (same as brand usually, e.g. "Apple")
     if (topName && !categoryMap.has(topName)) {
       const slug = slugify(topName);
-      const cat = await prisma.category.upsert({
-        where: { slug },
-        update: { title: topName },
-        create: { title: topName, slug, sortOrder: categoryMap.size },
-      });
+      const cat = await withRetry(
+        () =>
+          prisma.category.upsert({
+            where: { slug },
+            update: { title: topName },
+            create: { title: topName, slug, sortOrder: categoryMap.size },
+          }),
+        `category upsert: ${topName}`,
+      );
       categoryMap.set(topName, cat.id);
     }
 
@@ -288,9 +383,10 @@ async function main() {
         let finalSlug = slug;
         let attempt = 0;
         while (true) {
-          const existing = await prisma.category.findUnique({
-            where: { slug: finalSlug },
-          });
+          const existing = await withRetry(
+            () => prisma.category.findUnique({ where: { slug: finalSlug } }),
+            `category find: ${finalSlug}`,
+          );
           if (
             !existing ||
             existing.parentId === (topName ? categoryMap.get(topName) : null)
@@ -302,16 +398,20 @@ async function main() {
         }
 
         const parentId = topName ? categoryMap.get(topName) : undefined;
-        const cat = await prisma.category.upsert({
-          where: { slug: finalSlug },
-          update: { title: midName, parentId: parentId || null },
-          create: {
-            title: midName,
-            slug: finalSlug,
-            parentId: parentId || null,
-            sortOrder: categoryMap.size,
-          },
-        });
+        const cat = await withRetry(
+          () =>
+            prisma.category.upsert({
+              where: { slug: finalSlug },
+              update: { title: midName, parentId: parentId || null },
+              create: {
+                title: midName,
+                slug: finalSlug,
+                parentId: parentId || null,
+                sortOrder: categoryMap.size,
+              },
+            }),
+          `category upsert: ${midName}`,
+        );
         categoryMap.set(midKey, cat.id);
       }
     }
@@ -327,9 +427,10 @@ async function main() {
         const parentId = parentKey ? categoryMap.get(parentKey) : undefined;
 
         while (true) {
-          const existing = await prisma.category.findUnique({
-            where: { slug: finalSlug },
-          });
+          const existing = await withRetry(
+            () => prisma.category.findUnique({ where: { slug: finalSlug } }),
+            `category find: ${finalSlug}`,
+          );
           if (!existing || existing.parentId === (parentId || null)) {
             break;
           }
@@ -337,16 +438,20 @@ async function main() {
           finalSlug = `${slug}-${attempt}`;
         }
 
-        const cat = await prisma.category.upsert({
-          where: { slug: finalSlug },
-          update: { title: leafName, parentId: parentId || null },
-          create: {
-            title: leafName,
-            slug: finalSlug,
-            parentId: parentId || null,
-            sortOrder: categoryMap.size,
-          },
-        });
+        const cat = await withRetry(
+          () =>
+            prisma.category.upsert({
+              where: { slug: finalSlug },
+              update: { title: leafName, parentId: parentId || null },
+              create: {
+                title: leafName,
+                slug: finalSlug,
+                parentId: parentId || null,
+                sortOrder: categoryMap.size,
+              },
+            }),
+          `category upsert: ${leafName}`,
+        );
         categoryMap.set(leafKey, cat.id);
       }
     }
@@ -370,6 +475,13 @@ async function main() {
       try {
         const name = row.get('Название')?.trim();
         if (!name) {
+          skipped++;
+          continue;
+        }
+
+        // Skip products from excluded categories
+        const topCat = row.get('Категория')?.trim();
+        if (topCat && SKIP_CATEGORIES.has(topCat)) {
           skipped++;
           continue;
         }
@@ -428,44 +540,79 @@ async function main() {
           attributes.push({ name: key, value: value.trim() });
         }
 
-        // Create product with all relations
-        await prisma.product.create({
-          data: {
-            name,
-            slug,
-            description,
-            price,
-            oldPrice,
-            isActive,
-            isOnSale,
-            brandId,
-            // Relations
-            categories: {
-              create: categoryIds.map((catId, idx) => ({
-                categoryId: catId,
-                isPrimary: idx === 0,
-              })),
-            },
-            images: imageUrl
-              ? {
-                  create: imageUrl.split(',').map((url, idx) => ({
-                    url: url.trim(),
-                    alt: `${name} - image ${idx + 1}`,
-                    sortOrder: idx,
-                  })),
-                }
-              : undefined,
-            attributes:
-              attributes.length > 0
-                ? {
-                    create: attributes.map((attr) => ({
-                      name: attr.name,
-                      value: attr.value,
-                    })),
-                  }
-                : undefined,
-          },
-        });
+        // Upsert product (idempotent – safe to re-run)
+        const productData = {
+          name,
+          description,
+          price,
+          oldPrice,
+          isActive,
+          isOnSale,
+          brandId,
+        };
+
+        const categoriesCreate = categoryIds.map((catId, idx) => ({
+          categoryId: catId,
+          isPrimary: idx === 0,
+        }));
+
+        const imagesCreate = imageUrl
+          ? imageUrl
+              .split(';')
+              .filter((u) => u.trim())
+              .map((url, idx) => ({
+                url: url.trim(),
+                alt: `${name} - image ${idx + 1}`,
+                sortOrder: idx,
+              }))
+          : [];
+
+        const attributesCreate =
+          attributes.length > 0
+            ? attributes.map((attr) => ({
+                name: attr.name,
+                value: attr.value,
+              }))
+            : [];
+
+        await withRetry(
+          () =>
+            prisma.product.upsert({
+              where: { slug },
+              create: {
+                ...productData,
+                slug,
+                categories: { create: categoriesCreate },
+                images:
+                  imagesCreate.length > 0
+                    ? { create: imagesCreate }
+                    : undefined,
+                attributes:
+                  attributesCreate.length > 0
+                    ? { create: attributesCreate }
+                    : undefined,
+              },
+              update: {
+                ...productData,
+                // Delete old relations, then recreate
+                categories: {
+                  deleteMany: {},
+                  create: categoriesCreate,
+                },
+                images: {
+                  deleteMany: {},
+                  ...(imagesCreate.length > 0 ? { create: imagesCreate } : {}),
+                },
+                attributes: {
+                  deleteMany: {},
+                  ...(attributesCreate.length > 0
+                    ? { create: attributesCreate }
+                    : {}),
+                },
+              },
+            }),
+          `product upsert: ${name.substring(0, 40)}`,
+        );
 
         imported++;
       } catch (err: any) {
@@ -485,6 +632,11 @@ async function main() {
         `   📊 Progress: ${progress}/${rows.length} (imported: ${imported}, skipped: ${skipped}, errors: ${errors})`,
       );
     }
+
+    // Small delay between batches to avoid overwhelming the remote DB
+    if (i + BATCH_SIZE < rows.length) {
+      await sleep(BATCH_DELAY);
+    }
   }
 
   // ── Step 6: Summary ─────────────────────────────────────────────────────
@@ -500,11 +652,27 @@ async function main() {
   console.log(`  Categories created:     ${categoryMap.size}`);
   console.log('');
   console.log('  Database counts:');
-  console.log(`    Products:       ${await prisma.product.count()}`);
-  console.log(`    Brands:         ${await prisma.brand.count()}`);
-  console.log(`    Categories:     ${await prisma.category.count()}`);
-  console.log(`    Images:         ${await prisma.productImage.count()}`);
-  console.log(`    Attributes:     ${await prisma.productAttribute.count()}`);
+  try {
+    console.log(
+      `    Products:       ${await withRetry(() => prisma.product.count(), 'count products')}`,
+    );
+    console.log(
+      `    Brands:         ${await withRetry(() => prisma.brand.count(), 'count brands')}`,
+    );
+    console.log(
+      `    Categories:     ${await withRetry(() => prisma.category.count(), 'count categories')}`,
+    );
+    console.log(
+      `    Images:         ${await withRetry(() => prisma.productImage.count(), 'count images')}`,
+    );
+    console.log(
+      `    Attributes:     ${await withRetry(() => prisma.productAttribute.count(), 'count attributes')}`,
+    );
+  } catch (err: any) {
+    console.log(
+      `    ⚠️  Could not fetch counts: ${err.message?.substring(0, 80)}`,
+    );
+  }
   console.log('═══════════════════════════════════════════════════════════');
 }
 

@@ -166,15 +166,29 @@ export class ProductService {
           skip,
           take: limit,
           orderBy,
-          include: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            price: true,
+            oldPrice: true,
+            isActive: true,
+            isOnSale: true,
+            brandId: true,
+            brand: { select: { id: true, name: true, slug: true } },
             categories: {
-              include: {
+              select: {
+                categoryId: true,
+                isPrimary: true,
                 category: { select: { id: true, title: true, slug: true } },
               },
               orderBy: { isPrimary: 'desc' },
             },
-            brand: { select: { id: true, name: true, slug: true } },
-            images: { orderBy: { sortOrder: 'asc' }, take: 1 },
+            images: {
+              select: { id: true, url: true, alt: true },
+              orderBy: { sortOrder: 'asc' },
+              take: 1,
+            },
             reviews: { select: { rating: true } },
             productStock: { select: { stockCount: true } },
           },
