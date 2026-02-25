@@ -88,14 +88,78 @@ const CATEGORY_IMAGES: Record<string, string> = {
 };
 
 // ─── Prisma setup ──────────────────────────────────────────────────────────
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false },
-});
+const RETRY_ATTEMPTS = 5;
+const RETRY_BASE_DELAY = 2000; // ms
+const BATCH_DELAY = 300; // ms delay between batches to avoid overwhelming DB
 
-const prisma = new PrismaClient({
-  adapter: new PrismaPg(pool),
-});
+function createPool() {
+  return new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: { rejectUnauthorized: false },
+    max: 3, // low concurrency for remote DB
+    idleTimeoutMillis: 30_000,
+    connectionTimeoutMillis: 30_000,
+    keepAlive: true,
+    keepAliveInitialDelayMillis: 10_000,
+  });
+}
+
+function createPrisma(p: Pool) {
+  return new PrismaClient({
+    adapter: new PrismaPg(p),
+  });
+}
+
+let pool = createPool();
+let prisma = createPrisma(pool);
+
+async function reconnect() {
+  console.log('   🔄 Reconnecting to database...');
+  try {
+    await prisma.$disconnect();
+  } catch (_) {}
+  try {
+    await pool.end();
+  } catch (_) {}
+  pool = createPool();
+  prisma = createPrisma(pool);
+  // Verify connection
+  await prisma.$executeRawUnsafe('SELECT 1');
+  console.log('   ✅ Reconnected successfully');
+}
+
+async function withRetry<T>(fn: () => Promise<T>, label: string): Promise<T> {
+  for (let attempt = 1; attempt <= RETRY_ATTEMPTS; attempt++) {
+    try {
+      return await fn();
+    } catch (err: any) {
+      const msg = err.message || '';
+      const isConnectionError =
+        msg.includes('Connection terminated') ||
+        msg.includes('connection error') ||
+        msg.includes('not queryable') ||
+        msg.includes("Can't reach database") ||
+        err.code === 'P1001' ||
+        err.code === 'P1017' ||
+        err.code === 'ECONNRESET' ||
+        err.code === 'ECONNREFUSED';
+
+      if (isConnectionError && attempt < RETRY_ATTEMPTS) {
+        const delay = RETRY_BASE_DELAY * Math.pow(2, attempt - 1);
+        console.log(
+          `   ⚠️  Connection error (attempt ${attempt}/${RETRY_ATTEMPTS}), retrying in ${delay}ms...`,
+        );
+        await new Promise((r) => setTimeout(r, delay));
+        await reconnect();
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw new Error(`Failed after ${RETRY_ATTEMPTS} attempts: ${label}`);
+}
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -284,12 +348,32 @@ async function main() {
   // ── Step 2: Clean existing product data ─────────────────────────────────
   if (!SKIP_TRUNCATE) {
     console.log('🧹 Cleaning existing product data...');
-    await prisma.$executeRawUnsafe('TRUNCATE TABLE "ProductAttribute" CASCADE');
-    await prisma.$executeRawUnsafe('TRUNCATE TABLE "ProductImage" CASCADE');
-    await prisma.$executeRawUnsafe('TRUNCATE TABLE "ProductStock" CASCADE');
-    await prisma.$executeRawUnsafe('TRUNCATE TABLE "ProductCategory" CASCADE');
-    await prisma.$executeRawUnsafe('TRUNCATE TABLE "Favorite" CASCADE');
-    await prisma.$executeRawUnsafe('TRUNCATE TABLE "Product" CASCADE');
+    await withRetry(
+      () =>
+        prisma.$executeRawUnsafe('TRUNCATE TABLE "ProductAttribute" CASCADE'),
+      'truncate ProductAttribute',
+    );
+    await withRetry(
+      () => prisma.$executeRawUnsafe('TRUNCATE TABLE "ProductImage" CASCADE'),
+      'truncate ProductImage',
+    );
+    await withRetry(
+      () => prisma.$executeRawUnsafe('TRUNCATE TABLE "ProductStock" CASCADE'),
+      'truncate ProductStock',
+    );
+    await withRetry(
+      () =>
+        prisma.$executeRawUnsafe('TRUNCATE TABLE "ProductCategory" CASCADE'),
+      'truncate ProductCategory',
+    );
+    await withRetry(
+      () => prisma.$executeRawUnsafe('TRUNCATE TABLE "Favorite" CASCADE'),
+      'truncate Favorite',
+    );
+    await withRetry(
+      () => prisma.$executeRawUnsafe('TRUNCATE TABLE "Product" CASCADE'),
+      'truncate Product',
+    );
     console.log('✅ Cleaned');
   }
 
@@ -304,11 +388,15 @@ async function main() {
   const brandMap = new Map<string, string>(); // name → id
   for (const name of brandNames) {
     const slug = slugify(name);
-    const brand = await prisma.brand.upsert({
-      where: { slug },
-      update: { name },
-      create: { name, slug },
-    });
+    const brand = await withRetry(
+      () =>
+        prisma.brand.upsert({
+          where: { slug },
+          update: { name },
+          create: { name, slug },
+        }),
+      `brand upsert: ${name}`,
+    );
     brandMap.set(name, brand.id);
   }
   console.log(`✅ ${brandMap.size} brands ready`);
@@ -346,9 +434,10 @@ async function main() {
         let finalSlug = slug;
         let attempt = 0;
         while (true) {
-          const existing = await prisma.category.findUnique({
-            where: { slug: finalSlug },
-          });
+          const existing = await withRetry(
+            () => prisma.category.findUnique({ where: { slug: finalSlug } }),
+            `category find: ${finalSlug}`,
+          );
           if (
             !existing ||
             existing.parentId === (topName ? categoryMap.get(topName) : null)
@@ -387,9 +476,10 @@ async function main() {
         const parentId = parentKey ? categoryMap.get(parentKey) : undefined;
 
         while (true) {
-          const existing = await prisma.category.findUnique({
-            where: { slug: finalSlug },
-          });
+          const existing = await withRetry(
+            () => prisma.category.findUnique({ where: { slug: finalSlug } }),
+            `category find: ${finalSlug}`,
+          );
           if (!existing || existing.parentId === (parentId || null)) {
             break;
           }
@@ -432,6 +522,13 @@ async function main() {
       try {
         const name = row.get('Название')?.trim();
         if (!name) {
+          skipped++;
+          continue;
+        }
+
+        // Skip products from excluded categories
+        const topCat = row.get('Категория')?.trim();
+        if (topCat && SKIP_CATEGORIES.has(topCat)) {
           skipped++;
           continue;
         }
@@ -547,6 +644,11 @@ async function main() {
         `   📊 Progress: ${progress}/${rows.length} (imported: ${imported}, skipped: ${skipped}, errors: ${errors})`,
       );
     }
+
+    // Small delay between batches to avoid overwhelming the remote DB
+    if (i + BATCH_SIZE < rows.length) {
+      await sleep(BATCH_DELAY);
+    }
   }
 
   // ── Step 6: Summary ─────────────────────────────────────────────────────
@@ -562,11 +664,27 @@ async function main() {
   console.log(`  Categories created:     ${categoryMap.size}`);
   console.log('');
   console.log('  Database counts:');
-  console.log(`    Products:       ${await prisma.product.count()}`);
-  console.log(`    Brands:         ${await prisma.brand.count()}`);
-  console.log(`    Categories:     ${await prisma.category.count()}`);
-  console.log(`    Images:         ${await prisma.productImage.count()}`);
-  console.log(`    Attributes:     ${await prisma.productAttribute.count()}`);
+  try {
+    console.log(
+      `    Products:       ${await withRetry(() => prisma.product.count(), 'count products')}`,
+    );
+    console.log(
+      `    Brands:         ${await withRetry(() => prisma.brand.count(), 'count brands')}`,
+    );
+    console.log(
+      `    Categories:     ${await withRetry(() => prisma.category.count(), 'count categories')}`,
+    );
+    console.log(
+      `    Images:         ${await withRetry(() => prisma.productImage.count(), 'count images')}`,
+    );
+    console.log(
+      `    Attributes:     ${await withRetry(() => prisma.productAttribute.count(), 'count attributes')}`,
+    );
+  } catch (err: any) {
+    console.log(
+      `    ⚠️  Could not fetch counts: ${err.message?.substring(0, 80)}`,
+    );
+  }
   console.log('═══════════════════════════════════════════════════════════');
 }
 
