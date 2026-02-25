@@ -23,6 +23,7 @@ import { BlogModule } from './blog/blog.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { UsersModule } from './users/users.module';
 import { ReviewsModule } from './reviews/reviews.module';
+import { LoyaltyModule } from './loyalty/loyalty.module';
 
 @Module({
   imports: [
@@ -66,6 +67,7 @@ import { ReviewsModule } from './reviews/reviews.module';
     DashboardModule,
     UsersModule,
     ReviewsModule,
+    LoyaltyModule,
   ],
   controllers: [AppController],
   providers: [],

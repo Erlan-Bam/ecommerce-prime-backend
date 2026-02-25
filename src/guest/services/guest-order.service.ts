@@ -548,6 +548,9 @@ export class GuestOrderService {
           buyer: dto.buyer,
           email: dto.email,
           phone: dto.phone,
+          comment: dto.comment || null,
+          entrance: dto.entrance || null,
+          deliveryTime: dto.deliveryTime || null,
           status: 'PROCESSING',
         };
 

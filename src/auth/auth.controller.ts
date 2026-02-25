@@ -16,6 +16,7 @@ import {
   RefreshResponseDto,
   GuestAuthDto,
   GuestAuthResponseDto,
+  TelegramAuthDto,
 } from './dto';
 import { Public } from '../shared/decorator/public.decorator';
 
@@ -52,6 +53,23 @@ export class AuthController {
   @ApiResponse({ status: 403, description: 'User is banned' })
   async loginUser(@Body() dto: LoginUserDto) {
     return this.authService.loginUser(dto);
+  }
+
+  // ==================== TELEGRAM AUTH ====================
+
+  @Public()
+  @Post('telegram')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Login or register via Telegram' })
+  @ApiResponse({
+    status: 200,
+    description: 'User authenticated via Telegram',
+    type: AuthResponseDto,
+  })
+  @ApiResponse({ status: 401, description: 'Invalid Telegram auth data' })
+  @ApiResponse({ status: 403, description: 'User is banned' })
+  async telegramAuth(@Body() dto: TelegramAuthDto) {
+    return this.authService.telegramAuth(dto);
   }
 
   // ==================== ADMIN AUTH ====================

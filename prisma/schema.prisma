@@ -48,15 +48,18 @@ enum DeliveryMethod {
 }
 
 model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  phone     String   @unique
-  password  String
-  name      String
-  role      Role     @default(USER)
-  isBanned  Boolean  @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id         String   @id @default(uuid())
+  email      String?  @unique
+  phone      String?  @unique
+  password   String?
+  name       String
+  telegramId String?  @unique
+  avatar     String?
+  role       Role     @default(USER)
+  isBanned   Boolean  @default(false)
+  totalSpent Decimal  @default(0) @db.Decimal(12, 2)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   bonuses    Bonus[]
   reviews    Review[]
@@ -224,11 +227,16 @@ model Order {
   deliveryMethod DeliveryMethod @default(DELIVERY)
   paymentMethod  PaymentMethod @default(CASH)
   address      String?
+  entrance     String?
+  comment      String?
+  deliveryTime String?
   pointId      String?
   windowId     String?
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
   couponId     String?
+  bonusUsed    Decimal     @default(0) @db.Decimal(10, 2)
+  bonusEarned  Decimal     @default(0) @db.Decimal(10, 2)
 
   user         User?          @relation(fields: [userId], references: [id])
   session      GuestSession? @relation(fields: [sessionId], references: [id], onDelete: Cascade)
@@ -237,6 +245,7 @@ model Order {
   pickupWindow PickupWindow? @relation(fields: [windowId], references: [id])
   coupon       Coupon?       @relation(fields: [couponId], references: [id])
   payment      Payment?
+  bonuses      Bonus[]
 
   @@index([userId])
   @@index([sessionId])
@@ -280,11 +289,20 @@ model Review {
 }
 
 model Bonus {
-  id        Int       @id @default(autoincrement())
-  userId    String   
-  amount    Decimal
-  type      BonusType
-  user      User      @relation(fields: [userId], references: [id])
+  id          Int       @id @default(autoincrement())
+  userId      String
+  orderId     Int?
+  amount      Decimal   @db.Decimal(10, 2)
+  type        BonusType
+  description String?
+  createdAt   DateTime  @default(now())
+
+  user        User      @relation(fields: [userId], references: [id])
+  order       Order?    @relation(fields: [orderId], references: [id])
+
+  @@index([userId])
+  @@index([orderId])
+  @@index([createdAt])
 }
 
 model PickupPoint {

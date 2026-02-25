@@ -84,6 +84,30 @@ export class AdminFinalizeOrderDto {
   @IsNotEmpty()
   @IsEnum(PaymentMethod)
   paymentMethod: PaymentMethod;
+
+  @ApiPropertyOptional({
+    description: 'Entrance number (подъезд)',
+    example: '2',
+  })
+  @IsOptional()
+  @IsString()
+  entrance?: string;
+
+  @ApiPropertyOptional({
+    description: 'Comment for the order',
+    example: 'Позвонить за 30 минут до доставки',
+  })
+  @IsOptional()
+  @IsString()
+  comment?: string;
+
+  @ApiPropertyOptional({
+    description: 'Preferred delivery time slot',
+    example: '17:00-22:00',
+  })
+  @IsOptional()
+  @IsString()
+  deliveryTime?: string;
 }
 
 export class AdminFinalizeOrderResponseDto {
@@ -121,6 +145,15 @@ export class AdminFinalizeOrderResponseDto {
     description: 'Delivery address (for DELIVERY method)',
   })
   address?: string;
+
+  @ApiPropertyOptional({ description: 'Entrance number' })
+  entrance?: string;
+
+  @ApiPropertyOptional({ description: 'Comment for the order' })
+  comment?: string;
+
+  @ApiPropertyOptional({ description: 'Preferred delivery time slot' })
+  deliveryTime?: string;
 
   @ApiPropertyOptional({
     description: 'Pickup point details (for PICKUP method)',

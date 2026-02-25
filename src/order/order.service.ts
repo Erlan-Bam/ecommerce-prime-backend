@@ -16,6 +16,7 @@ import {
   AdminFinalizeOrderDto,
 } from './dto';
 import { OrderCacheService } from './services/cache.service';
+import { LoyaltyService } from '../loyalty/loyalty.service';
 
 @Injectable()
 export class OrderService {
@@ -24,6 +25,7 @@ export class OrderService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly cacheService: OrderCacheService,
+    private readonly loyaltyService: LoyaltyService,
   ) {}
 
   async addOrderItem(userId: string, dto: AddOrderItemDto) {
@@ -724,6 +726,9 @@ export class OrderService {
           buyer: dto.buyer,
           email: dto.email,
           phone: dto.phone,
+          comment: dto.comment || null,
+          entrance: dto.entrance || null,
+          deliveryTime: dto.deliveryTime || null,
           status: 'PROCESSING',
         };
 
@@ -906,6 +911,16 @@ export class OrderService {
             coupon: true,
           },
         });
+
+        // 7. Accrue cashback bonuses for registered users
+        if (userId) {
+          await this.loyaltyService.accrueCashback(
+            tx,
+            userId,
+            orderId,
+            Number(updatedOrder.finalTotal),
+          );
+        }
 
         return updatedOrder;
       });

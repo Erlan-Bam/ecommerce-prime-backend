@@ -6,8 +6,10 @@ import {
   LoginUserDto,
   LoginAdminDto,
   GuestAuthDto,
+  TelegramAuthDto,
 } from './dto';
 import * as bcrypt from 'bcryptjs';
+import * as crypto from 'crypto';
 import { ConfigService } from '@nestjs/config';
 import { Role } from '@prisma/client';
 
@@ -180,6 +182,132 @@ export class AuthService {
       throw new HttpException(
         error.message || 'Failed to login admin',
         HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  // ==================== TELEGRAM AUTH ====================
+
+  async telegramAuth(dto: TelegramAuthDto) {
+    try {
+      this.logger.log(`Telegram auth attempt for ID: ${dto.id}`);
+
+      // 1. Verify Telegram hash
+      this.verifyTelegramHash(dto);
+
+      // 2. Check auth_date is not too old (allow up to 1 day)
+      const currentTime = Math.floor(Date.now() / 1000);
+      if (currentTime - dto.auth_date > 86400) {
+        throw new HttpException(
+          'Telegram auth data is expired',
+          HttpStatus.UNAUTHORIZED,
+        );
+      }
+
+      const telegramId = String(dto.id);
+
+      // 3. Find or create user
+      let user = await this.prisma.user.findUnique({
+        where: { telegramId },
+      });
+
+      if (user) {
+        // Existing user — check if banned
+        if (user.isBanned) {
+          throw new HttpException('User is banned', HttpStatus.FORBIDDEN);
+        }
+
+        // Update avatar if changed
+        if (dto.photo_url && dto.photo_url !== user.avatar) {
+          user = await this.prisma.user.update({
+            where: { id: user.id },
+            data: { avatar: dto.photo_url },
+          });
+        }
+
+        this.logger.log(`Existing Telegram user logged in: ${user.id}`);
+      } else {
+        // New user — create account from Telegram data
+        const name = [dto.first_name, dto.last_name]
+          .filter(Boolean)
+          .join(' ');
+
+        user = await this.prisma.user.create({
+          data: {
+            telegramId,
+            name: name || `Telegram User ${dto.id}`,
+            avatar: dto.photo_url || null,
+            role: Role.USER,
+          },
+        });
+
+        this.logger.log(`New Telegram user created: ${user.id}`);
+      }
+
+      const tokens = await this.generateTokens(user.id, user.role);
+
+      return {
+        user: {
+          id: user.id,
+          email: user.email,
+          phone: user.phone,
+          name: user.name,
+          role: user.role,
+          telegramId: user.telegramId,
+          avatar: user.avatar,
+        },
+        ...tokens,
+      };
+    } catch (error) {
+      this.logger.error(
+        `Error in Telegram auth: ${error.message}`,
+        error.stack,
+      );
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new HttpException(
+        error.message || 'Failed to authenticate via Telegram',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  private verifyTelegramHash(dto: TelegramAuthDto): void {
+    const botToken = this.configService.get<string>('TELEGRAM_BOT_TOKEN');
+
+    if (!botToken) {
+      throw new HttpException(
+        'Telegram bot token not configured',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+
+    const { hash, ...data } = dto;
+
+    // Build check string: key=value pairs sorted alphabetically, joined by \n
+    const checkString = Object.keys(data)
+      .sort()
+      .map((key) => `${key}=${data[key as keyof typeof data]}`)
+      .filter((pair) => !pair.endsWith('=undefined') && !pair.endsWith('=null'))
+      .join('\n');
+
+    // SHA256 hash of bot token is used as secret key
+    const secretKey = crypto
+      .createHash('sha256')
+      .update(botToken)
+      .digest();
+
+    // HMAC-SHA256 of check string with the secret key
+    const hmac = crypto
+      .createHmac('sha256', secretKey)
+      .update(checkString)
+      .digest('hex');
+
+    if (hmac !== hash) {
+      throw new HttpException(
+        'Invalid Telegram auth data',
+        HttpStatus.UNAUTHORIZED,
       );
     }
   }
