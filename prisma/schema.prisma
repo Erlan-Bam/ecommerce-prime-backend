@@ -36,7 +36,9 @@ enum PaymentStatus {
 enum OrderStatus {
   PENDING
   PROCESSING
+  CONFIRMED
   PAYED
+  ASSEMBLED
   SHIPPED
   DELIVERED
   CANCELLED

@@ -11,7 +11,7 @@ export class UpdateOrderStatusDto {
   })
   @IsEnum(OrderStatus, {
     message:
-      'Status must be one of: PENDING, PROCESSING, SHIPPED, DELIVERED, CANCELLED',
+      'Status must be one of: PENDING, PROCESSING, CONFIRMED, PAYED, ASSEMBLED, SHIPPED, DELIVERED, CANCELLED',
   })
   @IsNotEmpty()
   status: OrderStatus;
