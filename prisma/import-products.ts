@@ -30,62 +30,8 @@ const PRODUCT_FIELD_COLUMNS = new Set([
   'Старая цена',
 ]);
 
-// ─── Base URL for static images ────────────────────────────────────────────
-const BASE_URL = 'https://api.prime-electronics.ru';
-
-// Category images — local images use BASE_URL prefix, subcategories use internet images
-const CATEGORY_IMAGES: Record<string, string> = {
-  // Parent categories (local images)
-  apple: `${BASE_URL}/images/categories/apple.png`,
-  samsung: `${BASE_URL}/images/categories/samsung.png`,
-  xiaomi: `${BASE_URL}/images/categories/xiaomi.png`,
-  dyson: `${BASE_URL}/images/categories/dyson.png`,
-  smartphones: `${BASE_URL}/images/categories/smartphones.png`,
-  laptops: `${BASE_URL}/images/categories/laptops.png`,
-  'smart-watches': `${BASE_URL}/images/categories/smart-watches.png`,
-  headphones: `${BASE_URL}/images/categories/headphones.png`,
-  'gaming-consoles': `${BASE_URL}/images/categories/playstations.png`,
-  accessories: `${BASE_URL}/images/categories/accessories.png`,
-  macbook: `${BASE_URL}/images/categories/macbook.png`,
-
-  // Apple subcategories
-  iphone:
-    'https://store.storeimages.cdn-apple.com/4982/as-images.apple.com/is/iphone-16-pro-finish-select-202409-6-3inch-naturaltitanium?wid=400&hei=400&fmt=p-jpg',
-  'apple-watch':
-    'https://store.storeimages.cdn-apple.com/4982/as-images.apple.com/is/store-card-40-watch-s10-202409?wid=400&hei=400&fmt=p-jpg',
-  airpods:
-    'https://store.storeimages.cdn-apple.com/4982/as-images.apple.com/is/MQD83?wid=400&hei=400&fmt=p-jpg',
-  imac:
-    'https://store.storeimages.cdn-apple.com/4982/as-images.apple.com/is/store-card-40-imac-202310?wid=400&hei=400&fmt=p-jpg',
-  ipad:
-    'https://store.storeimages.cdn-apple.com/4982/as-images.apple.com/is/ipad-air-select-wifi-blue-202203?wid=400&hei=400&fmt=p-jpg',
-  'mac-mini':
-    'https://store.storeimages.cdn-apple.com/4982/as-images.apple.com/is/mac-mini-hero-202301?wid=400&hei=400&fmt=p-jpg',
-
-  // Samsung subcategories
-  'samsung-galaxy':
-    'https://fdn2.gsmarena.com/vv/pics/samsung/samsung-galaxy-s24-ultra-5g-sm-s928-0.jpg',
-  'samsung-watch':
-    'https://fdn2.gsmarena.com/vv/bigpic/samsung-galaxy-watch6.jpg',
-  'galaxy-buds': `${BASE_URL}/images/categories/headphones.png`,
-  'samsung-tablets':
-    'https://fdn2.gsmarena.com/vv/bigpic/samsung-galaxy-tab-s9-5g.jpg',
-
-  // Xiaomi subcategories
-  'xiaomi-phones':
-    'https://fdn2.gsmarena.com/vv/bigpic/xiaomi-14.jpg',
-  'xiaomi-watch':
-    'https://fdn2.gsmarena.com/vv/bigpic/xiaomi-watch-2-pro.jpg',
-  'xiaomi-buds': `${BASE_URL}/images/categories/headphones.png`,
-
-  // Dyson subcategories
-  'dyson-vacuums':
-    'https://dyson-h.assetsadobe2.com/is/image/content/dam/dyson/images/products/primary/394472-01.png',
-  'dyson-aircare':
-    'https://dyson-h.assetsadobe2.com/is/image/content/dam/dyson/images/products/primary/369535-01.png',
-  'dyson-haircare':
-    'https://dyson-h.assetsadobe2.com/is/image/content/dam/dyson/images/products/primary/426081-01.png',
-};
+// ─── Categories to skip during import ──────────────────────────────────────
+const SKIP_CATEGORIES = new Set(['Сервис и услуги']);
 
 // ─── Prisma setup ──────────────────────────────────────────────────────────
 const RETRY_ATTEMPTS = 5;
@@ -416,12 +362,15 @@ async function main() {
     // Top-level category (same as brand usually, e.g. "Apple")
     if (topName && !categoryMap.has(topName)) {
       const slug = slugify(topName);
-      const image = CATEGORY_IMAGES[slug] || null;
-      const cat = await prisma.category.upsert({
-        where: { slug },
-        update: { title: topName, ...(image && { image }) },
-        create: { title: topName, slug, sortOrder: categoryMap.size, ...(image && { image }) },
-      });
+      const cat = await withRetry(
+        () =>
+          prisma.category.upsert({
+            where: { slug },
+            update: { title: topName },
+            create: { title: topName, slug, sortOrder: categoryMap.size },
+          }),
+        `category upsert: ${topName}`,
+      );
       categoryMap.set(topName, cat.id);
     }
 
@@ -449,18 +398,20 @@ async function main() {
         }
 
         const parentId = topName ? categoryMap.get(topName) : undefined;
-        const midImage = CATEGORY_IMAGES[finalSlug] || null;
-        const cat = await prisma.category.upsert({
-          where: { slug: finalSlug },
-          update: { title: midName, parentId: parentId || null, ...(midImage && { image: midImage }) },
-          create: {
-            title: midName,
-            slug: finalSlug,
-            parentId: parentId || null,
-            sortOrder: categoryMap.size,
-            ...(midImage && { image: midImage }),
-          },
-        });
+        const cat = await withRetry(
+          () =>
+            prisma.category.upsert({
+              where: { slug: finalSlug },
+              update: { title: midName, parentId: parentId || null },
+              create: {
+                title: midName,
+                slug: finalSlug,
+                parentId: parentId || null,
+                sortOrder: categoryMap.size,
+              },
+            }),
+          `category upsert: ${midName}`,
+        );
         categoryMap.set(midKey, cat.id);
       }
     }
@@ -487,18 +438,20 @@ async function main() {
           finalSlug = `${slug}-${attempt}`;
         }
 
-        const leafImage = CATEGORY_IMAGES[finalSlug] || null;
-        const cat = await prisma.category.upsert({
-          where: { slug: finalSlug },
-          update: { title: leafName, parentId: parentId || null, ...(leafImage && { image: leafImage }) },
-          create: {
-            title: leafName,
-            slug: finalSlug,
-            parentId: parentId || null,
-            sortOrder: categoryMap.size,
-            ...(leafImage && { image: leafImage }),
-          },
-        });
+        const cat = await withRetry(
+          () =>
+            prisma.category.upsert({
+              where: { slug: finalSlug },
+              update: { title: leafName, parentId: parentId || null },
+              create: {
+                title: leafName,
+                slug: finalSlug,
+                parentId: parentId || null,
+                sortOrder: categoryMap.size,
+              },
+            }),
+          `category upsert: ${leafName}`,
+        );
         categoryMap.set(leafKey, cat.id);
       }
     }
@@ -587,44 +540,79 @@ async function main() {
           attributes.push({ name: key, value: value.trim() });
         }
 
-        // Create product with all relations
-        await prisma.product.create({
-          data: {
-            name,
-            slug,
-            description,
-            price,
-            oldPrice,
-            isActive,
-            isOnSale,
-            brandId,
-            // Relations
-            categories: {
-              create: categoryIds.map((catId, idx) => ({
-                categoryId: catId,
-                isPrimary: idx === 0,
-              })),
-            },
-            images: imageUrl
-              ? {
-                  create: imageUrl.split(';').map((url, idx) => ({
-                    url: url.trim(),
-                    alt: `${name} - image ${idx + 1}`,
-                    sortOrder: idx,
-                  })).filter((img) => img.url.length > 0),
-                }
-              : undefined,
-            attributes:
-              attributes.length > 0
-                ? {
-                    create: attributes.map((attr) => ({
-                      name: attr.name,
-                      value: attr.value,
-                    })),
-                  }
-                : undefined,
-          },
-        });
+        // Upsert product (idempotent – safe to re-run)
+        const productData = {
+          name,
+          description,
+          price,
+          oldPrice,
+          isActive,
+          isOnSale,
+          brandId,
+        };
+
+        const categoriesCreate = categoryIds.map((catId, idx) => ({
+          categoryId: catId,
+          isPrimary: idx === 0,
+        }));
+
+        const imagesCreate = imageUrl
+          ? imageUrl
+              .split(';')
+              .filter((u) => u.trim())
+              .map((url, idx) => ({
+                url: url.trim(),
+                alt: `${name} - image ${idx + 1}`,
+                sortOrder: idx,
+              }))
+          : [];
+
+        const attributesCreate =
+          attributes.length > 0
+            ? attributes.map((attr) => ({
+                name: attr.name,
+                value: attr.value,
+              }))
+            : [];
+
+        await withRetry(
+          () =>
+            prisma.product.upsert({
+              where: { slug },
+              create: {
+                ...productData,
+                slug,
+                categories: { create: categoriesCreate },
+                images:
+                  imagesCreate.length > 0
+                    ? { create: imagesCreate }
+                    : undefined,
+                attributes:
+                  attributesCreate.length > 0
+                    ? { create: attributesCreate }
+                    : undefined,
+              },
+              update: {
+                ...productData,
+                // Delete old relations, then recreate
+                categories: {
+                  deleteMany: {},
+                  create: categoriesCreate,
+                },
+                images: {
+                  deleteMany: {},
+                  ...(imagesCreate.length > 0 ? { create: imagesCreate } : {}),
+                },
+                attributes: {
+                  deleteMany: {},
+                  ...(attributesCreate.length > 0
+                    ? { create: attributesCreate }
+                    : {}),
+                },
+              },
+            }),
+          `product upsert: ${name.substring(0, 40)}`,
+        );
 
         imported++;
       } catch (err: any) {
