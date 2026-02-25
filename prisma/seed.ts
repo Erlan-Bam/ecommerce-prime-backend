@@ -28,6 +28,60 @@ const PRODUCT_IMAGES = [
   `${BASE_URL}/images/products/product-4.png`,
 ];
 
+// Category images — local images use BASE_URL prefix, subcategories use internet images
+const CATEGORY_IMAGES: Record<string, string> = {
+  // Parent categories (local images)
+  apple: `${BASE_URL}/images/categories/apple.png`,
+  samsung: `${BASE_URL}/images/categories/samsung.png`,
+  xiaomi: `${BASE_URL}/images/categories/xiaomi.png`,
+  dyson: `${BASE_URL}/images/categories/dyson.png`,
+  smartphones: `${BASE_URL}/images/categories/smartphones.png`,
+  laptops: `${BASE_URL}/images/categories/laptops.png`,
+  'smart-watches': `${BASE_URL}/images/categories/smart-watches.png`,
+  headphones: `${BASE_URL}/images/categories/headphones.png`,
+  'gaming-consoles': `${BASE_URL}/images/categories/playstations.png`,
+  accessories: `${BASE_URL}/images/categories/accessories.png`,
+  macbook: `${BASE_URL}/images/categories/macbook.png`,
+
+  // Apple subcategories (internet images)
+  iphone:
+    'https://store.storeimages.cdn-apple.com/4982/as-images.apple.com/is/iphone-16-pro-finish-select-202409-6-3inch-naturaltitanium?wid=400&hei=400&fmt=p-jpg',
+  'apple-watch':
+    'https://store.storeimages.cdn-apple.com/4982/as-images.apple.com/is/store-card-40-watch-s10-202409?wid=400&hei=400&fmt=p-jpg',
+  airpods:
+    'https://store.storeimages.cdn-apple.com/4982/as-images.apple.com/is/MQD83?wid=400&hei=400&fmt=p-jpg',
+  imac:
+    'https://store.storeimages.cdn-apple.com/4982/as-images.apple.com/is/store-card-40-imac-202310?wid=400&hei=400&fmt=p-jpg',
+  ipad:
+    'https://store.storeimages.cdn-apple.com/4982/as-images.apple.com/is/ipad-air-select-wifi-blue-202203?wid=400&hei=400&fmt=p-jpg',
+  'mac-mini':
+    'https://store.storeimages.cdn-apple.com/4982/as-images.apple.com/is/mac-mini-hero-202301?wid=400&hei=400&fmt=p-jpg',
+
+  // Samsung subcategories (internet images)
+  'samsung-galaxy':
+    'https://fdn2.gsmarena.com/vv/pics/samsung/samsung-galaxy-s24-ultra-5g-sm-s928-0.jpg',
+  'samsung-watch':
+    'https://fdn2.gsmarena.com/vv/bigpic/samsung-galaxy-watch6.jpg',
+  'galaxy-buds': `${BASE_URL}/images/categories/headphones.png`,
+  'samsung-tablets':
+    'https://fdn2.gsmarena.com/vv/bigpic/samsung-galaxy-tab-s9-5g.jpg',
+
+  // Xiaomi subcategories (internet images)
+  'xiaomi-phones':
+    'https://fdn2.gsmarena.com/vv/bigpic/xiaomi-14.jpg',
+  'xiaomi-watch':
+    'https://fdn2.gsmarena.com/vv/bigpic/xiaomi-watch-2-pro.jpg',
+  'xiaomi-buds': `${BASE_URL}/images/categories/headphones.png`,
+
+  // Dyson subcategories (internet images)
+  'dyson-vacuums':
+    'https://dyson-h.assetsadobe2.com/is/image/content/dam/dyson/images/products/primary/394472-01.png',
+  'dyson-aircare':
+    'https://dyson-h.assetsadobe2.com/is/image/content/dam/dyson/images/products/primary/369535-01.png',
+  'dyson-haircare':
+    'https://dyson-h.assetsadobe2.com/is/image/content/dam/dyson/images/products/primary/426081-01.png',
+};
+
 async function main() {
   console.log('🌱 Starting database seed...');
 
@@ -130,13 +184,13 @@ async function main() {
     where: { slug: 'apple' },
     update: {
       title: 'Apple',
-      image: `${BASE_URL}/images/categories/apple.png`,
+      image: CATEGORY_IMAGES['apple'],
       sortOrder: 1,
     },
     create: {
       title: 'Apple',
       slug: 'apple',
-      image: `${BASE_URL}/images/categories/apple.png`,
+      image: CATEGORY_IMAGES['apple'],
       sortOrder: 1,
     },
   });
@@ -145,13 +199,13 @@ async function main() {
     where: { slug: 'samsung' },
     update: {
       title: 'Samsung',
-      image: `${BASE_URL}/images/categories/samsung.png`,
+      image: CATEGORY_IMAGES['samsung'],
       sortOrder: 2,
     },
     create: {
       title: 'Samsung',
       slug: 'samsung',
-      image: `${BASE_URL}/images/categories/samsung.png`,
+      image: CATEGORY_IMAGES['samsung'],
       sortOrder: 2,
     },
   });
@@ -160,13 +214,13 @@ async function main() {
     where: { slug: 'xiaomi' },
     update: {
       title: 'Xiaomi',
-      image: `${BASE_URL}/images/categories/xiaomi.png`,
+      image: CATEGORY_IMAGES['xiaomi'],
       sortOrder: 3,
     },
     create: {
       title: 'Xiaomi',
       slug: 'xiaomi',
-      image: `${BASE_URL}/images/categories/xiaomi.png`,
+      image: CATEGORY_IMAGES['xiaomi'],
       sortOrder: 3,
     },
   });
@@ -175,13 +229,13 @@ async function main() {
     where: { slug: 'dyson' },
     update: {
       title: 'Dyson',
-      image: `${BASE_URL}/images/categories/dyson.png`,
+      image: CATEGORY_IMAGES['dyson'],
       sortOrder: 4,
     },
     create: {
       title: 'Dyson',
       slug: 'dyson',
-      image: `${BASE_URL}/images/categories/dyson.png`,
+      image: CATEGORY_IMAGES['dyson'],
       sortOrder: 4,
     },
   });
@@ -190,13 +244,13 @@ async function main() {
     where: { slug: 'smartphones' },
     update: {
       title: 'Смартфоны',
-      image: `${BASE_URL}/images/categories/smartphones.png`,
+      image: CATEGORY_IMAGES['smartphones'],
       sortOrder: 5,
     },
     create: {
       title: 'Смартфоны',
       slug: 'smartphones',
-      image: `${BASE_URL}/images/categories/smartphones.png`,
+      image: CATEGORY_IMAGES['smartphones'],
       sortOrder: 5,
     },
   });
@@ -205,13 +259,13 @@ async function main() {
     where: { slug: 'laptops' },
     update: {
       title: 'Ноутбуки',
-      image: `${BASE_URL}/images/categories/laptops.png`,
+      image: CATEGORY_IMAGES['laptops'],
       sortOrder: 6,
     },
     create: {
       title: 'Ноутбуки',
       slug: 'laptops',
-      image: `${BASE_URL}/images/categories/laptops.png`,
+      image: CATEGORY_IMAGES['laptops'],
       sortOrder: 6,
     },
   });
@@ -220,13 +274,13 @@ async function main() {
     where: { slug: 'smart-watches' },
     update: {
       title: 'Умные часы',
-      image: `${BASE_URL}/images/categories/smart-watches.png`,
+      image: CATEGORY_IMAGES['smart-watches'],
       sortOrder: 7,
     },
     create: {
       title: 'Умные часы',
       slug: 'smart-watches',
-      image: `${BASE_URL}/images/categories/smart-watches.png`,
+      image: CATEGORY_IMAGES['smart-watches'],
       sortOrder: 7,
     },
   });
@@ -235,13 +289,13 @@ async function main() {
     where: { slug: 'headphones' },
     update: {
       title: 'Наушники',
-      image: `${BASE_URL}/images/categories/headphones.png`,
+      image: CATEGORY_IMAGES['headphones'],
       sortOrder: 8,
     },
     create: {
       title: 'Наушники',
       slug: 'headphones',
-      image: `${BASE_URL}/images/categories/headphones.png`,
+      image: CATEGORY_IMAGES['headphones'],
       sortOrder: 8,
     },
   });
@@ -250,13 +304,13 @@ async function main() {
     where: { slug: 'gaming-consoles' },
     update: {
       title: 'Игровые приставки',
-      image: `${BASE_URL}/images/categories/playstations.png`,
+      image: CATEGORY_IMAGES['gaming-consoles'],
       sortOrder: 9,
     },
     create: {
       title: 'Игровые приставки',
       slug: 'gaming-consoles',
-      image: `${BASE_URL}/images/categories/playstations.png`,
+      image: CATEGORY_IMAGES['gaming-consoles'],
       sortOrder: 9,
     },
   });
@@ -265,13 +319,13 @@ async function main() {
     where: { slug: 'accessories' },
     update: {
       title: 'Аксессуары',
-      image: `${BASE_URL}/images/categories/accessories.png`,
+      image: CATEGORY_IMAGES['accessories'],
       sortOrder: 10,
     },
     create: {
       title: 'Аксессуары',
       slug: 'accessories',
-      image: `${BASE_URL}/images/categories/accessories.png`,
+      image: CATEGORY_IMAGES['accessories'],
       sortOrder: 10,
     },
   });
@@ -282,14 +336,14 @@ async function main() {
     update: {
       title: 'iPhone',
       parentId: apple.id,
-      image: `${BASE_URL}/images/categories/smartphones.png`,
+      image: CATEGORY_IMAGES['iphone'],
       sortOrder: 1,
     },
     create: {
       title: 'iPhone',
       slug: 'iphone',
       parentId: apple.id,
-      image: `${BASE_URL}/images/categories/smartphones.png`,
+      image: CATEGORY_IMAGES['iphone'],
       sortOrder: 1,
     },
   });
@@ -299,14 +353,14 @@ async function main() {
     update: {
       title: 'Apple Watch',
       parentId: apple.id,
-      image: `${BASE_URL}/images/categories/smart-watches.png`,
+      image: CATEGORY_IMAGES['apple-watch'],
       sortOrder: 2,
     },
     create: {
       title: 'Apple Watch',
       slug: 'apple-watch',
       parentId: apple.id,
-      image: `${BASE_URL}/images/categories/smart-watches.png`,
+      image: CATEGORY_IMAGES['apple-watch'],
       sortOrder: 2,
     },
   });
@@ -316,14 +370,14 @@ async function main() {
     update: {
       title: 'AirPods',
       parentId: apple.id,
-      image: `${BASE_URL}/images/categories/headphones.png`,
+      image: CATEGORY_IMAGES['airpods'],
       sortOrder: 3,
     },
     create: {
       title: 'AirPods',
       slug: 'airpods',
       parentId: apple.id,
-      image: `${BASE_URL}/images/categories/headphones.png`,
+      image: CATEGORY_IMAGES['airpods'],
       sortOrder: 3,
     },
   });
@@ -333,14 +387,14 @@ async function main() {
     update: {
       title: 'iMac',
       parentId: apple.id,
-      image: `${BASE_URL}/images/categories/laptops.png`,
+      image: CATEGORY_IMAGES['imac'],
       sortOrder: 4,
     },
     create: {
       title: 'iMac',
       slug: 'imac',
       parentId: apple.id,
-      image: `${BASE_URL}/images/categories/laptops.png`,
+      image: CATEGORY_IMAGES['imac'],
       sortOrder: 4,
     },
   });
@@ -350,14 +404,14 @@ async function main() {
     update: {
       title: 'iPad',
       parentId: apple.id,
-      image: `${BASE_URL}/images/categories/laptops.png`,
+      image: CATEGORY_IMAGES['ipad'],
       sortOrder: 5,
     },
     create: {
       title: 'iPad',
       slug: 'ipad',
       parentId: apple.id,
-      image: `${BASE_URL}/images/categories/laptops.png`,
+      image: CATEGORY_IMAGES['ipad'],
       sortOrder: 5,
     },
   });
@@ -367,14 +421,14 @@ async function main() {
     update: {
       title: 'MacBook',
       parentId: apple.id,
-      image: `${BASE_URL}/images/categories/macbook.png`,
+      image: CATEGORY_IMAGES['macbook'],
       sortOrder: 6,
     },
     create: {
       title: 'MacBook',
       slug: 'macbook',
       parentId: apple.id,
-      image: `${BASE_URL}/images/categories/macbook.png`,
+      image: CATEGORY_IMAGES['macbook'],
       sortOrder: 6,
     },
   });
@@ -384,14 +438,14 @@ async function main() {
     update: {
       title: 'Mac mini',
       parentId: apple.id,
-      image: `${BASE_URL}/images/categories/laptops.png`,
+      image: CATEGORY_IMAGES['mac-mini'],
       sortOrder: 7,
     },
     create: {
       title: 'Mac mini',
       slug: 'mac-mini',
       parentId: apple.id,
-      image: `${BASE_URL}/images/categories/laptops.png`,
+      image: CATEGORY_IMAGES['mac-mini'],
       sortOrder: 7,
     },
   });
@@ -402,14 +456,14 @@ async function main() {
     update: {
       title: 'Samsung Galaxy',
       parentId: samsung.id,
-      image: `${BASE_URL}/images/categories/smartphones.png`,
+      image: CATEGORY_IMAGES['samsung-galaxy'],
       sortOrder: 1,
     },
     create: {
       title: 'Samsung Galaxy',
       slug: 'samsung-galaxy',
       parentId: samsung.id,
-      image: `${BASE_URL}/images/categories/smartphones.png`,
+      image: CATEGORY_IMAGES['samsung-galaxy'],
       sortOrder: 1,
     },
   });
@@ -419,14 +473,14 @@ async function main() {
     update: {
       title: 'Samsung Galaxy Watch',
       parentId: samsung.id,
-      image: `${BASE_URL}/images/categories/smart-watches.png`,
+      image: CATEGORY_IMAGES['samsung-watch'],
       sortOrder: 2,
     },
     create: {
       title: 'Samsung Galaxy Watch',
       slug: 'samsung-watch',
       parentId: samsung.id,
-      image: `${BASE_URL}/images/categories/smart-watches.png`,
+      image: CATEGORY_IMAGES['samsung-watch'],
       sortOrder: 2,
     },
   });
@@ -436,14 +490,14 @@ async function main() {
     update: {
       title: 'Galaxy Buds',
       parentId: samsung.id,
-      image: `${BASE_URL}/images/categories/headphones.png`,
+      image: CATEGORY_IMAGES['galaxy-buds'],
       sortOrder: 3,
     },
     create: {
       title: 'Galaxy Buds',
       slug: 'galaxy-buds',
       parentId: samsung.id,
-      image: `${BASE_URL}/images/categories/headphones.png`,
+      image: CATEGORY_IMAGES['galaxy-buds'],
       sortOrder: 3,
     },
   });
@@ -453,14 +507,14 @@ async function main() {
     update: {
       title: 'Samsung Tablets',
       parentId: samsung.id,
-      image: `${BASE_URL}/images/categories/laptops.png`,
+      image: CATEGORY_IMAGES['samsung-tablets'],
       sortOrder: 4,
     },
     create: {
       title: 'Samsung Tablets',
       slug: 'samsung-tablets',
       parentId: samsung.id,
-      image: `${BASE_URL}/images/categories/laptops.png`,
+      image: CATEGORY_IMAGES['samsung-tablets'],
       sortOrder: 4,
     },
   });
@@ -471,14 +525,14 @@ async function main() {
     update: {
       title: 'Xiaomi Phones',
       parentId: xiaomi.id,
-      image: `${BASE_URL}/images/categories/smartphones.png`,
+      image: CATEGORY_IMAGES['xiaomi-phones'],
       sortOrder: 1,
     },
     create: {
       title: 'Xiaomi Phones',
       slug: 'xiaomi-phones',
       parentId: xiaomi.id,
-      image: `${BASE_URL}/images/categories/smartphones.png`,
+      image: CATEGORY_IMAGES['xiaomi-phones'],
       sortOrder: 1,
     },
   });
@@ -488,14 +542,14 @@ async function main() {
     update: {
       title: 'Xiaomi Watch',
       parentId: xiaomi.id,
-      image: `${BASE_URL}/images/categories/smart-watches.png`,
+      image: CATEGORY_IMAGES['xiaomi-watch'],
       sortOrder: 2,
     },
     create: {
       title: 'Xiaomi Watch',
       slug: 'xiaomi-watch',
       parentId: xiaomi.id,
-      image: `${BASE_URL}/images/categories/smart-watches.png`,
+      image: CATEGORY_IMAGES['xiaomi-watch'],
       sortOrder: 2,
     },
   });
@@ -505,14 +559,14 @@ async function main() {
     update: {
       title: 'Xiaomi Buds',
       parentId: xiaomi.id,
-      image: `${BASE_URL}/images/categories/headphones.png`,
+      image: CATEGORY_IMAGES['xiaomi-buds'],
       sortOrder: 3,
     },
     create: {
       title: 'Xiaomi Buds',
       slug: 'xiaomi-buds',
       parentId: xiaomi.id,
-      image: `${BASE_URL}/images/categories/headphones.png`,
+      image: CATEGORY_IMAGES['xiaomi-buds'],
       sortOrder: 3,
     },
   });
@@ -523,14 +577,14 @@ async function main() {
     update: {
       title: 'Dyson Vacuums',
       parentId: dyson.id,
-      image: `${BASE_URL}/images/categories/dyson.png`,
+      image: CATEGORY_IMAGES['dyson-vacuums'],
       sortOrder: 1,
     },
     create: {
       title: 'Dyson Vacuums',
       slug: 'dyson-vacuums',
       parentId: dyson.id,
-      image: `${BASE_URL}/images/categories/dyson.png`,
+      image: CATEGORY_IMAGES['dyson-vacuums'],
       sortOrder: 1,
     },
   });
@@ -540,14 +594,14 @@ async function main() {
     update: {
       title: 'Dyson Aircare',
       parentId: dyson.id,
-      image: `${BASE_URL}/images/categories/dyson.png`,
+      image: CATEGORY_IMAGES['dyson-aircare'],
       sortOrder: 2,
     },
     create: {
       title: 'Dyson Aircare',
       slug: 'dyson-aircare',
       parentId: dyson.id,
-      image: `${BASE_URL}/images/categories/dyson.png`,
+      image: CATEGORY_IMAGES['dyson-aircare'],
       sortOrder: 2,
     },
   });
@@ -557,14 +611,14 @@ async function main() {
     update: {
       title: 'Dyson Haircare',
       parentId: dyson.id,
-      image: `${BASE_URL}/images/categories/dyson.png`,
+      image: CATEGORY_IMAGES['dyson-haircare'],
       sortOrder: 3,
     },
     create: {
       title: 'Dyson Haircare',
       slug: 'dyson-haircare',
       parentId: dyson.id,
-      image: `${BASE_URL}/images/categories/dyson.png`,
+      image: CATEGORY_IMAGES['dyson-haircare'],
       sortOrder: 3,
     },
   });
