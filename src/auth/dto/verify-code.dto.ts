@@ -10,10 +10,10 @@ export class VerifyCodeDto {
   @IsString()
   @IsNotEmpty()
   @Matches(
-    /^\+(?:7|373|374|375|380|992|993|994|995|996|998)[\s\(\)-]?\d{1,4}[\s\(\)-]?\d{1,4}[\s\(\)-]?\d{1,4}(?:[\s\(\)-]?\d{1,4})?$/,
+    /^(?:\+(?:7|373|374|375|380|992|993|994|995|996|998)|8)[\s\(\)-]?\d{1,4}[\s\(\)-]?\d{1,4}[\s\(\)-]?\d{1,4}(?:[\s\(\)-]?\d{1,4})?$/,
     {
       message:
-        'Phone must be from CIS country with valid format (e.g., +7 999 123 45 67, +380 XX XXX XX XX)',
+        'Phone must be from CIS country with valid format (e.g., +7 999 123 45 67, 89991234567)',
     },
   )
   phone: string;

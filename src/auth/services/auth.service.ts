@@ -34,7 +34,16 @@ export class AuthService {
   // ==================== SMS OTP AUTH ====================
 
   private normalizePhone(phone: string): string {
-    return phone.replace(/[\s\-\(\)]/g, '');
+    let normalized = phone.replace(/[\s\-\(\)]/g, '');
+    // Convert Russian local format 8XXXXXXXXXX → +7XXXXXXXXXX
+    if (normalized.startsWith('8') && normalized.length === 11) {
+      normalized = '+7' + normalized.slice(1);
+    }
+    // Ensure + prefix for international numbers
+    if (!normalized.startsWith('+')) {
+      normalized = '+' + normalized;
+    }
+    return normalized;
   }
 
   async enterUser(dto: EnterUserDto) {
