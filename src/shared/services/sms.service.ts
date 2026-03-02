@@ -36,8 +36,11 @@ export class SmsService {
   ): Promise<{ success: boolean; data: any; message: string | null }> {
     const callbackUrl = this.configService.get<string>('SMSAERO_CALLBACK_URL');
 
+    // SMSAero expects numbers without leading '+'
+    const cleanNumber = number.replace(/^\+/, '');
+
     const params: Record<string, any> = {
-      number,
+      number: cleanNumber,
       text,
       sign: this.sign,
     };
