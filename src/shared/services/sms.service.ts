@@ -1,6 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, HttpException, HttpStatus } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import axios, { AxiosInstance } from 'axios';
+import axios, { AxiosInstance, AxiosError } from 'axios';
 
 @Injectable()
 export class SmsService {
@@ -12,7 +12,15 @@ export class SmsService {
     const email = this.configService.getOrThrow<string>('SMSAERO_EMAIL');
     const apiKey = this.configService.getOrThrow<string>('SMSAERO_API_KEY');
 
-    this.sign = this.configService.get<string>('SMSAERO_SIGN', 'prime-electronics');
+    // SMSAero sign must be ≤11 characters
+    this.sign = this.configService.get<string>('SMSAERO_SIGN', 'SMS Aero');
+
+    if (this.sign.length > 11) {
+      this.logger.warn(
+        `SMSAERO_SIGN "${this.sign}" exceeds 11 characters — SMSAero will reject requests. Truncating to 11.`,
+      );
+      this.sign = this.sign.slice(0, 11);
+    }
 
     this.client = axios.create({
       baseURL: 'https://gate.smsaero.ru/v2',
@@ -56,20 +64,15 @@ export class SmsService {
         return response.data;
       }
 
-      const errorDetail =
-        typeof response.data?.message === 'object'
-          ? JSON.stringify(response.data.message)
-          : response.data?.message;
-
-      this.logger.error(`SMSAero API error: ${errorDetail}`);
-      throw new Error(`SMSAero error: ${errorDetail}`);
+      const errorDetail = this.extractErrorDetail(response.data);
+      this.logger.error(`SMSAero API error for ${number}: ${errorDetail}`);
+      throw new HttpException(
+        `SMS delivery failed: ${errorDetail}`,
+        HttpStatus.BAD_GATEWAY,
+      );
     } catch (error) {
-      if (error?.response) {
-        this.logger.error(`SMSAero HTTP ${error.response.status}: ${JSON.stringify(error.response.data)}`);
-      } else {
-        this.logger.error(`Failed to send SMS to ${number}: ${error?.message || error}`);
-      }
-      throw error;
+      if (error instanceof HttpException) throw error;
+      this.handleAxiosError(error, `send SMS to ${number}`);
     }
   }
 
@@ -95,15 +98,52 @@ export class SmsService {
         return response.data;
       }
 
-      this.logger.warn(`SMSAero status check failed for id=${smsId}: ${response.data?.message}`);
+      this.logger.warn(
+        `SMSAero status check unsuccessful for id=${smsId}: ${response.data?.message}`,
+      );
       return response.data;
     } catch (error) {
-      if (error?.response) {
-        this.logger.error(`SMSAero status HTTP ${error.response.status}: ${JSON.stringify(error.response.data)}`);
-      } else {
-        this.logger.error(`Failed to check SMS status for id=${smsId}: ${error?.message || error}`);
-      }
-      throw error;
+      if (error instanceof HttpException) throw error;
+      this.handleAxiosError(error, `check status for SMS id=${smsId}`);
     }
+  }
+
+  private extractErrorDetail(responseData: any): string {
+    const msg = responseData?.message;
+    const data = responseData?.data;
+
+    if (typeof msg === 'string' && msg) return msg;
+
+    if (data && typeof data === 'object') {
+      const fieldErrors = Object.entries(data)
+        .map(([field, msgs]) => `${field}: ${Array.isArray(msgs) ? msgs.join(', ') : msgs}`)
+        .join('; ');
+      if (fieldErrors) return fieldErrors;
+    }
+
+    return JSON.stringify(responseData);
+  }
+
+  private handleAxiosError(error: unknown, context: string): never {
+    const axiosErr = error as AxiosError<any>;
+
+    if (axiosErr.response) {
+      const status = axiosErr.response.status;
+      const detail = this.extractErrorDetail(axiosErr.response.data);
+
+      this.logger.error(`SMSAero HTTP ${status} while trying to ${context}: ${detail}`);
+
+      throw new HttpException(
+        `SMSAero error (${status}): ${detail}`,
+        HttpStatus.BAD_GATEWAY,
+      );
+    }
+
+    // Network / timeout error
+    this.logger.error(`SMSAero network error while trying to ${context}: ${axiosErr.message}`);
+    throw new HttpException(
+      'SMS provider unreachable. Please try again later.',
+      HttpStatus.SERVICE_UNAVAILABLE,
+    );
   }
 }
