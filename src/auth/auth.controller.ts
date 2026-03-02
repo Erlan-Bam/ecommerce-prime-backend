@@ -2,12 +2,19 @@ import {
   Controller,
   Post,
   Body,
+  Get,
   HttpCode,
   HttpStatus,
   Ip,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBody } from '@nestjs/swagger';
-import { AuthService } from './auth.service';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBody,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
+import { AuthService } from './services/auth.service';
 import {
   RegisterUserDto,
   LoginUserDto,
@@ -17,15 +24,103 @@ import {
   GuestAuthDto,
   GuestAuthResponseDto,
   TelegramAuthDto,
+  EnterUserDto,
+  VerifyCodeDto,
+  ResendCodeDto,
+  RefreshTokenDto,
 } from './dto';
 import { Public } from '../shared/decorator/public.decorator';
+import { User } from '../shared/decorator/user.decorator';
 
 @ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
-  // ==================== USER AUTH ====================
+  // ==================== SMS OTP AUTH ====================
+
+  @Public()
+  @Post('enter')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Send verification code to phone number' })
+  @ApiResponse({
+    status: 200,
+    description: 'Verification code sent successfully',
+  })
+  async enterUser(@Body() dto: EnterUserDto) {
+    return this.authService.enterUser(dto);
+  }
+
+  @Public()
+  @Post('verify')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Verify phone number with code' })
+  @ApiResponse({
+    status: 200,
+    description: 'Phone verified successfully, returns tokens',
+  })
+  @ApiResponse({ status: 400, description: 'Invalid or expired code' })
+  @ApiResponse({ status: 429, description: 'Too many failed attempts' })
+  async verifyCode(@Body() dto: VerifyCodeDto) {
+    return this.authService.verifyCode(dto);
+  }
+
+  @Public()
+  @Post('resend')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Resend verification code' })
+  @ApiResponse({
+    status: 200,
+    description: 'Verification code resent successfully',
+  })
+  @ApiResponse({ status: 429, description: 'Too many requests, please wait' })
+  async resendCode(@Body() dto: ResendCodeDto) {
+    return this.authService.resendCode(dto);
+  }
+
+  // ==================== PROFILE ====================
+
+  @Get('me')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get current user profile' })
+  @ApiResponse({
+    status: 200,
+    description: 'User profile retrieved successfully',
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  async getProfile(@User('id') userId: string) {
+    return this.authService.getProfile(userId);
+  }
+
+  // ==================== LOGOUT ====================
+
+  @Public()
+  @Post('logout')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Logout and revoke refresh token' })
+  @ApiResponse({
+    status: 200,
+    description: 'Logged out successfully',
+  })
+  async logout(@Body() dto: RefreshTokenDto) {
+    return this.authService.logout(dto.refreshToken);
+  }
+
+  @Post('logout-all')
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Logout from all devices (revoke all refresh tokens)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Logged out from all devices',
+  })
+  async logoutAll(@User('id') userId: string) {
+    return this.authService.logoutAll(userId);
+  }
+
+  // ==================== USER AUTH (email/password) ====================
 
   @Public()
   @Post('user/register')
@@ -95,23 +190,14 @@ export class AuthController {
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Refresh access token' })
-  @ApiBody({
-    schema: {
-      type: 'object',
-      properties: {
-        refreshToken: { type: 'string' },
-      },
-      required: ['refreshToken'],
-    },
-  })
   @ApiResponse({
     status: 200,
     description: 'Tokens refreshed successfully',
     type: RefreshResponseDto,
   })
   @ApiResponse({ status: 401, description: 'Invalid refresh token' })
-  async refreshTokens(@Body('refreshToken') refreshToken: string) {
-    return this.authService.refreshTokens(refreshToken);
+  async refreshTokens(@Body() dto: RefreshTokenDto) {
+    return this.authService.refreshTokens(dto.refreshToken);
   }
 
   // ==================== GUEST AUTH ====================
@@ -133,22 +219,13 @@ export class AuthController {
   @Post('guest/refresh')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Refresh guest access token' })
-  @ApiBody({
-    schema: {
-      type: 'object',
-      properties: {
-        refreshToken: { type: 'string' },
-      },
-      required: ['refreshToken'],
-    },
-  })
   @ApiResponse({
     status: 200,
     description: 'Guest tokens refreshed successfully',
     type: RefreshResponseDto,
   })
   @ApiResponse({ status: 401, description: 'Invalid refresh token' })
-  async refreshGuestTokens(@Body('refreshToken') refreshToken: string) {
-    return this.authService.refreshGuestTokens(refreshToken);
+  async refreshGuestTokens(@Body() dto: RefreshTokenDto) {
+    return this.authService.refreshGuestTokens(dto.refreshToken);
   }
 }

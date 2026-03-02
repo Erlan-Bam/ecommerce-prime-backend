@@ -3,7 +3,9 @@ import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AuthController } from './auth.controller';
-import { AuthService } from './auth.service';
+import { AuthService } from './services/auth.service';
+import { AuthRedisService } from './services/auth-redis.service';
+import { AuthSmsService } from './services/auth-sms.service';
 import { GuestGuard } from '../shared/guards/guest.guard';
 
 @Module({
@@ -21,7 +23,7 @@ import { GuestGuard } from '../shared/guards/guest.guard';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, GuestGuard],
+  providers: [AuthService, AuthRedisService, AuthSmsService, GuestGuard],
   exports: [AuthService, GuestGuard],
 })
 export class AuthModule {}

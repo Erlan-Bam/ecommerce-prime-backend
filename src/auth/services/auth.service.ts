@@ -1,17 +1,23 @@
 import { Injectable, HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { PrismaService } from '../shared/services/prisma.service';
+import { PrismaService } from '../../shared/services/prisma.service';
 import {
   RegisterUserDto,
   LoginUserDto,
   LoginAdminDto,
   GuestAuthDto,
   TelegramAuthDto,
-} from './dto';
+  EnterUserDto,
+  VerifyCodeDto,
+  ResendCodeDto,
+} from '../dto';
 import * as bcrypt from 'bcryptjs';
 import * as crypto from 'crypto';
 import { ConfigService } from '@nestjs/config';
 import { Role } from '@prisma/client';
+import { AuthRedisService } from './auth-redis.service';
+import { AuthSmsService } from './auth-sms.service';
+import { randomUUID } from 'crypto';
 
 @Injectable()
 export class AuthService {
@@ -21,7 +27,182 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly authRedisService: AuthRedisService,
+    private readonly authSmsService: AuthSmsService,
   ) {}
+
+  // ==================== SMS OTP AUTH ====================
+
+  private normalizePhone(phone: string): string {
+    return phone.replace(/[\s\-\(\)]/g, '');
+  }
+
+  async enterUser(dto: EnterUserDto) {
+    const phone = this.normalizePhone(dto.phone);
+
+    try {
+      // Generate and store verification code
+      const code = this.authRedisService.generateCode();
+      await this.authRedisService.storeCode(phone, code);
+
+      // Send SMS with verification code
+      await this.authSmsService.sendVerificationCode(phone, code);
+
+      this.logger.log(`Verification code sent to ${phone}`);
+
+      return {
+        message: 'Verification code sent successfully',
+        phone,
+      };
+    } catch (error) {
+      this.logger.error(
+        `Failed to send verification code to ${phone}`,
+        error.stack,
+      );
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new HttpException(
+        'Не удалось отправить SMS. Попробуйте позже или обратитесь в поддержку.',
+        HttpStatus.SERVICE_UNAVAILABLE,
+      );
+    }
+  }
+
+  async verifyCode(dto: VerifyCodeDto) {
+    const phone = this.normalizePhone(dto.phone);
+    const { code } = dto;
+
+    try {
+      // Check brute-force lockout
+      const attempts = await this.authRedisService.getAttempts(phone);
+      if (this.authRedisService.isLockedOut(attempts)) {
+        throw new HttpException(
+          'Too many failed attempts. Please request a new code.',
+          HttpStatus.TOO_MANY_REQUESTS,
+        );
+      }
+
+      const isValid = await this.authRedisService.verifyCode(phone, code);
+      if (!isValid) {
+        await this.authRedisService.incrementAttempts(phone);
+        throw new HttpException(
+          'Invalid or expired code',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      // Delete the code and reset attempts after successful verification
+      await this.authRedisService.deleteCode(phone);
+      await this.authRedisService.resetAttempts(phone);
+
+      // Create or get user
+      const user = await this.prisma.user.upsert({
+        where: { phone },
+        update: {},
+        create: { phone, name: phone, role: Role.USER },
+      });
+
+      const tokens = await this.generateTokens(user.id, user.role);
+
+      return {
+        message: 'Phone verified successfully',
+        user: {
+          id: user.id,
+          phone: user.phone,
+          email: user.email,
+          name: user.name,
+          role: user.role,
+          avatar: user.avatar,
+        },
+        ...tokens,
+      };
+    } catch (error) {
+      this.logger.error(`Failed to verify code for ${phone}`, error.stack);
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new HttpException(
+        'Failed to verify code. Please try again later.',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  async resendCode(dto: ResendCodeDto) {
+    const phone = this.normalizePhone(dto.phone);
+
+    try {
+      // Check if there's an existing code and get its creation time
+      const existingCode = await this.authRedisService.getCode(phone);
+      if (existingCode) {
+        const elapsed = Date.now() - existingCode.createdAt;
+        const minResendInterval = 60 * 1000; // 1 minute minimum between resends
+
+        if (elapsed < minResendInterval) {
+          const remainingSeconds = Math.ceil(
+            (minResendInterval - elapsed) / 1000,
+          );
+          throw new HttpException(
+            `Please wait ${remainingSeconds} seconds before requesting a new code`,
+            HttpStatus.TOO_MANY_REQUESTS,
+          );
+        }
+      }
+
+      // Generate new code and store it
+      const code = this.authRedisService.generateCode();
+      await this.authRedisService.storeCode(phone, code);
+
+      // Send SMS with new verification code
+      await this.authSmsService.sendVerificationCode(phone, code);
+
+      return {
+        message: 'Verification code resent successfully',
+        phone,
+      };
+    } catch (error) {
+      this.logger.error(
+        `Failed to resend verification code to ${phone}`,
+        error.stack,
+      );
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new HttpException(
+        'Не удалось отправить SMS. Попробуйте позже или обратитесь в поддержку.',
+        HttpStatus.SERVICE_UNAVAILABLE,
+      );
+    }
+  }
+
+  async logout(refreshToken: string) {
+    try {
+      const payload = await this.jwtService.verifyAsync(refreshToken, {
+        secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
+      });
+
+      if (payload.jti) {
+        await this.authRedisService.revokeRefreshToken(payload.id, payload.jti);
+      }
+
+      this.logger.log(`User ${payload.id} logged out, refresh token revoked`);
+
+      return { message: 'Logged out successfully' };
+    } catch (error) {
+      this.logger.error(`Logout failed: ${error.message}`);
+      // Even if token is invalid/expired, return success (idempotent)
+      return { message: 'Logged out successfully' };
+    }
+  }
+
+  async logoutAll(userId: string) {
+    await this.authRedisService.revokeAllRefreshTokens(userId);
+    this.logger.log(`User ${userId} logged out from all devices`);
+    return { message: 'Logged out from all devices successfully' };
+  }
+
+  // ==================== USER AUTH (email/password) ====================
 
   async registerUser(dto: RegisterUserDto) {
     try {
@@ -128,6 +309,8 @@ export class AuthService {
       );
     }
   }
+
+  // ==================== ADMIN AUTH ====================
 
   async loginAdmin(dto: LoginAdminDto) {
     try {
@@ -312,6 +495,32 @@ export class AuthService {
     }
   }
 
+  // ==================== TOKEN MANAGEMENT ====================
+
+  private async generateTokens(userId: string, role: string) {
+    const tokenId = randomUUID();
+    const payload = { id: userId, role, jti: tokenId };
+
+    const [accessToken, refreshToken] = await Promise.all([
+      this.jwtService.signAsync(payload, {
+        secret: this.configService.get<string>('JWT_ACCESS_SECRET'),
+        expiresIn: '15m',
+      }),
+      this.jwtService.signAsync(payload, {
+        secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
+        expiresIn: '7d',
+      }),
+    ]);
+
+    // Store refresh token in Redis for revocation support
+    await this.authRedisService.storeRefreshToken(userId, tokenId);
+
+    return {
+      accessToken,
+      refreshToken,
+    };
+  }
+
   async refreshTokens(refreshToken: string) {
     try {
       this.logger.log('Refreshing tokens');
@@ -319,6 +528,20 @@ export class AuthService {
       const payload = await this.jwtService.verifyAsync(refreshToken, {
         secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
       });
+
+      // If token has jti, validate it against Redis
+      if (payload.jti) {
+        const isValid = await this.authRedisService.isRefreshTokenValid(
+          payload.id,
+          payload.jti,
+        );
+        if (!isValid) {
+          throw new HttpException(
+            'Refresh token has been revoked',
+            HttpStatus.UNAUTHORIZED,
+          );
+        }
+      }
 
       const user = await this.prisma.user.findUnique({
         where: { id: payload.id },
@@ -329,14 +552,29 @@ export class AuthService {
       }
 
       if (user.isBanned) {
+        await this.authRedisService.revokeAllRefreshTokens(user.id);
         throw new HttpException('User is banned', HttpStatus.FORBIDDEN);
+      }
+
+      // Revoke old refresh token (rotation)
+      if (payload.jti) {
+        await this.authRedisService.revokeRefreshToken(payload.id, payload.jti);
       }
 
       const tokens = await this.generateTokens(user.id, user.role);
 
       this.logger.log(`Tokens refreshed for user: ${user.id}`);
 
-      return tokens;
+      return {
+        ...tokens,
+        user: {
+          id: user.id,
+          email: user.email,
+          phone: user.phone,
+          name: user.name,
+          role: user.role,
+        },
+      };
     } catch (error) {
       this.logger.error(
         `Error refreshing tokens: ${error.message}`,
@@ -352,6 +590,8 @@ export class AuthService {
     }
   }
 
+  // ==================== PROFILE ====================
+
   async getProfile(userId: string) {
     try {
       this.logger.log(`Getting profile for user: ${userId}`);
@@ -364,6 +604,7 @@ export class AuthService {
           phone: true,
           name: true,
           role: true,
+          avatar: true,
           createdAt: true,
         },
       });
@@ -420,26 +661,6 @@ export class AuthService {
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
-  }
-
-  private async generateTokens(userId: string, role: string) {
-    const payload = { id: userId, role };
-
-    const [accessToken, refreshToken] = await Promise.all([
-      this.jwtService.signAsync(payload, {
-        secret: this.configService.get<string>('JWT_ACCESS_SECRET'),
-        expiresIn: '15m',
-      }),
-      this.jwtService.signAsync(payload, {
-        secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
-        expiresIn: '7d',
-      }),
-    ]);
-
-    return {
-      accessToken,
-      refreshToken,
-    };
   }
 
   // ==================== GUEST AUTH ====================

@@ -5,3 +5,7 @@ export * from './auth-response.dto';
 export * from './guest-auth.dto';
 export * from './change-password.dto';
 export * from './telegram-auth.dto';
+export * from './enter-user.dto';
+export * from './verify-code.dto';
+export * from './resend-code.dto';
+export * from './refresh-token.dto';
