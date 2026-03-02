@@ -13,14 +13,7 @@ export class SmsService {
     const apiKey = this.configService.getOrThrow<string>('SMSAERO_API_KEY');
 
     // SMSAero sign must be ≤11 characters
-    this.sign = this.configService.get<string>('SMSAERO_SIGN', 'SMS Aero');
-
-    if (this.sign.length > 11) {
-      this.logger.warn(
-        `SMSAERO_SIGN "${this.sign}" exceeds 11 characters — SMSAero will reject requests. Truncating to 11.`,
-      );
-      this.sign = this.sign.slice(0, 11);
-    }
+    this.sign = this.configService.get<string>('SMSAERO_SIGN', 'prime');
 
     this.client = axios.create({
       baseURL: 'https://gate.smsaero.ru/v2',
