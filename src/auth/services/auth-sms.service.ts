@@ -21,6 +21,6 @@ export class AuthSmsService {
   }
 
   private buildVerificationMessage(code: string): string {
-    return `Ваш код подтверждения: ${code}. Код действителен 15 минут. Никому не сообщайте этот код.`;
+    return `Ваш код: ${code}. Не сообщайте никому. Действует 15 мин.`;
   }
 }
