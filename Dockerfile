@@ -4,11 +4,9 @@ RUN corepack enable && corepack prepare yarn@stable --activate
 
 WORKDIR /app
 
-COPY package.json yarn.lock .yarnrc.yml ./
+COPY . .
 
 RUN yarn install
-
-COPY . .
 
 RUN yarn prisma:generate
 
