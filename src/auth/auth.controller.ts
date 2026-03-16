@@ -6,6 +6,7 @@ import {
   HttpCode,
   HttpStatus,
   Ip,
+  UseGuards,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -31,6 +32,7 @@ import {
 } from './dto';
 import { Public } from '../shared/decorator/public.decorator';
 import { User } from '../shared/decorator/user.decorator';
+import { UserGuard } from '../shared/guards/user.guard';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -81,6 +83,7 @@ export class AuthController {
   // ==================== PROFILE ====================
 
   @Get('me')
+  @UseGuards(UserGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get current user profile' })
   @ApiResponse({
