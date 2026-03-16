@@ -7,7 +7,6 @@ import {
   Param,
   UseGuards,
   ParseIntPipe,
-  ForbiddenException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -55,9 +54,7 @@ export class GuestOrderController {
     description: 'Bad request - Cart is empty or contains inactive products',
   })
   quickBuy(@Guest('id') sessionId: string, @Body() dto: QuickBuyDto) {
-    throw new ForbiddenException(
-      'Для оформления заказа необходимо зарегистрироваться',
-    );
+    return this.guestOrderService.quickBuy(sessionId, dto);
   }
 
   // Init order endpoint
@@ -80,9 +77,7 @@ export class GuestOrderController {
     description: 'Bad request - Cart is empty or contains inactive products',
   })
   initOrder(@Guest('id') sessionId: string) {
-    throw new ForbiddenException(
-      'Для оформления заказа необходимо зарегистрироваться',
-    );
+    return this.guestOrderService.initOrder(sessionId);
   }
 
   // Get all guest orders
@@ -173,9 +168,7 @@ export class GuestOrderController {
     @Param('id', ParseIntPipe) orderId: number,
     @Body() dto: FinalizeOrderDto,
   ) {
-    throw new ForbiddenException(
-      'Для оформления заказа необходимо зарегистрироваться',
-    );
+    return this.guestOrderService.finalizeOrder(sessionId, orderId, dto);
   }
 
   // Apply coupon endpoint
