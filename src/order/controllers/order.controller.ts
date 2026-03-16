@@ -3,6 +3,7 @@ import {
   Post,
   Get,
   Delete,
+  Patch,
   Body,
   Param,
   UseGuards,
@@ -83,6 +84,22 @@ export class OrderController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   getCart(@User('id') userId: string) {
     return this.orderService.getCartItems(userId);
+  }
+
+  @Patch('cart/items/:id')
+  @ApiOperation({ summary: 'Update cart item quantity' })
+  @ApiResponse({
+    status: 200,
+    description: 'Cart item updated successfully',
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 404, description: 'Cart item not found' })
+  updateCartItem(
+    @User('id') userId: string,
+    @Param('id') id: string,
+    @Body() body: { quantity: number },
+  ) {
+    return this.orderService.updateCartItem(userId, id, body.quantity);
   }
 
   @Delete('cart/items/:id')

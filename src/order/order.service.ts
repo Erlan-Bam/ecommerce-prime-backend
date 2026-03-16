@@ -171,6 +171,65 @@ export class OrderService {
     }
   }
 
+  async updateCartItem(
+    userId: string,
+    orderItemId: string,
+    quantity: number,
+  ) {
+    try {
+      this.logger.log(
+        `Updating cart item ${orderItemId} quantity to ${quantity} for user ${userId}`,
+      );
+
+      if (quantity < 1) {
+        throw new HttpException(
+          'Quantity must be at least 1',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      const orderItem = await this.prisma.orderItem.findFirst({
+        where: {
+          id: orderItemId,
+          userId,
+          orderId: null,
+        },
+      });
+
+      if (!orderItem) {
+        throw new HttpException('Cart item not found', HttpStatus.NOT_FOUND);
+      }
+
+      const updated = await this.prisma.orderItem.update({
+        where: { id: orderItemId },
+        data: { quantity },
+        include: {
+          product: {
+            include: {
+              images: { orderBy: { sortOrder: 'asc' }, take: 1 },
+            },
+          },
+        },
+      });
+
+      await this.cacheService.invalidateCart(userId);
+      this.logger.log(
+        `Updated cart item ${orderItemId} to quantity ${quantity}`,
+      );
+
+      return updated;
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      this.logger.error(
+        `Error updating cart item ${orderItemId}: ${error.message}`,
+        error.stack,
+      );
+      throw new InternalServerErrorException('Failed to update cart item');
+    }
+  }
+
   async removeOrderItem(
     userId: string,
     orderItemId: string,
