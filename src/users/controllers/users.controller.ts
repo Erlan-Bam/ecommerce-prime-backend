@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Patch,
   Body,
   UseGuards,
   HttpCode,
@@ -15,6 +16,7 @@ import {
   ApiBearerAuth,
 } from '@nestjs/swagger';
 import { UsersService } from '../users.service';
+import { UpdateProfileDto } from '../dto/update-profile.dto';
 import { ChangePasswordDto } from '../../auth/dto';
 import { FormDto } from '../../email/dto';
 import { UserGuard } from '../../shared/guards/user.guard';
@@ -37,6 +39,19 @@ export class UsersController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async getProfile(@User('id') userId: string) {
     return this.usersService.getProfile(userId);
+  }
+
+  @UseGuards(UserGuard)
+  @Patch('profile')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Update current user profile' })
+  @ApiResponse({ status: 200, description: 'Profile updated successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  async updateProfile(
+    @User('id') userId: string,
+    @Body() dto: UpdateProfileDto,
+  ) {
+    return this.usersService.updateProfile(userId, dto);
   }
 
   @UseGuards(UserGuard)

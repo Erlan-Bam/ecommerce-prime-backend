@@ -68,9 +68,6 @@ export class AuthService {
         `Failed to send verification code to ${phone}`,
         error.stack,
       );
-      if (error instanceof HttpException) {
-        throw error;
-      }
       throw new HttpException(
         'Не удалось отправить SMS. Попробуйте позже или обратитесь в поддержку.',
         HttpStatus.SERVICE_UNAVAILABLE,
@@ -175,7 +172,10 @@ export class AuthService {
         `Failed to resend verification code to ${phone}`,
         error.stack,
       );
-      if (error instanceof HttpException) {
+      if (
+        error instanceof HttpException &&
+        error.getStatus() === HttpStatus.TOO_MANY_REQUESTS
+      ) {
         throw error;
       }
       throw new HttpException(

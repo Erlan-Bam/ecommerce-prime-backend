@@ -524,7 +524,33 @@ export class ProductService {
       this.logger.log(`Removing product: ${id}`);
 
       await this.findOne(id);
-      await this.prisma.product.delete({ where: { id } });
+
+      await this.prisma.$transaction(async (tx) => {
+        // Remove related records that are safe to delete
+        await tx.favorite.deleteMany({ where: { productId: id } });
+        await tx.review.deleteMany({ where: { productId: id } });
+        await tx.productImage.deleteMany({ where: { productId: id } });
+        await tx.productAttribute.deleteMany({ where: { productId: id } });
+        // Only remove cart items (not linked to orders)
+        await tx.orderItem.deleteMany({
+          where: { productId: id, orderId: null },
+        });
+
+        // Check if product is in any finalized orders
+        const linkedOrderItems = await tx.orderItem.count({
+          where: { productId: id, orderId: { not: null } },
+        });
+
+        if (linkedOrderItems > 0) {
+          throw new HttpException(
+            'Невозможно удалить товар — он присутствует в оформленных заказах. Переведите товар в архив.',
+            HttpStatus.CONFLICT,
+          );
+        }
+
+        await tx.product.delete({ where: { id } });
+      });
+
       await this.invalidateProductCaches();
       await this.cacheService.invalidateProduct(id);
 
@@ -540,7 +566,7 @@ export class ProductService {
         throw error;
       }
       throw new HttpException(
-        error.message || 'Failed to remove product',
+        'Не удалось удалить товар',
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }

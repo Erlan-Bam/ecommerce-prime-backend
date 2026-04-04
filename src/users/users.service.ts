@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../shared/services/prisma.service';
-import { UpdateUserDto } from './dto';
+import { UpdateUserDto, UpdateProfileDto } from './dto';
 import { Prisma, Role } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 
@@ -177,6 +177,26 @@ export class UsersService {
   async getProfile(userId: string) {
     return this.prisma.user.findUnique({
       where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        phone: true,
+        name: true,
+        role: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+  }
+
+  async updateProfile(userId: string, dto: UpdateProfileDto) {
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        ...(dto.name !== undefined && { name: dto.name }),
+        ...(dto.phone !== undefined && { phone: dto.phone }),
+        ...(dto.email !== undefined && { email: dto.email }),
+      },
       select: {
         id: true,
         email: true,

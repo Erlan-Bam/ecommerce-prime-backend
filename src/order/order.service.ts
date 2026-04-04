@@ -171,7 +171,7 @@ export class OrderService {
     }
   }
 
-  async updateCartItem(
+  async updateCartItemQuantity(
     userId: string,
     orderItemId: string,
     quantity: number,
@@ -194,19 +194,30 @@ export class OrderService {
           userId,
           orderId: null,
         },
+        include: {
+          product: { select: { price: true } },
+        },
       });
 
       if (!orderItem) {
         throw new HttpException('Cart item not found', HttpStatus.NOT_FOUND);
       }
 
-      const updated = await this.prisma.orderItem.update({
+      const result = await this.prisma.orderItem.update({
         where: { id: orderItemId },
-        data: { quantity },
+        data: {
+          quantity,
+          price: orderItem.product.price.toNumber() * quantity,
+        },
         include: {
           product: {
-            include: {
-              images: { orderBy: { sortOrder: 'asc' }, take: 1 },
+            select: {
+              id: true,
+              name: true,
+              slug: true,
+              price: true,
+              isActive: true,
+              images: true,
             },
           },
         },
@@ -217,7 +228,7 @@ export class OrderService {
         `Updated cart item ${orderItemId} to quantity ${quantity}`,
       );
 
-      return updated;
+      return result;
     } catch (error) {
       if (error instanceof HttpException) {
         throw error;
@@ -971,15 +982,7 @@ export class OrderService {
           },
         });
 
-        // 7. Accrue cashback bonuses for registered users
-        if (userId) {
-          await this.loyaltyService.accrueCashback(
-            tx,
-            userId,
-            orderId,
-            Number(updatedOrder.finalTotal),
-          );
-        }
+        // Cashback is accrued when order status changes to DELIVERED (not at finalization)
 
         return updatedOrder;
       });
@@ -1497,46 +1500,67 @@ export class OrderService {
         throw new HttpException('Order not found', HttpStatus.NOT_FOUND);
       }
 
-      const updatedOrder = await this.prisma.order.update({
-        where: { id: orderId },
-        data: { status: dto.status },
-        include: {
-          items: {
-            include: {
-              product: {
-                select: {
-                  id: true,
-                  name: true,
-                  images: true,
-                  slug: true,
+      const updatedOrder = await this.prisma.$transaction(async (tx) => {
+        const updated = await tx.order.update({
+          where: { id: orderId },
+          data: { status: dto.status },
+          include: {
+            items: {
+              include: {
+                product: {
+                  select: {
+                    id: true,
+                    name: true,
+                    images: true,
+                    slug: true,
+                  },
                 },
               },
             },
-          },
-          user: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-              phone: true,
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                phone: true,
+              },
+            },
+            pickupPoint: {
+              select: {
+                id: true,
+                name: true,
+                address: true,
+              },
+            },
+            coupon: {
+              select: {
+                id: true,
+                code: true,
+                type: true,
+                value: true,
+              },
             },
           },
-          pickupPoint: {
-            select: {
-              id: true,
-              name: true,
-              address: true,
-            },
-          },
-          coupon: {
-            select: {
-              id: true,
-              code: true,
-              type: true,
-              value: true,
-            },
-          },
-        },
+        });
+
+        // Accrue cashback when order is delivered
+        if (
+          dto.status === 'DELIVERED' &&
+          order.status !== 'DELIVERED' &&
+          order.userId
+        ) {
+          await this.loyaltyService.accrueCashback(
+            tx,
+            order.userId,
+            orderId,
+            Number(updated.finalTotal),
+          );
+          this.logger.log(
+            `Cashback accrued for order ${orderId} on delivery`,
+          );
+        }
+
+        return updated;
       });
 
       // Invalidate cache
