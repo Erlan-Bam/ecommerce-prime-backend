@@ -14,6 +14,11 @@ export class CreateCategoryDto {
   @IsString()
   title: string;
 
+  @ApiPropertyOptional({ description: 'Category slug (auto-generated if not provided)' })
+  @IsOptional()
+  @IsString()
+  slug?: string;
+
   @ApiPropertyOptional({ description: 'Parent category ID' })
   @IsOptional()
   @IsUUID()

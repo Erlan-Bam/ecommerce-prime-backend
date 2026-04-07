@@ -2,8 +2,8 @@ import {
   Controller,
   Post,
   Get,
-  Delete,
   Patch,
+  Delete,
   Body,
   Param,
   UseGuards,
@@ -99,7 +99,7 @@ export class OrderController {
     @Param('id') id: string,
     @Body() body: { quantity: number },
   ) {
-    return this.orderService.updateCartItem(userId, id, body.quantity);
+    return this.orderService.updateCartItemQuantity(userId, id, body.quantity);
   }
 
   @Delete('cart/items/:id')

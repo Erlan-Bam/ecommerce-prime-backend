@@ -192,6 +192,10 @@ export class ProductService {
               orderBy: { sortOrder: 'asc' },
               take: 1,
             },
+            attributes: {
+              select: { id: true, name: true, value: true },
+              take: 4,
+            },
             reviews: { select: { rating: true } },
             productStock: { select: { stockCount: true } },
           },
@@ -546,7 +550,7 @@ export class ProductService {
         throw error;
       }
       throw new HttpException(
-        error.message || 'Failed to remove product',
+        'Не удалось удалить товар',
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }

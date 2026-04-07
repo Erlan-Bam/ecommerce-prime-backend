@@ -276,16 +276,11 @@ export class BrandService {
 
       await this.findOne(id);
 
-      const productsCount = await this.prisma.product.count({
+      // Unlink products from this brand before deleting
+      await this.prisma.product.updateMany({
         where: { brandId: id },
+        data: { brandId: null },
       });
-
-      if (productsCount > 0) {
-        throw new HttpException(
-          `Cannot delete brand with ${productsCount} associated products`,
-          HttpStatus.CONFLICT,
-        );
-      }
 
       await this.prisma.brand.update({
         where: { id },
