@@ -276,12 +276,6 @@ export class BrandService {
 
       await this.findOne(id);
 
-      // Unlink products from this brand before deleting
-      await this.prisma.product.updateMany({
-        where: { brandId: id },
-        data: { brandId: null },
-      });
-
       await this.prisma.brand.update({
         where: { id },
         data: {

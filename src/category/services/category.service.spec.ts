@@ -57,8 +57,6 @@ describe('CategoryService - Soft Delete', () => {
       };
 
       mockPrisma.category.findUnique.mockResolvedValue(existingCategory);
-      mockPrisma.productCategory.count.mockResolvedValue(0);
-      mockPrisma.category.count.mockResolvedValue(0);
       mockPrisma.category.update.mockResolvedValue({
         ...existingCategory,
         isDeleted: true,

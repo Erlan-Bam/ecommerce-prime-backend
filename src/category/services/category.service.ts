@@ -342,28 +342,6 @@ export class CategoryService {
 
       await this.findOne(id);
 
-      const productsCount = await this.prisma.productCategory.count({
-        where: { categoryId: id },
-      });
-
-      if (productsCount > 0) {
-        throw new HttpException(
-          `Cannot delete category with ${productsCount} associated products`,
-          HttpStatus.CONFLICT,
-        );
-      }
-
-      const childrenCount = await this.prisma.category.count({
-        where: { parentId: id },
-      });
-
-      if (childrenCount > 0) {
-        throw new HttpException(
-          `Cannot delete category with ${childrenCount} subcategories`,
-          HttpStatus.CONFLICT,
-        );
-      }
-
       const category = await this.prisma.category.update({
         where: { id },
         data: {

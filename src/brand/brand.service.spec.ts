@@ -58,7 +58,6 @@ describe('BrandService - Soft Delete', () => {
       };
 
       mockPrisma.brand.findUnique.mockResolvedValue(existingBrand);
-      mockPrisma.product.count.mockResolvedValue(0);
       mockPrisma.brand.update.mockResolvedValue({
         ...existingBrand,
         isDeleted: true,
