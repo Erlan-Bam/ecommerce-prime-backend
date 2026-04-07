@@ -116,13 +116,13 @@ export class CategoryService {
 
       const [data, total] = await Promise.all([
         this.prisma.category.findMany({
-          where: { isActive: true },
+          where: { isActive: true, isDeleted: false },
           skip,
           take: limit,
           include: {
             parent: { select: { id: true, title: true, slug: true } },
             children: {
-              where: { isActive: true },
+              where: { isActive: true, isDeleted: false },
               select: { id: true, title: true, slug: true, image: true },
               orderBy: { sortOrder: 'asc' },
             },
@@ -130,7 +130,9 @@ export class CategoryService {
           },
           orderBy: [{ sortOrder: 'asc' }, { title: 'asc' }],
         }),
-        this.prisma.category.count({ where: { isActive: true } }),
+        this.prisma.category.count({
+          where: { isActive: true, isDeleted: false },
+        }),
       ]);
 
       const result = {
@@ -173,13 +175,13 @@ export class CategoryService {
       }
 
       const categories = await this.prisma.category.findMany({
-        where: { isActive: true, parentId: null },
+        where: { isActive: true, isDeleted: false, parentId: null },
         include: {
           children: {
-            where: { isActive: true },
+            where: { isActive: true, isDeleted: false },
             include: {
               children: {
-                where: { isActive: true },
+                where: { isActive: true, isDeleted: false },
                 orderBy: { sortOrder: 'asc' },
                 include: {
                   _count: { select: { products: true } },
@@ -220,14 +222,14 @@ export class CategoryService {
         include: {
           parent: { select: { id: true, title: true, slug: true } },
           children: {
-            where: { isActive: true },
+            where: { isActive: true, isDeleted: false },
             orderBy: { sortOrder: 'asc' },
           },
           _count: { select: { products: true } },
         },
       });
 
-      if (!category) {
+      if (!category || category.isDeleted) {
         throw new HttpException(`Category not found`, HttpStatus.NOT_FOUND);
       }
 
@@ -262,14 +264,14 @@ export class CategoryService {
         include: {
           parent: true,
           children: {
-            where: { isActive: true },
+            where: { isActive: true, isDeleted: false },
             orderBy: { sortOrder: 'asc' },
           },
           _count: { select: { products: true } },
         },
       });
 
-      if (!category) {
+      if (!category || category.isDeleted) {
         throw new HttpException(
           `Category with ID ${id} not found`,
           HttpStatus.NOT_FOUND,
@@ -336,7 +338,7 @@ export class CategoryService {
 
   async remove(id: string) {
     try {
-      this.logger.log(`Removing category: ${id}`);
+      this.logger.log(`Soft deleting category: ${id}`);
 
       await this.findOne(id);
 
@@ -362,12 +364,16 @@ export class CategoryService {
         );
       }
 
-      const category = await this.prisma.category.delete({
+      const category = await this.prisma.category.update({
         where: { id },
+        data: {
+          isDeleted: true,
+          deletedAt: new Date(),
+        },
       });
 
       await this.cacheService.invalidateAllCaches();
-      this.logger.log(`Deleted category ${id}, cache invalidated`);
+      this.logger.log(`Soft deleted category ${id}, cache invalidated`);
 
       return category;
     } catch (error) {
@@ -380,6 +386,111 @@ export class CategoryService {
       }
       throw new HttpException(
         error.message || 'Failed to remove category',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  async restore(id: string) {
+    try {
+      this.logger.log(`Restoring category: ${id}`);
+
+      const category = await this.prisma.category.findUnique({
+        where: { id },
+      });
+
+      if (!category) {
+        throw new HttpException(
+          `Category with ID ${id} not found`,
+          HttpStatus.NOT_FOUND,
+        );
+      }
+
+      if (!category.isDeleted) {
+        throw new HttpException(
+          'Category is not deleted',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      const daysSinceDeleted =
+        (Date.now() - new Date(category.deletedAt).getTime()) /
+        (1000 * 60 * 60 * 24);
+
+      if (daysSinceDeleted > 7) {
+        throw new HttpException(
+          'Category cannot be restored after 7 days',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      const restored = await this.prisma.category.update({
+        where: { id },
+        data: {
+          isDeleted: false,
+          deletedAt: null,
+        },
+      });
+
+      await this.cacheService.invalidateAllCaches();
+      this.logger.log(`Restored category ${id}, cache invalidated`);
+
+      return restored;
+    } catch (error) {
+      this.logger.error(
+        `Error restoring category ${id}: ${error.message}`,
+        error.stack,
+      );
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new HttpException(
+        error.message || 'Failed to restore category',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  async findDeleted(paginationDto: PaginationDto) {
+    try {
+      this.logger.log('Finding deleted categories');
+
+      const { page = 1, limit = 10 } = paginationDto;
+      const skip = (page - 1) * limit;
+
+      const [data, total] = await Promise.all([
+        this.prisma.category.findMany({
+          where: { isDeleted: true },
+          skip,
+          take: limit,
+          orderBy: { deletedAt: 'desc' },
+          include: {
+            parent: { select: { id: true, title: true, slug: true } },
+            _count: { select: { products: true } },
+          },
+        }),
+        this.prisma.category.count({ where: { isDeleted: true } }),
+      ]);
+
+      return {
+        data,
+        meta: {
+          total,
+          page,
+          limit,
+          totalPages: Math.ceil(total / limit),
+        },
+      };
+    } catch (error) {
+      this.logger.error(
+        `Error finding deleted categories: ${error.message}`,
+        error.stack,
+      );
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new HttpException(
+        error.message || 'Failed to find deleted categories',
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }

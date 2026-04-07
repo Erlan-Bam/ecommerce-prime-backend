@@ -71,15 +71,17 @@ model User {
 }
 
 model Category {
-  id        String   @id @default(uuid())
+  id        String    @id @default(uuid())
   parentId  String?
   title     String
-  slug      String   @unique
+  slug      String    @unique
   image     String?
-  isActive  Boolean  @default(true)
-  sortOrder Int      @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  isActive  Boolean   @default(true)
+  sortOrder Int       @default(0)
+  isDeleted Boolean   @default(false)
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
   parent    Category?  @relation("CategoryChildren", fields: [parentId], references: [id])
   children  Category[] @relation("CategoryChildren")
@@ -87,36 +89,42 @@ model Category {
 
   @@index([parentId])
   @@index([slug])
+  @@index([isDeleted])
 }
 
 model Brand {
-  id        String   @id @default(uuid())
-  name      String   @unique
-  slug      String   @unique
+  id        String    @id @default(uuid())
+  name      String    @unique
+  slug      String    @unique
   logo      String?
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  isActive  Boolean   @default(true)
+  isDeleted Boolean   @default(false)
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
   products  Product[]
 
   @@index([slug])
+  @@index([isDeleted])
 }
 
 model Product {
-  id          String   @id @default(uuid())
+  id          String    @id @default(uuid())
   brandId     String?
   name        String
-  slug        String   @unique
+  slug        String    @unique
   description String?
-  price       Decimal  @db.Decimal(10, 2)
-  oldPrice    Decimal? @db.Decimal(10, 2)
-  isActive    Boolean  @default(true)
-  isOnSale    Boolean  @default(false)
-  viewCount   Int      @default(0)
-  soldCount   Int      @default(0)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  price       Decimal   @db.Decimal(10, 2)
+  oldPrice    Decimal?  @db.Decimal(10, 2)
+  isActive    Boolean   @default(true)
+  isOnSale    Boolean   @default(false)
+  viewCount   Int       @default(0)
+  soldCount   Int       @default(0)
+  isDeleted   Boolean   @default(false)
+  deletedAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   brand       Brand?    @relation(fields: [brandId], references: [id])
   categories  ProductCategory[]
@@ -132,6 +140,7 @@ model Product {
   @@index([price])
   @@index([createdAt])
   @@index([isActive, isOnSale])
+  @@index([isDeleted])
 }
 
 model ProductCategory {
@@ -353,6 +362,8 @@ model Coupon {
   usageLimit Int        @default(0) // 0 = unlimited
   usageCount Int        @default(0)
   isActive   Boolean    @default(true)
+  isDeleted  Boolean    @default(false)
+  deletedAt  DateTime?
   createdAt  DateTime   @default(now())
   updatedAt  DateTime   @updatedAt
 
@@ -361,6 +372,7 @@ model Coupon {
   @@index([code])
   @@index([isActive])
   @@index([validFrom, validTo])
+  @@index([isDeleted])
 }
 
 model GuestSession {

@@ -70,12 +70,12 @@ export class FavoriteService {
 
   // Add product to favorites
   async addToFavorites(userId: string, productId: string) {
-    // Check if product exists
+    // Check if product exists and is not soft-deleted
     const product = await this.prisma.product.findUnique({
       where: { id: productId },
     });
 
-    if (!product) {
+    if (!product || product.isDeleted) {
       throw new NotFoundException('Product not found');
     }
 

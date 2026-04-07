@@ -50,6 +50,18 @@ export class ProductController {
     return this.productService.getFilters(categoryId);
   }
 
+  @Get('deleted/list')
+  @UseGuards(AdminGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get soft-deleted products (Admin)' })
+  @ApiResponse({ status: 200, description: 'Deleted products retrieved' })
+  findDeleted(@Query() filter: ProductFilterDto) {
+    return this.productService.findDeleted({
+      page: filter.page,
+      limit: filter.limit,
+    });
+  }
+
   @Public()
   @Get('slug/:slug')
   @ApiOperation({ summary: 'Get product by slug' })
@@ -80,9 +92,28 @@ export class ProductController {
   @Delete(':id')
   @UseGuards(AdminGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Delete product (Admin)' })
-  @ApiResponse({ status: 200, description: 'Product deleted successfully' })
+  @ApiOperation({ summary: 'Soft delete product (Admin)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Product soft deleted successfully',
+  })
   remove(@Param('id') id: string) {
     return this.productService.remove(id);
+  }
+
+  @Post(':id/restore')
+  @UseGuards(AdminGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Restore soft-deleted product within 7 days (Admin)',
+  })
+  @ApiResponse({ status: 200, description: 'Product restored successfully' })
+  @ApiResponse({
+    status: 400,
+    description: 'Cannot restore - expired or not deleted',
+  })
+  @ApiResponse({ status: 404, description: 'Product not found' })
+  restore(@Param('id') id: string) {
+    return this.productService.restore(id);
   }
 }

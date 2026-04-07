@@ -32,6 +32,7 @@ export class SearchService {
         this.prisma.product.findMany({
           where: {
             isActive: true,
+            isDeleted: false,
             OR: [
               { name: { contains: q, mode: 'insensitive' } },
               {
@@ -54,6 +55,7 @@ export class SearchService {
         this.prisma.category.findMany({
           where: {
             isActive: true,
+            isDeleted: false,
             title: { contains: q, mode: 'insensitive' },
           },
           select: { id: true, title: true, slug: true },
@@ -62,6 +64,7 @@ export class SearchService {
         this.prisma.brand.findMany({
           where: {
             isActive: true,
+            isDeleted: false,
             name: { contains: q, mode: 'insensitive' },
           },
           select: { id: true, name: true, slug: true },
@@ -129,6 +132,7 @@ export class SearchService {
         this.prisma.product.findMany({
           where: {
             isActive: true,
+            isDeleted: false,
             OR: [
               { name: { contains: q, mode: 'insensitive' } },
               { description: { contains: q, mode: 'insensitive' } },
@@ -166,6 +170,7 @@ export class SearchService {
         this.prisma.product.count({
           where: {
             isActive: true,
+            isDeleted: false,
             OR: [
               { name: { contains: q, mode: 'insensitive' } },
               { description: { contains: q, mode: 'insensitive' } },
@@ -230,7 +235,7 @@ export class SearchService {
 
       // Get top products by views/sales as popular searches
       const products = await this.prisma.product.findMany({
-        where: { isActive: true },
+        where: { isActive: true, isDeleted: false },
         select: { name: true },
         orderBy: [{ soldCount: 'desc' }, { viewCount: 'desc' }],
         take: 10,

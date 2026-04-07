@@ -54,13 +54,13 @@ export class CronService {
 
       // Cache category tree (most commonly accessed)
       const categoryTree = await this.prisma.category.findMany({
-        where: { isActive: true, parentId: null },
+        where: { isActive: true, isDeleted: false, parentId: null },
         include: {
           children: {
-            where: { isActive: true },
+            where: { isActive: true, isDeleted: false },
             include: {
               children: {
-                where: { isActive: true },
+                where: { isActive: true, isDeleted: false },
                 orderBy: { sortOrder: 'asc' },
               },
             },
@@ -80,12 +80,12 @@ export class CronService {
       // Cache first page of categories (common initial load)
       const [categories, total] = await Promise.all([
         this.prisma.category.findMany({
-          where: { isActive: true },
+          where: { isActive: true, isDeleted: false },
           take: 10,
           include: {
             parent: { select: { id: true, title: true, slug: true } },
             children: {
-              where: { isActive: true },
+              where: { isActive: true, isDeleted: false },
               select: { id: true, title: true, slug: true, image: true },
               orderBy: { sortOrder: 'asc' },
             },
@@ -93,7 +93,9 @@ export class CronService {
           },
           orderBy: [{ sortOrder: 'asc' }, { title: 'asc' }],
         }),
-        this.prisma.category.count({ where: { isActive: true } }),
+        this.prisma.category.count({
+          where: { isActive: true, isDeleted: false },
+        }),
       ]);
 
       await this.redisService.set(
@@ -130,7 +132,7 @@ export class CronService {
 
       // Cache active brands (commonly used for filters)
       const activeBrands = await this.prisma.brand.findMany({
-        where: { isActive: true },
+        where: { isActive: true, isDeleted: false },
         orderBy: { name: 'asc' },
         select: { id: true, name: true, slug: true, logo: true },
       });
@@ -144,11 +146,12 @@ export class CronService {
       // Cache first page of brands
       const [brands, total] = await Promise.all([
         this.prisma.brand.findMany({
+          where: { isDeleted: false },
           take: 20,
           orderBy: { name: 'asc' },
           include: { _count: { select: { products: true } } },
         }),
-        this.prisma.brand.count(),
+        this.prisma.brand.count({ where: { isDeleted: false } }),
       ]);
 
       await this.redisService.set(
@@ -288,5 +291,40 @@ export class CronService {
   async refreshAllCaches() {
     this.logger.log('Manual cache refresh triggered');
     await this.warmCaches();
+  }
+
+  /**
+   * Clean up soft-deleted items that have been deleted for more than 7 days
+   * Runs daily at midnight
+   */
+  @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
+  async cleanupSoftDeletedItems() {
+    this.logger.log('Starting soft-delete cleanup...');
+
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - 7);
+
+    try {
+      const [products, categories, brands, coupons] = await Promise.all([
+        this.prisma.product.deleteMany({
+          where: { isDeleted: true, deletedAt: { lte: cutoffDate } },
+        }),
+        this.prisma.category.deleteMany({
+          where: { isDeleted: true, deletedAt: { lte: cutoffDate } },
+        }),
+        this.prisma.brand.deleteMany({
+          where: { isDeleted: true, deletedAt: { lte: cutoffDate } },
+        }),
+        this.prisma.coupon.deleteMany({
+          where: { isDeleted: true, deletedAt: { lte: cutoffDate } },
+        }),
+      ]);
+
+      this.logger.log(
+        `Soft-delete cleanup completed: ${products.count} products, ${categories.count} categories, ${brands.count} brands, ${coupons.count} coupons permanently removed`,
+      );
+    } catch (error) {
+      this.logger.error('Error during soft-delete cleanup:', error);
+    }
   }
 }

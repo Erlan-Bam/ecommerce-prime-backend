@@ -39,7 +39,7 @@ export class OrderService {
         where: { id: dto.productId },
       });
 
-      if (!product) {
+      if (!product || product.isDeleted) {
         this.logger.warn(`Product ${dto.productId} not found`);
         throw new HttpException('Product not found', HttpStatus.NOT_FOUND);
       }
@@ -171,11 +171,7 @@ export class OrderService {
     }
   }
 
-  async updateCartItem(
-    userId: string,
-    orderItemId: string,
-    quantity: number,
-  ) {
+  async updateCartItem(userId: string, orderItemId: string, quantity: number) {
     try {
       this.logger.log(
         `Updating cart item ${orderItemId} quantity to ${quantity} for user ${userId}`,
@@ -1115,7 +1111,7 @@ export class OrderService {
           where: { code: normalizedCode },
         });
 
-        if (!coupon) {
+        if (!coupon || coupon.isDeleted) {
           this.logger.warn(`Coupon ${normalizedCode} not found`);
           throw new HttpException('Coupon not found', HttpStatus.NOT_FOUND);
         }

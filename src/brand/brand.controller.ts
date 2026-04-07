@@ -51,6 +51,15 @@ export class BrandController {
     return this.brandService.findActive();
   }
 
+  @Get('deleted/list')
+  @UseGuards(AdminGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get soft-deleted brands (Admin)' })
+  @ApiResponse({ status: 200, description: 'Deleted brands retrieved' })
+  findDeleted(@Query() pagination: PaginationDto) {
+    return this.brandService.findDeleted(pagination);
+  }
+
   @Public()
   @Get(':id')
   @ApiOperation({ summary: 'Get brand by ID' })
@@ -72,9 +81,23 @@ export class BrandController {
   @Delete(':id')
   @UseGuards(AdminGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Delete brand (Admin)' })
-  @ApiResponse({ status: 200, description: 'Brand deleted successfully' })
+  @ApiOperation({ summary: 'Soft delete brand (Admin)' })
+  @ApiResponse({ status: 200, description: 'Brand soft deleted successfully' })
   remove(@Param('id') id: string) {
     return this.brandService.remove(id);
+  }
+
+  @Post(':id/restore')
+  @UseGuards(AdminGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Restore soft-deleted brand within 7 days (Admin)' })
+  @ApiResponse({ status: 200, description: 'Brand restored successfully' })
+  @ApiResponse({
+    status: 400,
+    description: 'Cannot restore - expired or not deleted',
+  })
+  @ApiResponse({ status: 404, description: 'Brand not found' })
+  restore(@Param('id') id: string) {
+    return this.brandService.restore(id);
   }
 }

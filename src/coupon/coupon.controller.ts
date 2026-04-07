@@ -66,6 +66,15 @@ export class CouponController {
     return this.couponService.validateCoupon(validateCouponDto.code);
   }
 
+  @Get('deleted/list')
+  @UseGuards(AdminGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get soft-deleted coupons (Admin)' })
+  @ApiResponse({ status: 200, description: 'Deleted coupons retrieved' })
+  findDeleted(@Query() pagination: PaginationDto) {
+    return this.couponService.findDeleted(pagination);
+  }
+
   @Get(':id')
   @UseGuards(AdminGuard)
   @ApiBearerAuth()
@@ -89,8 +98,8 @@ export class CouponController {
   @Delete(':id')
   @UseGuards(AdminGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Delete coupon (Admin)' })
-  @ApiResponse({ status: 200, description: 'Coupon deleted successfully' })
+  @ApiOperation({ summary: 'Soft delete coupon (Admin)' })
+  @ApiResponse({ status: 200, description: 'Coupon soft deleted successfully' })
   @ApiResponse({ status: 404, description: 'Coupon not found' })
   remove(@Param('id') id: string) {
     return this.couponService.remove(id);
@@ -103,5 +112,21 @@ export class CouponController {
   @ApiResponse({ status: 200, description: 'Usage count incremented' })
   incrementUsage(@Param('id') id: string) {
     return this.couponService.incrementUsage(id);
+  }
+
+  @Post(':id/restore')
+  @UseGuards(AdminGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Restore soft-deleted coupon within 7 days (Admin)',
+  })
+  @ApiResponse({ status: 200, description: 'Coupon restored successfully' })
+  @ApiResponse({
+    status: 400,
+    description: 'Cannot restore - expired or not deleted',
+  })
+  @ApiResponse({ status: 404, description: 'Coupon not found' })
+  restore(@Param('id') id: string) {
+    return this.couponService.restore(id);
   }
 }

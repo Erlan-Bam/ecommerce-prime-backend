@@ -293,7 +293,7 @@ export class ProductService {
         },
       });
 
-      if (!product) {
+      if (!product || product.isDeleted) {
         throw new HttpException(
           `Product with ID ${id} not found`,
           HttpStatus.NOT_FOUND,
@@ -379,7 +379,7 @@ export class ProductService {
         },
       });
 
-      if (!product) {
+      if (!product || product.isDeleted) {
         throw new HttpException(`Product not found`, HttpStatus.NOT_FOUND);
       }
 
@@ -521,14 +521,20 @@ export class ProductService {
 
   async remove(id: string) {
     try {
-      this.logger.log(`Removing product: ${id}`);
+      this.logger.log(`Soft deleting product: ${id}`);
 
       await this.findOne(id);
-      await this.prisma.product.delete({ where: { id } });
+      await this.prisma.product.update({
+        where: { id },
+        data: {
+          isDeleted: true,
+          deletedAt: new Date(),
+        },
+      });
       await this.invalidateProductCaches();
       await this.cacheService.invalidateProduct(id);
 
-      this.logger.log(`Removed product ${id}`);
+      this.logger.log(`Soft deleted product ${id}`);
 
       return { message: 'Product deleted successfully' };
     } catch (error) {
@@ -546,12 +552,119 @@ export class ProductService {
     }
   }
 
+  async restore(id: string) {
+    try {
+      this.logger.log(`Restoring product: ${id}`);
+
+      const product = await this.prisma.product.findUnique({ where: { id } });
+
+      if (!product) {
+        throw new HttpException(
+          `Product with ID ${id} not found`,
+          HttpStatus.NOT_FOUND,
+        );
+      }
+
+      if (!product.isDeleted) {
+        throw new HttpException(
+          'Product is not deleted',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      const daysSinceDeleted =
+        (Date.now() - new Date(product.deletedAt).getTime()) /
+        (1000 * 60 * 60 * 24);
+
+      if (daysSinceDeleted > 7) {
+        throw new HttpException(
+          'Product cannot be restored after 7 days',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      const restored = await this.prisma.product.update({
+        where: { id },
+        data: { isDeleted: false, deletedAt: null },
+      });
+
+      await this.invalidateProductCaches();
+      await this.cacheService.invalidateProduct(id);
+      this.logger.log(`Restored product ${id}`);
+
+      return restored;
+    } catch (error) {
+      this.logger.error(
+        `Error restoring product ${id}: ${error.message}`,
+        error.stack,
+      );
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new HttpException(
+        error.message || 'Failed to restore product',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  async findDeleted(pagination: { page?: number; limit?: number }) {
+    try {
+      this.logger.log('Finding deleted products');
+
+      const { page = 1, limit = 20 } = pagination;
+      const skip = (page - 1) * limit;
+
+      const [data, total] = await Promise.all([
+        this.prisma.product.findMany({
+          where: { isDeleted: true },
+          skip,
+          take: limit,
+          orderBy: { deletedAt: 'desc' },
+          include: {
+            brand: { select: { id: true, name: true, slug: true } },
+            categories: {
+              include: {
+                category: { select: { id: true, title: true, slug: true } },
+              },
+            },
+            images: { orderBy: { sortOrder: 'asc' }, take: 1 },
+          },
+        }),
+        this.prisma.product.count({ where: { isDeleted: true } }),
+      ]);
+
+      return {
+        data,
+        meta: {
+          total,
+          page,
+          limit,
+          totalPages: Math.ceil(total / limit),
+        },
+      };
+    } catch (error) {
+      this.logger.error(
+        `Error finding deleted products: ${error.message}`,
+        error.stack,
+      );
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new HttpException(
+        error.message || 'Failed to find deleted products',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
   async getFilters(categoryId?: string) {
     try {
       this.logger.log(`Getting filters for category: ${categoryId || 'all'}`);
 
       const where: any = {
         isActive: true,
+        isDeleted: false,
         ...(categoryId && {
           categories: {
             some: { categoryId },
@@ -634,6 +747,7 @@ export class ProductService {
   private async buildWhereClause(filter: ProductFilterDto): Promise<any> {
     const where: any = {
       isActive: true,
+      isDeleted: false,
     };
 
     if (filter.categoryId) {

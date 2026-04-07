@@ -207,4 +207,20 @@ export class DashboardController {
   getOrderHeatmap() {
     return this.dashboardService.getOrderHeatmap();
   }
+
+  @Get('deleted-items')
+  @ApiOperation({
+    summary: 'Get overview of all soft-deleted items (Admin)',
+    description:
+      'Returns counts and recent soft-deleted items across categories, brands, products, and coupons',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Deleted items overview retrieved successfully',
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden - Admin only' })
+  getDeletedItems() {
+    return this.dashboardService.getDeletedItemsOverview();
+  }
 }

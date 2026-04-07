@@ -98,7 +98,7 @@ export class GuestCartService {
         where: { id: dto.productId },
       });
 
-      if (!product || !product.isActive) {
+      if (!product || !product.isActive || product.isDeleted) {
         throw new HttpException('Product not found', HttpStatus.NOT_FOUND);
       }
 

@@ -96,11 +96,12 @@ export class CouponService {
 
       const [data, total] = await Promise.all([
         this.prisma.coupon.findMany({
+          where: { isDeleted: false },
           skip,
           take: limit,
           orderBy: { createdAt: 'desc' },
         }),
-        this.prisma.coupon.count(),
+        this.prisma.coupon.count({ where: { isDeleted: false } }),
       ]);
 
       const result = {
@@ -143,6 +144,7 @@ export class CouponService {
       const data = await this.prisma.coupon.findMany({
         where: {
           isActive: true,
+          isDeleted: false,
           validFrom: { lte: now },
           validTo: { gte: now },
         },
@@ -185,7 +187,7 @@ export class CouponService {
         where: { id },
       });
 
-      if (!coupon) {
+      if (!coupon || coupon.isDeleted) {
         throw new HttpException('Coupon not found', HttpStatus.NOT_FOUND);
       }
 
@@ -221,7 +223,7 @@ export class CouponService {
         where: { code: normalizedCode },
       });
 
-      if (!coupon) {
+      if (!coupon || coupon.isDeleted) {
         throw new HttpException('Coupon not found', HttpStatus.NOT_FOUND);
       }
 
@@ -382,7 +384,7 @@ export class CouponService {
 
   async remove(id: string) {
     try {
-      this.logger.log(`Removing coupon: ${id}`);
+      this.logger.log(`Soft deleting coupon: ${id}`);
 
       const existing = await this.prisma.coupon.findUnique({
         where: { id },
@@ -392,12 +394,16 @@ export class CouponService {
         throw new HttpException('Coupon not found', HttpStatus.NOT_FOUND);
       }
 
-      await this.prisma.coupon.delete({
+      await this.prisma.coupon.update({
         where: { id },
+        data: {
+          isDeleted: true,
+          deletedAt: new Date(),
+        },
       });
 
       await this.cacheService.invalidateCoupon(id, existing.code);
-      this.logger.log(`Removed coupon ${id}, cache invalidated`);
+      this.logger.log(`Soft deleted coupon ${id}, cache invalidated`);
 
       return { message: 'Coupon deleted successfully' };
     } catch (error) {
@@ -407,6 +413,99 @@ export class CouponService {
       }
       throw new HttpException(
         error.message || 'Failed to delete coupon',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  async restore(id: string) {
+    try {
+      this.logger.log(`Restoring coupon: ${id}`);
+
+      const coupon = await this.prisma.coupon.findUnique({ where: { id } });
+
+      if (!coupon) {
+        throw new HttpException('Coupon not found', HttpStatus.NOT_FOUND);
+      }
+
+      if (!coupon.isDeleted) {
+        throw new HttpException(
+          'Coupon is not deleted',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      const daysSinceDeleted =
+        (Date.now() - new Date(coupon.deletedAt).getTime()) /
+        (1000 * 60 * 60 * 24);
+
+      if (daysSinceDeleted > 7) {
+        throw new HttpException(
+          'Coupon cannot be restored after 7 days',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      const restored = await this.prisma.coupon.update({
+        where: { id },
+        data: { isDeleted: false, deletedAt: null },
+      });
+
+      await this.cacheService.invalidateAllCaches();
+      this.logger.log(`Restored coupon ${id}, cache invalidated`);
+
+      return restored;
+    } catch (error) {
+      this.logger.error(
+        `Error restoring coupon: ${error.message}`,
+        error.stack,
+      );
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new HttpException(
+        error.message || 'Failed to restore coupon',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  async findDeleted(pagination: PaginationDto) {
+    try {
+      this.logger.log('Finding deleted coupons');
+
+      const { page = 1, limit = 20 } = pagination;
+      const skip = (page - 1) * limit;
+
+      const [data, total] = await Promise.all([
+        this.prisma.coupon.findMany({
+          where: { isDeleted: true },
+          skip,
+          take: limit,
+          orderBy: { deletedAt: 'desc' },
+        }),
+        this.prisma.coupon.count({ where: { isDeleted: true } }),
+      ]);
+
+      return {
+        data,
+        meta: {
+          total,
+          page,
+          limit,
+          totalPages: Math.ceil(total / limit),
+        },
+      };
+    } catch (error) {
+      this.logger.error(
+        `Error finding deleted coupons: ${error.message}`,
+        error.stack,
+      );
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new HttpException(
+        error.message || 'Failed to find deleted coupons',
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }

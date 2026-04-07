@@ -855,4 +855,93 @@ export class DashboardService {
     };
     return labels[period];
   }
+
+  /**
+   * Get overview of all soft-deleted items for admin dashboard
+   */
+  async getDeletedItemsOverview() {
+    try {
+      const [
+        deletedCategories,
+        deletedBrands,
+        deletedProducts,
+        deletedCoupons,
+        recentDeletedCategories,
+        recentDeletedBrands,
+        recentDeletedProducts,
+        recentDeletedCoupons,
+      ] = await Promise.all([
+        this.prisma.category.count({ where: { isDeleted: true } }),
+        this.prisma.brand.count({ where: { isDeleted: true } }),
+        this.prisma.product.count({ where: { isDeleted: true } }),
+        this.prisma.coupon.count({ where: { isDeleted: true } }),
+        this.prisma.category.findMany({
+          where: { isDeleted: true },
+          take: 5,
+          orderBy: { deletedAt: 'desc' },
+          select: { id: true, title: true, slug: true, deletedAt: true },
+        }),
+        this.prisma.brand.findMany({
+          where: { isDeleted: true },
+          take: 5,
+          orderBy: { deletedAt: 'desc' },
+          select: { id: true, name: true, slug: true, deletedAt: true },
+        }),
+        this.prisma.product.findMany({
+          where: { isDeleted: true },
+          take: 5,
+          orderBy: { deletedAt: 'desc' },
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            price: true,
+            deletedAt: true,
+          },
+        }),
+        this.prisma.coupon.findMany({
+          where: { isDeleted: true },
+          take: 5,
+          orderBy: { deletedAt: 'desc' },
+          select: {
+            id: true,
+            code: true,
+            type: true,
+            value: true,
+            deletedAt: true,
+          },
+        }),
+      ]);
+
+      const now = new Date();
+      const sevenDaysFromNow = new Date();
+      sevenDaysFromNow.setDate(now.getDate() - 7);
+
+      return {
+        counts: {
+          categories: deletedCategories,
+          brands: deletedBrands,
+          products: deletedProducts,
+          coupons: deletedCoupons,
+          total:
+            deletedCategories +
+            deletedBrands +
+            deletedProducts +
+            deletedCoupons,
+        },
+        recent: {
+          categories: recentDeletedCategories,
+          brands: recentDeletedBrands,
+          products: recentDeletedProducts,
+          coupons: recentDeletedCoupons,
+        },
+      };
+    } catch (error) {
+      this.logger.error(
+        `Error getting deleted items overview: ${error.message}`,
+        error.stack,
+      );
+      throw error;
+    }
+  }
 }

@@ -60,6 +60,15 @@ export class CategoryController {
     return this.categoryService.findTree();
   }
 
+  @Get('deleted/list')
+  @UseGuards(AdminGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get soft-deleted categories (Admin)' })
+  @ApiResponse({ status: 200, description: 'Deleted categories retrieved' })
+  async findDeleted(@Query() paginationDto: PaginationDto) {
+    return this.categoryService.findDeleted(paginationDto);
+  }
+
   @Public()
   @Get('slug/:slug')
   @ApiOperation({ summary: 'Get category by slug' })
@@ -94,9 +103,28 @@ export class CategoryController {
   @Delete(':id')
   @UseGuards(AdminGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Delete category (Admin)' })
-  @ApiResponse({ status: 200, description: 'Category deleted successfully' })
+  @ApiOperation({ summary: 'Soft delete category (Admin)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Category soft deleted successfully',
+  })
   async remove(@Param('id') id: string) {
     return this.categoryService.remove(id);
+  }
+
+  @Post(':id/restore')
+  @UseGuards(AdminGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Restore soft-deleted category within 7 days (Admin)',
+  })
+  @ApiResponse({ status: 200, description: 'Category restored successfully' })
+  @ApiResponse({
+    status: 400,
+    description: 'Cannot restore - expired or not deleted',
+  })
+  @ApiResponse({ status: 404, description: 'Category not found' })
+  async restore(@Param('id') id: string) {
+    return this.categoryService.restore(id);
   }
 }

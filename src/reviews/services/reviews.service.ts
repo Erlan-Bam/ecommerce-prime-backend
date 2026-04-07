@@ -20,12 +20,12 @@ export class ReviewsService {
   ) {}
 
   async create(userId: string, dto: CreateReviewDto) {
-    // Check if product exists
+    // Check if product exists and is not soft-deleted
     const product = await this.prisma.product.findUnique({
       where: { id: dto.productId },
     });
 
-    if (!product) {
+    if (!product || product.isDeleted) {
       throw new NotFoundException('Product not found');
     }
 
@@ -78,12 +78,12 @@ export class ReviewsService {
   }
 
   async createGuestReview(dto: CreateGuestReviewDto) {
-    // Check if product exists
+    // Check if product exists and is not soft-deleted
     const product = await this.prisma.product.findUnique({
       where: { id: dto.productId },
     });
 
-    if (!product) {
+    if (!product || product.isDeleted) {
       throw new NotFoundException('Product not found');
     }
 
