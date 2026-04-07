@@ -192,6 +192,10 @@ export class ProductService {
               orderBy: { sortOrder: 'asc' },
               take: 1,
             },
+            attributes: {
+              select: { id: true, name: true, value: true },
+              take: 4,
+            },
             reviews: { select: { rating: true } },
             productStock: { select: { stockCount: true } },
           },
