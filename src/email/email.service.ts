@@ -1,12 +1,16 @@
 import { Injectable, HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { FormDto } from './dto';
 import { EmailQueueService } from './services/email-queue.service';
+import { AmoCrmService } from '../amocrm';
 
 @Injectable()
 export class EmailService {
   private readonly logger = new Logger(EmailService.name);
 
-  constructor(private readonly emailQueueService: EmailQueueService) {}
+  constructor(
+    private readonly emailQueueService: EmailQueueService,
+    private readonly amoCrmService: AmoCrmService,
+  ) {}
 
   async submitForm(dto: FormDto) {
     try {
@@ -18,6 +22,7 @@ export class EmailService {
         phone: dto.phone,
         message: dto.message,
       });
+      await this.amoCrmService.safeSubmitContactForm(dto);
 
       this.logger.log(`Email form submitted successfully from: ${dto.email}`);
 

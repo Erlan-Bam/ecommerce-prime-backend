@@ -24,6 +24,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
 import { UsersModule } from './users/users.module';
 import { ReviewsModule } from './reviews/reviews.module';
 import { LoyaltyModule } from './loyalty/loyalty.module';
+import { AmoCrmModule } from './amocrm';
 
 @Module({
   imports: [
@@ -50,6 +51,7 @@ import { LoyaltyModule } from './loyalty/loyalty.module';
       },
     }),
     SharedModule,
+    AmoCrmModule,
     AuthModule,
     GuestModule,
     CategoryModule,
