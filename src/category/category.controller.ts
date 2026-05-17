@@ -16,12 +16,15 @@ import {
   ApiOperation,
   ApiResponse,
 } from '@nestjs/swagger';
+import { Role } from '@prisma/client';
 import { CategoryService } from './services/category.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
+import { ReorderCategoriesDto } from './dto/reorder-categories.dto';
 import { PaginationDto } from '../shared/dto/pagination.dto';
 import { AdminGuard } from '../shared/guards/admin.guard';
 import { Public } from '../shared/decorator/public.decorator';
+import { Roles } from '../shared/decorator/roles.decorator';
 
 @ApiTags('Categories')
 @Controller('categories')
@@ -62,6 +65,7 @@ export class CategoryController {
 
   @Get('deleted/list')
   @UseGuards(AdminGuard)
+  @Roles(Role.ADMIN)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get soft-deleted categories (Admin)' })
   @ApiResponse({ status: 200, description: 'Deleted categories retrieved' })
@@ -87,6 +91,16 @@ export class CategoryController {
     return this.categoryService.findOne(id);
   }
 
+  @Patch('reorder')
+  @UseGuards(AdminGuard)
+  @ApiBearerAuth()
+  @ApiBody({ type: ReorderCategoriesDto })
+  @ApiOperation({ summary: 'Reorder categories (Admin)' })
+  @ApiResponse({ status: 200, description: 'Categories reordered successfully' })
+  async reorder(@Body() reorderCategoriesDto: ReorderCategoriesDto) {
+    return this.categoryService.reorder(reorderCategoriesDto);
+  }
+
   @Patch(':id')
   @UseGuards(AdminGuard)
   @ApiBearerAuth()
@@ -102,6 +116,7 @@ export class CategoryController {
 
   @Delete(':id')
   @UseGuards(AdminGuard)
+  @Roles(Role.ADMIN)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Soft delete category (Admin)' })
   @ApiResponse({
@@ -114,6 +129,7 @@ export class CategoryController {
 
   @Post(':id/restore')
   @UseGuards(AdminGuard)
+  @Roles(Role.ADMIN)
   @ApiBearerAuth()
   @ApiOperation({
     summary: 'Restore soft-deleted category within 7 days (Admin)',

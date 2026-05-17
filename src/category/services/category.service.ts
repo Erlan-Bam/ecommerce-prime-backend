@@ -2,6 +2,7 @@ import { Injectable, Logger, HttpException, HttpStatus } from '@nestjs/common';
 import { PrismaService } from '../../shared/services/prisma.service';
 import { CreateCategoryDto } from '../dto/create-category.dto';
 import { UpdateCategoryDto } from '../dto/update-category.dto';
+import { ReorderCategoriesDto } from '../dto/reorder-categories.dto';
 import { PaginationDto } from '../../shared/dto/pagination.dto';
 import { CategoryCacheService } from './cache.service';
 
@@ -331,6 +332,55 @@ export class CategoryService {
       }
       throw new HttpException(
         error.message || 'Failed to update category',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  async reorder(reorderCategoriesDto: ReorderCategoriesDto) {
+    try {
+      const items = reorderCategoriesDto.items;
+      const ids = items.map((item) => item.id);
+
+      this.logger.log(`Reordering categories: ${ids.join(', ')}`);
+
+      const existingCount = await this.prisma.category.count({
+        where: {
+          id: { in: ids },
+          isDeleted: false,
+        },
+      });
+
+      if (existingCount !== items.length) {
+        throw new HttpException(
+          'One or more categories not found',
+          HttpStatus.NOT_FOUND,
+        );
+      }
+
+      await this.prisma.$transaction(
+        items.map((item) =>
+          this.prisma.category.update({
+            where: { id: item.id },
+            data: { sortOrder: item.sortOrder },
+          }),
+        ),
+      );
+
+      await this.cacheService.invalidateAllCaches();
+      this.logger.log(`Reordered ${items.length} categories, cache invalidated`);
+
+      return { updated: items.length };
+    } catch (error) {
+      this.logger.error(
+        `Error reordering categories: ${error.message}`,
+        error.stack,
+      );
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new HttpException(
+        error.message || 'Failed to reorder categories',
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }

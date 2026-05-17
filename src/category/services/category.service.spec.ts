@@ -16,6 +16,7 @@ const mockPrisma = {
   productCategory: {
     count: jest.fn(),
   },
+  $transaction: jest.fn(),
 };
 
 const mockCacheService = {
@@ -206,6 +207,65 @@ describe('CategoryService - Soft Delete', () => {
       );
       expect(result.data).toEqual(deletedCategories);
       expect(result.meta.total).toBe(1);
+    });
+  });
+
+  describe('reorder', () => {
+    it('should update category sort orders and invalidate cache', async () => {
+      const items = [
+        { id: 'cat-2', sortOrder: 1 },
+        { id: 'cat-1', sortOrder: 2 },
+      ];
+
+      mockPrisma.category.count.mockResolvedValue(items.length);
+      mockPrisma.category.update.mockImplementation((args) => args);
+      mockPrisma.$transaction.mockResolvedValue([]);
+
+      const result = await (service as any).reorder({ items });
+
+      expect(mockPrisma.category.count).toHaveBeenCalledWith({
+        where: {
+          id: { in: ['cat-2', 'cat-1'] },
+          isDeleted: false,
+        },
+      });
+      expect(mockPrisma.category.update).toHaveBeenCalledWith({
+        where: { id: 'cat-2' },
+        data: { sortOrder: 1 },
+      });
+      expect(mockPrisma.category.update).toHaveBeenCalledWith({
+        where: { id: 'cat-1' },
+        data: { sortOrder: 2 },
+      });
+      expect(mockPrisma.$transaction).toHaveBeenCalledWith([
+        {
+          where: { id: 'cat-2' },
+          data: { sortOrder: 1 },
+        },
+        {
+          where: { id: 'cat-1' },
+          data: { sortOrder: 2 },
+        },
+      ]);
+      expect(mockCacheService.invalidateAllCaches).toHaveBeenCalled();
+      expect(result).toEqual({ updated: 2 });
+    });
+
+    it('should reject reorder when any category is missing', async () => {
+      mockPrisma.category.count.mockResolvedValue(1);
+
+      await expect(
+        (service as any).reorder({
+          items: [
+            { id: 'cat-1', sortOrder: 1 },
+            { id: 'missing', sortOrder: 2 },
+          ],
+        }),
+      ).rejects.toMatchObject({
+        status: HttpStatus.NOT_FOUND,
+      });
+
+      expect(mockPrisma.$transaction).not.toHaveBeenCalled();
     });
   });
 });
