@@ -248,6 +248,9 @@ model Order {
   couponId     String?
   bonusUsed    Decimal     @default(0) @db.Decimal(10, 2)
   bonusEarned  Decimal     @default(0) @db.Decimal(10, 2)
+  bonusAccrualScheduledAt DateTime?
+  bonusAccrualAvailableAt DateTime?
+  bonusAccruedAt DateTime?
 
   user         User?          @relation(fields: [userId], references: [id])
   session      GuestSession? @relation(fields: [sessionId], references: [id], onDelete: Cascade)
@@ -261,6 +264,7 @@ model Order {
   @@index([userId])
   @@index([sessionId])
   @@index([status])
+  @@index([bonusAccrualAvailableAt, bonusAccruedAt])
   @@index([pointId])
   @@index([windowId])
   @@index([couponId])

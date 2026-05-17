@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../shared/services/prisma.service';
 
 export interface LoyaltyTier {
@@ -11,6 +12,8 @@ const LOYALTY_TIERS: LoyaltyTier[] = [
   { name: 'Стандарт', cashbackRate: 0.01, minSpent: 0 },
   { name: 'Премиум', cashbackRate: 0.015, minSpent: 500_000 },
 ];
+
+const BONUS_ACCRUAL_DELAY_DAYS = 7;
 
 @Injectable()
 export class LoyaltyService {
@@ -144,17 +147,23 @@ export class LoyaltyService {
     };
   }
 
+  private getBonusAccrualAvailableAt(deliveredAt = new Date()) {
+    return new Date(
+      deliveredAt.getTime() + BONUS_ACCRUAL_DELAY_DAYS * 24 * 60 * 60 * 1000,
+    );
+  }
+
   /**
-   * Accrue cashback for a finalized order.
-   * Called inside the order finalization transaction.
+   * Schedule cashback for an order that is marked as delivered.
+   * The balance record is created by the cron job after the delay.
    */
-  async accrueCashback(
+  async scheduleCashbackAccrual(
     tx: any,
     userId: string,
     orderId: number,
     orderTotal: number,
+    deliveredAt = new Date(),
   ) {
-    // Get user's totalSpent to determine tier
     const user = await tx.user.findUnique({
       where: { id: userId },
       select: { totalSpent: true },
@@ -166,36 +175,114 @@ export class LoyaltyService {
 
     if (cashbackAmount <= 0) return { cashbackAmount: 0 };
 
-    // Create bonus record
-    await tx.bonus.create({
-      data: {
-        userId,
-        orderId,
-        amount: cashbackAmount,
-        type: 'INCREASE',
-        description: `Кешбэк ${(tier.cashbackRate * 100).toFixed(1)}% за заказ #${orderId}`,
-      },
-    });
+    const availableAt = this.getBonusAccrualAvailableAt(deliveredAt);
 
-    // Update order with earned bonus
     await tx.order.update({
       where: { id: orderId },
-      data: { bonusEarned: cashbackAmount },
-    });
-
-    // Update user totalSpent
-    await tx.user.update({
-      where: { id: userId },
       data: {
-        totalSpent: { increment: orderTotal },
+        bonusEarned: cashbackAmount,
+        bonusAccrualScheduledAt: deliveredAt,
+        bonusAccrualAvailableAt: availableAt,
+        bonusAccruedAt: null,
       },
     });
 
     this.logger.log(
-      `Accrued ${cashbackAmount} bonus for user ${userId} on order ${orderId} (rate: ${tier.cashbackRate})`,
+      `Scheduled ${cashbackAmount} bonus for user ${userId} on order ${orderId}; available at ${availableAt.toISOString()}`,
     );
 
-    return { cashbackAmount };
+    return { cashbackAmount, availableAt };
+  }
+
+  async accrueCashback(
+    tx: any,
+    userId: string,
+    orderId: number,
+    orderTotal: number,
+  ) {
+    return this.scheduleCashbackAccrual(tx, userId, orderId, orderTotal);
+  }
+
+  @Cron(CronExpression.EVERY_HOUR)
+  async accruePendingCashback() {
+    const now = new Date();
+    const orders = await this.prisma.order.findMany({
+      where: {
+        status: 'DELIVERED',
+        userId: { not: null },
+        bonusEarned: { gt: 0 },
+        bonusAccrualAvailableAt: { lte: now },
+        bonusAccruedAt: null,
+      },
+      select: { id: true },
+      take: 100,
+    });
+
+    if (!orders.length) return { processed: 0 };
+
+    let processed = 0;
+    for (const order of orders) {
+      const result = await this.accrueScheduledCashback(order.id, now);
+      if (result.accrued) processed += 1;
+    }
+
+    this.logger.log(`Accrued delayed cashback for ${processed} orders`);
+    return { processed };
+  }
+
+  async accrueScheduledCashback(orderId: number, accruedAt = new Date()) {
+    return this.prisma.$transaction(async (tx) => {
+      const order = await tx.order.findUnique({
+        where: { id: orderId },
+        select: {
+          id: true,
+          userId: true,
+          finalTotal: true,
+          bonusEarned: true,
+          bonusAccrualAvailableAt: true,
+          bonusAccruedAt: true,
+          status: true,
+        },
+      });
+
+      if (
+        !order ||
+        !order.userId ||
+        order.status !== 'DELIVERED' ||
+        order.bonusAccruedAt ||
+        !order.bonusAccrualAvailableAt ||
+        order.bonusAccrualAvailableAt > accruedAt
+      ) {
+        return { accrued: false };
+      }
+
+      const cashbackAmount = Math.floor(Number(order.bonusEarned || 0));
+      if (cashbackAmount <= 0) return { accrued: false };
+
+      await tx.bonus.create({
+        data: {
+          userId: order.userId,
+          orderId,
+          amount: cashbackAmount,
+          type: 'INCREASE',
+          description: `Кешбэк за заказ #${orderId}`,
+        },
+      });
+
+      await tx.order.update({
+        where: { id: orderId },
+        data: { bonusAccruedAt: accruedAt },
+      });
+
+      await tx.user.update({
+        where: { id: order.userId },
+        data: {
+          totalSpent: { increment: Number(order.finalTotal) },
+        },
+      });
+
+      return { accrued: true, cashbackAmount };
+    });
   }
 
   /**

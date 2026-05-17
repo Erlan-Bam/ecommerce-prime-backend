@@ -1543,19 +1543,21 @@ export class OrderService {
           },
         });
 
-        // Accrue cashback when order is delivered
+        // Schedule cashback when order is marked as delivered ("Выдан").
+        // The actual balance transaction is created after the loyalty delay.
         if (
           dto.status === 'DELIVERED' &&
           order.status !== 'DELIVERED' &&
-          order.userId
+          order.userId &&
+          Number(order.bonusEarned || 0) <= 0
         ) {
-          await this.loyaltyService.accrueCashback(
+          await this.loyaltyService.scheduleCashbackAccrual(
             tx,
             order.userId,
             orderId,
             Number(updated.finalTotal),
           );
-          this.logger.log(`Cashback accrued for order ${orderId} on delivery`);
+          this.logger.log(`Cashback scheduled for order ${orderId} on delivery`);
         }
 
         return updated;
