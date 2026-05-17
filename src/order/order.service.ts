@@ -1549,7 +1549,7 @@ export class OrderService {
           dto.status === 'DELIVERED' &&
           order.status !== 'DELIVERED' &&
           order.userId &&
-          Number(order.bonusEarned || 0) <= 0
+          !order.bonusAccruedAt
         ) {
           await this.loyaltyService.scheduleCashbackAccrual(
             tx,
