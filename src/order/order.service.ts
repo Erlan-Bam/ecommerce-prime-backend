@@ -17,6 +17,13 @@ import {
 } from './dto';
 import { OrderCacheService } from './services/cache.service';
 import { LoyaltyService } from '../loyalty/loyalty.service';
+import { OrderStatus } from '@prisma/client';
+
+const CANCELLABLE_ORDER_STATUSES = new Set<OrderStatus>([
+  OrderStatus.PENDING,
+  OrderStatus.PROCESSING,
+]);
+
 
 @Injectable()
 export class OrderService {
@@ -1498,6 +1505,17 @@ export class OrderService {
 
       if (!order) {
         throw new HttpException('Order not found', HttpStatus.NOT_FOUND);
+      }
+
+      if (
+        dto.status === OrderStatus.CANCELLED &&
+        order.status !== OrderStatus.CANCELLED &&
+        !CANCELLABLE_ORDER_STATUSES.has(order.status)
+      ) {
+        throw new HttpException(
+          'Order can only be cancelled before confirmation',
+          HttpStatus.BAD_REQUEST,
+        );
       }
 
       const updatedOrder = await this.prisma.$transaction(async (tx) => {
