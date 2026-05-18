@@ -282,4 +282,27 @@ export class OrderController {
   ) {
     return this.orderService.getOrderById(userId, orderId);
   }
+
+  @Patch(':id/cancel')
+  @ApiOperation({
+    summary: 'Cancel an order before confirmation',
+    description:
+      'Allows the current user to cancel their order only while it is pending or processing.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Order cancelled successfully',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Order can only be cancelled before confirmation',
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 404, description: 'Order not found' })
+  cancelOrder(
+    @User('id') userId: string,
+    @Param('id', ParseIntPipe) orderId: number,
+  ) {
+    return this.orderService.cancelOrder(userId, orderId);
+  }
 }

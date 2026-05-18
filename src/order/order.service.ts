@@ -582,6 +582,82 @@ export class OrderService {
     }
   }
 
+  async cancelOrder(userId: string, orderId: number) {
+    try {
+      this.logger.log(`Cancelling order ${orderId} for user ${userId}`);
+
+      const order = await this.prisma.order.findFirst({
+        where: {
+          id: orderId,
+          userId,
+        },
+      });
+
+      if (!order) {
+        this.logger.warn(`Order ${orderId} not found for user ${userId}`);
+        throw new HttpException('Order not found', HttpStatus.NOT_FOUND);
+      }
+
+      if (order.status === OrderStatus.CANCELLED) {
+        return this.getOrderById(userId, orderId);
+      }
+
+      if (!CANCELLABLE_ORDER_STATUSES.has(order.status)) {
+        throw new HttpException(
+          'Order can only be cancelled before confirmation',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      const updatedOrder = await this.prisma.$transaction(async (tx) =>
+        tx.order.update({
+          where: { id: orderId },
+          data: { status: OrderStatus.CANCELLED },
+          include: {
+            items: {
+              include: {
+                product: {
+                  select: {
+                    id: true,
+                    name: true,
+                    slug: true,
+                    images: {
+                      take: 1,
+                      orderBy: { sortOrder: 'asc' },
+                    },
+                  },
+                },
+              },
+            },
+            pickupPoint: {
+              select: {
+                id: true,
+                name: true,
+                address: true,
+              },
+            },
+          },
+        }),
+      );
+
+      await this.cacheService.invalidateUserOrders(userId);
+      await this.cacheService.invalidateOrder(userId, orderId);
+
+      this.logger.log(`Order ${orderId} cancelled by user ${userId}`);
+
+      return updatedOrder;
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      this.logger.error(
+        `Error cancelling order ${orderId}: ${error.message}`,
+        error.stack,
+      );
+      throw new InternalServerErrorException('Failed to cancel order');
+    }
+  }
+
   /**
    * Select pickup point and window for an order.
    * Pickup windows are hourly slots from 10:00 to 21:00 Moscow time.
