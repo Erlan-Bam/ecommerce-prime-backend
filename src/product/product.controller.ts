@@ -60,13 +60,18 @@ export class ProductController {
   getFilters(
     @Query('categoryId') categoryId?: string,
     @Query('brandIds') brandIds?: string,
+    @Query('brandSlug') brandSlug?: string,
   ) {
     const parsedBrandIds = brandIds
       ?.split(',')
       .map((brandId) => brandId.trim())
       .filter(Boolean);
 
-    return this.productService.getFilters(categoryId, parsedBrandIds);
+    return this.productService.getFilters(
+      categoryId,
+      parsedBrandIds,
+      brandSlug,
+    );
   }
 
   @Get('variant-groups')

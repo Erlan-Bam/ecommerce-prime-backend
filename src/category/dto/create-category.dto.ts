@@ -4,6 +4,7 @@ import {
   IsUUID,
   IsBoolean,
   IsInt,
+  IsArray,
   Min,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
@@ -43,6 +44,15 @@ export class CreateCategoryDto {
   @IsOptional()
   @IsString()
   seoH1?: string;
+
+  @ApiPropertyOptional({
+    description: 'Catalog filter facets enabled for this category',
+    type: [String],
+  })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  filterAttributes?: string[];
 
   @ApiPropertyOptional({ description: 'Is category active', default: true })
   @IsOptional()

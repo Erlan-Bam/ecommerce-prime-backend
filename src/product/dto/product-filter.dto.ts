@@ -48,6 +48,13 @@ export class ProductFilterDto {
   @IsString({ each: true })
   brandIds?: string[];
 
+  @ApiPropertyOptional({
+    description: 'Brand slug that scopes a branded catalog section',
+  })
+  @IsOptional()
+  @IsString()
+  brandSlug?: string;
+
   @ApiPropertyOptional({ description: 'Minimum price' })
   @IsOptional()
   @Type(() => Number)

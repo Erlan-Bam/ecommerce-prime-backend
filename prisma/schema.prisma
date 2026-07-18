@@ -87,6 +87,7 @@ model Category {
   seoTitle  String?
   seoDescription String?
   seoH1     String?
+  filterAttributes String[] @default([])
   image     String?
   isActive  Boolean   @default(true)
   sortOrder Int       @default(0)

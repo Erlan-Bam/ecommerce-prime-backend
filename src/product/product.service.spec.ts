@@ -21,6 +21,7 @@ const mockPrisma = {
     findMany: jest.fn(),
   },
   brand: {
+    findUnique: jest.fn(),
     findMany: jest.fn(),
   },
   productVariantGroup: {
@@ -678,6 +679,7 @@ describe('ProductService - Soft Delete', () => {
         { name: 'Объём памяти', value: '64 ГБ', _count: 1 },
         { name: 'Память', value: '1TB', _count: 1 },
         { name: 'Встроенная память', value: '128 Гб', _count: 1 },
+        { name: 'Память', value: '120 ГБ/с', _count: 1 },
         { name: 'Параметр: Цвет', value: 'Чёрный', _count: 1 },
         { name: 'Цвет', value: 'Белый', _count: 1 },
         { name: 'Ширина', value: '71,5 мм', _count: 1 },
@@ -711,6 +713,44 @@ describe('ProductService - Soft Delete', () => {
           'Объём памяти': ['64 ГБ', '128 ГБ', '256 ГБ', '1 ТБ'],
           Цвет: ['Белый', 'Чёрный'],
         },
+      });
+    });
+
+    it('uses a brand slug as the catalog scope instead of a stale brand checkbox', async () => {
+      mockPrisma.category.findUnique.mockResolvedValue({
+        slug: 'samsung',
+        filterAttributes: [],
+      });
+      mockPrisma.category.findMany.mockResolvedValue([]);
+      mockPrisma.brand.findUnique.mockResolvedValue({
+        id: 'brand-samsung',
+        isActive: true,
+        isDeleted: false,
+      });
+      mockPrisma.brand.findMany.mockResolvedValue([
+        { id: 'brand-samsung', name: 'Samsung', slug: 'samsung' },
+      ]);
+      mockPrisma.product.aggregate.mockResolvedValue({
+        _min: { price: 1000 },
+        _max: { price: 2000 },
+      });
+      mockPrisma.productAttribute.groupBy.mockResolvedValue([]);
+
+      await service.getFilters(
+        'category-samsung',
+        ['brand-honor'],
+        'samsung',
+      );
+
+      expect(mockPrisma.product.aggregate).toHaveBeenCalledWith({
+        where: {
+          isDeleted: false,
+          isActive: true,
+          categories: { some: { categoryId: 'category-samsung' } },
+          brandId: { in: ['brand-samsung'] },
+        },
+        _min: { price: true },
+        _max: { price: true },
       });
     });
   });

@@ -533,6 +533,45 @@ export class ProductService {
     });
   }
 
+  private isValidCatalogFacetValue(facetName: string, value: string): boolean {
+    if (facetName !== 'Объём памяти' && facetName !== 'Оперативная память') {
+      return true;
+    }
+
+    return this.getCatalogFacetValueSortKey(facetName, value) !== null;
+  }
+
+  private async getCategoryFilterAttributes(
+    categoryId?: string,
+  ): Promise<Set<string>> {
+    if (!categoryId) return new Set();
+
+    const category = await this.prisma.category.findUnique({
+      where: { id: categoryId },
+      select: { filterAttributes: true },
+    });
+
+    return new Set(
+      (category?.filterAttributes || [])
+        .map((attribute) => this.normalizeText(attribute))
+        .filter(Boolean),
+    );
+  }
+
+  private async getActiveBrandIdBySlug(
+    brandSlug?: string,
+  ): Promise<string | null> {
+    const slug = brandSlug?.trim().toLowerCase();
+    if (!slug) return null;
+
+    const brand = await this.prisma.brand.findUnique({
+      where: { slug },
+      select: { id: true, isActive: true, isDeleted: true },
+    });
+
+    return brand?.isActive && !brand.isDeleted ? brand.id : null;
+  }
+
   private sanitizeAttributes(
     attributes:
       | Array<{ id?: string; name: string; value: string }>
@@ -2296,7 +2335,11 @@ export class ProductService {
     }
   }
 
-  async getFilters(categoryId?: string, brandIds?: string[]) {
+  async getFilters(
+    categoryId?: string,
+    brandIds?: string[],
+    brandSlug?: string,
+  ) {
     try {
       this.logger.log(
         `Getting filters for category: ${categoryId || 'all'}, brands: ${
@@ -2305,7 +2348,10 @@ export class ProductService {
       );
 
       // Keep the facet dataset in sync with the actual product request.
-      const where = await this.buildWhereClause({ categoryId, brandIds });
+      const [where, enabledFacetNames] = await Promise.all([
+        this.buildWhereClause({ categoryId, brandIds, brandSlug }),
+        this.getCategoryFilterAttributes(categoryId),
+      ]);
 
       const [brands, priceRange, attributes] = await Promise.all([
         this.prisma.brand.findMany({
@@ -2338,11 +2384,18 @@ export class ProductService {
         const facetName = this.getCatalogFacetName(normalizedName);
         if (!facetName) return;
 
+        if (
+          enabledFacetNames.size > 0 &&
+          !enabledFacetNames.has(this.normalizeText(facetName))
+        ) {
+          return;
+        }
+
         const value = this.normalizeCatalogFacetValue(
           facetName,
           attr.value?.trim() || '',
         );
-        if (!value) return;
+        if (!value || !this.isValidCatalogFacetValue(facetName, value)) return;
 
         if (!groupedAttributes.has(facetName)) {
           groupedAttributes.set(facetName, new Map());
@@ -2446,7 +2499,10 @@ export class ProductService {
       };
     }
 
-    if (filter.brandIds?.length) {
+    const scopedBrandId = await this.getActiveBrandIdBySlug(filter.brandSlug);
+    if (scopedBrandId) {
+      where.brandId = { in: [scopedBrandId] };
+    } else if (filter.brandIds?.length) {
       where.brandId = { in: filter.brandIds };
     }
 
