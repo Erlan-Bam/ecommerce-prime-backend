@@ -55,6 +55,35 @@ export class CreateProductDto {
   @IsString()
   brandId?: string;
 
+  @ApiPropertyOptional({ description: 'Linked product variant group ID' })
+  @IsOptional()
+  @IsString()
+  variantGroupId?: string;
+
+  @ApiPropertyOptional({
+    description: 'Manually curated additional products in display order',
+    type: [String],
+  })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  relatedProductIds?: string[];
+
+  @ApiPropertyOptional({ description: 'Variant color value for multi-listing products' })
+  @IsOptional()
+  @IsString()
+  variantColor?: string;
+
+  @ApiPropertyOptional({ description: 'Variant memory/storage value for multi-listing products' })
+  @IsOptional()
+  @IsString()
+  variantMemory?: string;
+
+  @ApiPropertyOptional({ description: 'Variant SIM value for multi-listing products' })
+  @IsOptional()
+  @IsString()
+  variantSim?: string;
+
   @ApiProperty({ description: 'Product name' })
   @IsString()
   @IsNotEmpty()
@@ -64,6 +93,21 @@ export class CreateProductDto {
   @IsOptional()
   @IsString()
   description?: string;
+
+  @ApiPropertyOptional({ description: 'Manual SEO title override' })
+  @IsOptional()
+  @IsString()
+  seoTitle?: string;
+
+  @ApiPropertyOptional({ description: 'Manual SEO description override' })
+  @IsOptional()
+  @IsString()
+  seoDescription?: string;
+
+  @ApiPropertyOptional({ description: 'Manual page H1 override' })
+  @IsOptional()
+  @IsString()
+  seoH1?: string;
 
   @ApiProperty({ description: 'Product price' })
   @Type(() => Number)
@@ -87,6 +131,14 @@ export class CreateProductDto {
   @IsOptional()
   @IsBoolean()
   isOnSale?: boolean;
+
+  @ApiPropertyOptional({
+    description: 'Is product popular (manual priority on homepage)',
+    default: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  isPopular?: boolean;
 
   @ApiPropertyOptional({
     description: 'Product images',

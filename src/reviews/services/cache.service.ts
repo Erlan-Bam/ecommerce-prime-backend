@@ -80,12 +80,20 @@ export class ReviewsCacheService {
     limit?: number;
     productId?: string;
     isActive?: boolean;
+    search?: string;
+    rating?: number;
+    sortBy?: 'createdAt' | 'rating';
+    sortOrder?: 'asc' | 'desc';
   }): string {
     const parts = [this.CACHE_PREFIX, 'list'];
     if (params.page) parts.push(`page:${params.page}`);
     if (params.limit) parts.push(`limit:${params.limit}`);
     if (params.productId) parts.push(`product:${params.productId}`);
     if (params.isActive !== undefined) parts.push(`active:${params.isActive}`);
+    if (params.search?.trim()) parts.push(`search:${params.search.trim()}`);
+    if (params.rating !== undefined) parts.push(`rating:${params.rating}`);
+    if (params.sortBy) parts.push(`sortBy:${params.sortBy}`);
+    if (params.sortOrder) parts.push(`sortOrder:${params.sortOrder}`);
     return parts.join(':');
   }
 }

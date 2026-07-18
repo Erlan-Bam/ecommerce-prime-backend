@@ -25,6 +25,7 @@ import { UsersModule } from './users/users.module';
 import { ReviewsModule } from './reviews/reviews.module';
 import { LoyaltyModule } from './loyalty/loyalty.module';
 import { AmoCrmModule } from './amocrm';
+import { SeoModule } from './seo';
 
 @Module({
   imports: [
@@ -70,6 +71,7 @@ import { AmoCrmModule } from './amocrm';
     UsersModule,
     ReviewsModule,
     LoyaltyModule,
+    SeoModule,
   ],
   controllers: [AppController],
   providers: [],

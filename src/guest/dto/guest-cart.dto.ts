@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsString, IsInt, Min } from 'class-validator';
+import { IsNotEmpty, IsString, IsInt, IsOptional, Min } from 'class-validator';
 
 export class AddGuestCartItemDto {
   @ApiProperty({
@@ -18,6 +18,22 @@ export class AddGuestCartItemDto {
   @IsInt()
   @Min(1)
   quantity: number = 1;
+
+  @ApiProperty({
+    description: 'Selected variant key',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  variantKey?: string;
+
+  @ApiProperty({
+    description: 'Selected variant label',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  variantLabel?: string;
 }
 
 export class UpdateGuestCartItemDto {

@@ -17,13 +17,18 @@ import {
 } from './dto';
 import { OrderCacheService } from './services/cache.service';
 import { LoyaltyService } from '../loyalty/loyalty.service';
+import {
+  calculateFinalTotalWithPayment,
+  normalizeDeliveryCost,
+} from './utils/delivery-cost';
+import { resolveCartPricing } from '../shared/lib/cart-variant-pricing';
+import { AmoCrmService } from '../amocrm';
 import { OrderStatus } from '@prisma/client';
 
 const CANCELLABLE_ORDER_STATUSES = new Set<OrderStatus>([
   OrderStatus.PENDING,
   OrderStatus.PROCESSING,
 ]);
-
 
 @Injectable()
 export class OrderService {
@@ -33,6 +38,7 @@ export class OrderService {
     private readonly prisma: PrismaService,
     private readonly cacheService: OrderCacheService,
     private readonly loyaltyService: LoyaltyService,
+    private readonly amoCrmService: AmoCrmService,
   ) {}
 
   async addOrderItem(userId: string, dto: AddOrderItemDto) {
@@ -44,6 +50,11 @@ export class OrderService {
       // Verify product exists and is active
       const product = await this.prisma.product.findUnique({
         where: { id: dto.productId },
+        include: {
+          attributes: {
+            select: { name: true, value: true },
+          },
+        },
       });
 
       if (!product || product.isDeleted) {
@@ -59,11 +70,14 @@ export class OrderService {
         );
       }
 
+      const pricing = resolveCartPricing(product, dto);
+
       // Check if item already exists in cart for this user
       const existingItem = await this.prisma.orderItem.findFirst({
         where: {
           userId,
           productId: dto.productId,
+          variantKey: pricing.variantKey,
           orderId: null, // Only cart items (not yet in an order)
         },
       });
@@ -75,7 +89,10 @@ export class OrderService {
           where: { id: existingItem.id },
           data: {
             quantity: newQuantity,
-            price: product.price.toNumber() * newQuantity,
+            unitPrice: pricing.unitPrice,
+            price: pricing.unitPrice * newQuantity,
+            variantKey: pricing.variantKey,
+            variantLabel: pricing.variantLabel,
           },
           include: {
             product: {
@@ -99,7 +116,10 @@ export class OrderService {
           userId,
           productId: dto.productId,
           quantity: dto.quantity,
-          price: product.price.toNumber() * dto.quantity,
+          unitPrice: pricing.unitPrice,
+          price: pricing.unitPrice * dto.quantity,
+          variantKey: pricing.variantKey,
+          variantLabel: pricing.variantLabel,
         },
         include: {
           product: {
@@ -214,7 +234,9 @@ export class OrderService {
         where: { id: orderItemId },
         data: {
           quantity,
-          price: orderItem.product.price.toNumber() * quantity,
+          price:
+            (orderItem.unitPrice?.toNumber() ||
+              orderItem.product.price.toNumber()) * quantity,
         },
         include: {
           product: {
@@ -368,8 +390,9 @@ export class OrderService {
         // Recalculate prices based on current product prices
         const updatedItems = await Promise.all(
           cartItems.map(async (item) => {
-            const currentPrice = item.product.price;
-            const calculatedPrice = currentPrice.toNumber() * item.quantity;
+            const unitPrice =
+              item.unitPrice?.toNumber() || item.product.price.toNumber();
+            const calculatedPrice = unitPrice * item.quantity;
 
             // Update item price if it changed
             if (item.price.toNumber() !== calculatedPrice) {
@@ -644,6 +667,10 @@ export class OrderService {
       await this.cacheService.invalidateOrder(userId, orderId);
 
       this.logger.log(`Order ${orderId} cancelled by user ${userId}`);
+      await this.amoCrmService.safeSubmitOrderCancellation(
+        updatedOrder,
+        'user-cancel',
+      );
 
       return updatedOrder;
     } catch (error) {
@@ -872,6 +899,11 @@ export class OrderService {
           );
         }
 
+        const deliveryCost = normalizeDeliveryCost(
+          dto.deliveryCost,
+          dto.deliveryMethod,
+        );
+
         // Prepare common update data
         const updateData: any = {
           deliveryMethod: dto.deliveryMethod,
@@ -882,6 +914,12 @@ export class OrderService {
           comment: dto.comment || null,
           entrance: dto.entrance || null,
           deliveryTime: dto.deliveryTime || null,
+          finalTotal: calculateFinalTotalWithPayment(
+            order.total.toNumber(),
+            order.discount.toNumber(),
+            deliveryCost,
+            dto.paymentMethod,
+          ),
           status: 'PROCESSING',
         };
 
@@ -1065,8 +1103,6 @@ export class OrderService {
           },
         });
 
-        // Cashback is accrued when order status changes to DELIVERED (not at finalization)
-
         return updatedOrder;
       });
 
@@ -1077,6 +1113,7 @@ export class OrderService {
       this.logger.log(
         `Order ${orderId} finalized successfully with ${dto.deliveryMethod} delivery`,
       );
+      await this.amoCrmService.safeSubmitOrder(result, ['registered-checkout']);
 
       return {
         ...result,
@@ -1573,6 +1610,79 @@ export class OrderService {
     }
   }
 
+  async syncOrderToAmoCrm(orderId: number) {
+    try {
+      const order = await this.prisma.order.findUnique({
+        where: { id: orderId },
+        include: {
+          items: {
+            include: {
+              product: {
+                select: {
+                  id: true,
+                  name: true,
+                  images: true,
+                  slug: true,
+                },
+              },
+            },
+          },
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              phone: true,
+            },
+          },
+          pickupPoint: {
+            select: {
+              id: true,
+              name: true,
+              address: true,
+            },
+          },
+          coupon: {
+            select: {
+              id: true,
+              code: true,
+              type: true,
+              value: true,
+            },
+          },
+        },
+      });
+
+      if (!order) {
+        throw new HttpException('Order not found', HttpStatus.NOT_FOUND);
+      }
+
+      if (order.status === OrderStatus.CANCELLED) {
+        await this.amoCrmService.safeSubmitOrderCancellation(
+          order,
+          'admin-resync',
+        );
+      } else {
+        await this.amoCrmService.safeSubmitOrder(order, ['admin-resync']);
+      }
+
+      return {
+        id: order.id,
+        status: order.status,
+        synced: true,
+      };
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      this.logger.error(
+        `Error syncing order ${orderId} to amoCRM: ${error.message}`,
+        error.stack,
+      );
+      throw new InternalServerErrorException('Failed to sync order to amoCRM');
+    }
+  }
+
   async updateOrderStatus(orderId: number, dto: UpdateOrderStatusDto) {
     try {
       const order = await this.prisma.order.findUnique({
@@ -1651,7 +1761,9 @@ export class OrderService {
             orderId,
             Number(updated.finalTotal),
           );
-          this.logger.log(`Cashback scheduled for order ${orderId} on delivery`);
+          this.logger.log(
+            `Cashback scheduled for order ${orderId} on delivery`,
+          );
         }
 
         return updated;
@@ -1662,6 +1774,15 @@ export class OrderService {
       await this.cacheService.invalidateOrder(order.userId, orderId);
 
       this.logger.log(`Order ${orderId} status updated to ${dto.status}`);
+      if (
+        dto.status === OrderStatus.CANCELLED &&
+        order.status !== OrderStatus.CANCELLED
+      ) {
+        await this.amoCrmService.safeSubmitOrderCancellation(
+          updatedOrder,
+          'admin-cancel',
+        );
+      }
 
       return updatedOrder;
     } catch (error) {
@@ -1819,10 +1940,21 @@ export class OrderService {
           );
         }
 
+        const deliveryCost = normalizeDeliveryCost(
+          dto.deliveryCost,
+          dto.deliveryMethod,
+        );
+
         // Prepare update data
         const updateData: any = {
           deliveryMethod: dto.deliveryMethod,
           paymentMethod: dto.paymentMethod,
+          finalTotal: calculateFinalTotalWithPayment(
+            order.total.toNumber(),
+            order.discount.toNumber(),
+            deliveryCost,
+            dto.paymentMethod,
+          ),
           status: 'PROCESSING',
         };
 
@@ -1978,6 +2110,9 @@ export class OrderService {
       }
 
       this.logger.log(`Admin finalized order ${orderId} successfully`);
+      await this.amoCrmService.safeSubmitOrder(result.updatedOrder, [
+        'admin-finalized',
+      ]);
 
       return {
         id: result.updatedOrder.id,
@@ -2111,6 +2246,15 @@ export class OrderService {
 
       this.logger.log(
         `Quick buy order created successfully: ${result.id} for ${dto.buyer}`,
+      );
+      await this.amoCrmService.safeSubmitOrder(
+        {
+          ...result,
+          buyer: dto.buyer,
+          phone: dto.phone,
+          items: cartItems,
+        },
+        ['registered-quick-buy'],
       );
 
       return {

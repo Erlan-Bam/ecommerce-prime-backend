@@ -9,3 +9,4 @@ export * from './enter-user.dto';
 export * from './verify-code.dto';
 export * from './resend-code.dto';
 export * from './refresh-token.dto';
+export * from './merge-guest-cart.dto';

@@ -33,9 +33,20 @@ export class ProductCacheService {
 
   async invalidateAllCaches(): Promise<void> {
     try {
-      const pattern = `${this.CACHE_PREFIX}s:*`;
-      const cleared = await this.redisService.clearByPattern(pattern);
-      this.cacheLogger.log(`Invalidated ${cleared} product cache entries`);
+      const patterns = [
+        `${this.CACHE_PREFIX}:*`,
+        `${this.CACHE_PREFIX}s:*`,
+        'search:*',
+      ];
+
+      let cleared = 0;
+      for (const pattern of patterns) {
+        cleared += await this.redisService.clearByPattern(pattern);
+      }
+
+      this.cacheLogger.log(
+        `Invalidated ${cleared} product/search cache entries`,
+      );
     } catch (error) {
       this.cacheLogger.error('Error invalidating product caches:', error);
     }

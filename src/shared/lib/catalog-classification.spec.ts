@@ -52,6 +52,23 @@ describe('catalog accessory classification', () => {
     });
   });
 
+  it('moves Samsung MagSafe cases out of a wrong Apple source path', () => {
+    const result = normalizeParsedCategoryPath({
+      productName: 'Чехол прозрачный для Samsung с MagSafe',
+      topCategory: 'Apple',
+      subcategory: 'Аксессуары',
+      section: 'Чехлы Apple',
+      sourcePath: 'Apple > Аксессуары Apple > Чехлы Apple',
+    });
+
+    expect(result).toEqual({
+      topCategory: 'Samsung',
+      subcategory: 'Аксессуары',
+      section: 'Чехлы',
+      isAccessory: true,
+    });
+  });
+
   it('does not treat real AirPods with charging case as an accessory', () => {
     expect(
       isAccessoryLikeProduct({
@@ -69,6 +86,34 @@ describe('catalog accessory classification', () => {
         subcategory: 'Аксессуары',
         sourcePath: 'Apple > Аксессуары',
         attributes: [{ name: 'Блок зарядного устройства', value: '140 Вт' }],
+      }),
+    ).toBe(false);
+  });
+
+  it('moves Beats headphones out of Apple AirPods category during import', () => {
+    const result = normalizeParsedCategoryPath({
+      productName: 'Beats Studio Pro Wireless Headphones',
+      topCategory: 'Apple',
+      subcategory: 'Наушники Apple AirPods и Beats',
+      section: 'Наушники Apple AirPods и Beats',
+      sourcePath: 'Apple > Наушники Apple AirPods и Beats',
+    });
+
+    expect(result).toEqual({
+      topCategory: 'Beats',
+      subcategory: 'Наушники',
+      section: 'Studio Pro',
+      isAccessory: false,
+    });
+  });
+
+  it('does not treat real Beats headphones as accessories because of a wrong source path', () => {
+    expect(
+      isAccessoryLikeProduct({
+        productName: 'Beats Studio Pro Wireless Headphones',
+        topCategory: 'Apple',
+        subcategory: 'Аксессуары',
+        sourcePath: 'Apple > Аксессуары',
       }),
     ).toBe(false);
   });

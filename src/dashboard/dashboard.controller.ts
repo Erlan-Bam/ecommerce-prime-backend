@@ -1,13 +1,31 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import {
+  Controller,
+  Get,
+  HttpException,
+  HttpStatus,
+  Post,
+  Query,
+  Res,
+  UploadedFile,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
+import {
+  ApiBody,
   ApiTags,
   ApiBearerAuth,
+  ApiConsumes,
   ApiOperation,
+  ApiProduces,
   ApiResponse,
   ApiQuery,
 } from '@nestjs/swagger';
 import { DashboardService } from './dashboard.service';
 import { AdminGuard } from '../shared/guards/admin.guard';
+import { Response } from 'express';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
+import * as path from 'path';
 
 @ApiTags('Dashboard')
 @Controller('admin/dashboard')
@@ -38,6 +56,159 @@ export class DashboardController {
   @ApiResponse({ status: 403, description: 'Forbidden - Admin only' })
   getRecentOrders() {
     return this.dashboardService.getRecentOrders();
+  }
+
+  @Get('parser-status')
+  @ApiOperation({
+    summary: 'Get parser status (Admin)',
+    description:
+      'Returns parser script/file status and current products counters',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Parser status retrieved successfully',
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden - Admin only' })
+  getParserStatus() {
+    return this.dashboardService.getParserStatus();
+  }
+
+  @Get('export/products-xlsx')
+  @ApiOperation({
+    summary: 'Export all products to XLSX (Admin)',
+    description:
+      'Generates products.xlsx from current database state (including manually added products)',
+  })
+  @ApiProduces(
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  )
+  @ApiResponse({
+    status: 200,
+    description: 'Products XLSX generated and downloaded successfully',
+  })
+  @ApiQuery({
+    name: 'activity',
+    required: false,
+    enum: ['all', 'active', 'inactive'],
+    description: 'Filter exported products by active status',
+  })
+  @ApiQuery({
+    name: 'categoryId',
+    required: false,
+    description: 'Export products from this category and its subcategories',
+  })
+  @ApiQuery({
+    name: 'brandId',
+    required: false,
+    description: 'Export products from this brand',
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden - Admin only' })
+  async exportProductsXlsx(
+    @Res() res: Response,
+    @Query('activity') activity?: string,
+    @Query('categoryId') categoryId?: string,
+    @Query('brandId') brandId?: string,
+  ) {
+    const exported = await this.dashboardService.exportProductsXlsx(
+      activity,
+      categoryId,
+      brandId,
+    );
+
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${exported.fileName}"`,
+    );
+    res.setHeader('Content-Length', exported.buffer.length.toString());
+    res.setHeader('X-Products-Count', exported.rowsCount.toString());
+
+    return res.send(exported.buffer);
+  }
+
+  @Post('import/products-xlsx')
+  @ApiOperation({
+    summary: 'Import products from XLSX (Admin)',
+    description:
+      'Imports products from XLSX file and creates/updates records in database',
+  })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        file: {
+          type: 'string',
+          format: 'binary',
+        },
+      },
+      required: ['file'],
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Products imported successfully',
+  })
+  @ApiResponse({ status: 400, description: 'Invalid file' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden - Admin only' })
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: {
+        fileSize: 15 * 1024 * 1024,
+      },
+      fileFilter: (_req, file, callback) => {
+        const allowedMimeTypes = [
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          'application/vnd.ms-excel',
+        ];
+        const ext = path.extname(file.originalname || '').toLowerCase();
+        const isExcelExt = ext === '.xlsx' || ext === '.xls';
+
+        if (isExcelExt || allowedMimeTypes.includes(file.mimetype)) {
+          callback(null, true);
+          return;
+        }
+
+        callback(
+          new HttpException(
+            'Invalid file type. Only .xlsx files are supported',
+            HttpStatus.BAD_REQUEST,
+          ),
+          false,
+        );
+      },
+    }),
+  )
+  async importProductsXlsx(@UploadedFile() file: Express.Multer.File) {
+    if (!file) {
+      throw new HttpException('No file uploaded', HttpStatus.BAD_REQUEST);
+    }
+
+    return this.dashboardService.importProductsXlsx(
+      file.buffer,
+      file.originalname,
+    );
+  }
+
+  @Get('import/products-xlsx/undo-status')
+  @ApiOperation({
+    summary: 'Get latest XLSX import rollback availability (Admin)',
+  })
+  getProductsXlsxUndoStatus() {
+    return this.dashboardService.getProductsXlsxUndoStatus();
+  }
+
+  @Post('import/products-xlsx/undo')
+  @ApiOperation({ summary: 'Rollback latest XLSX product import (Admin)' })
+  undoLatestProductsXlsxImport() {
+    return this.dashboardService.undoLatestProductsXlsxImport();
   }
 
   @Get('analytics/overview')

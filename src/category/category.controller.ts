@@ -21,6 +21,7 @@ import { CategoryService } from './services/category.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 import { ReorderCategoriesDto } from './dto/reorder-categories.dto';
+import { CategoryListQueryDto } from './dto/category-list-query.dto';
 import { PaginationDto } from '../shared/dto/pagination.dto';
 import { AdminGuard } from '../shared/guards/admin.guard';
 import { Public } from '../shared/decorator/public.decorator';
@@ -48,8 +49,8 @@ export class CategoryController {
     status: 200,
     description: 'Categories retrieved successfully',
   })
-  async findAll(@Query() paginationDto: PaginationDto) {
-    return this.categoryService.findAll(paginationDto);
+  async findAll(@Query() query: CategoryListQueryDto) {
+    return this.categoryService.findAll(query);
   }
 
   @Public()

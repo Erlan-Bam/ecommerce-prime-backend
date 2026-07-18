@@ -116,22 +116,28 @@ export class BlogService {
   async findBySlug(slug: string) {
     try {
       // Try cache first
-      const cached = await this.cacheService.getCachedPost(slug);
+      const cached =
+        (await this.cacheService.getCachedPost(slug)) ||
+        (await this.cacheService.getCachedPostById(slug));
       if (cached) {
         this.logger.debug(`Returning cached blog post: ${slug}`);
         return cached;
       }
 
-      const post = await this.prisma.blog.findUnique({
-        where: { slug },
+      const post = await this.prisma.blog.findFirst({
+        where: {
+          isActive: true,
+          OR: [{ slug }, { id: slug }],
+        },
       });
 
-      if (!post || !post.isActive) {
+      if (!post) {
         throw new HttpException('Blog post not found', HttpStatus.NOT_FOUND);
       }
 
-      // Cache the result
-      await this.cacheService.cachePost(slug, post);
+      // Cache both public URL forms: canonical slug and legacy/id links.
+      await this.cacheService.cachePost(post.slug, post);
+      await this.cacheService.cachePostById(post.id, post);
 
       return post;
     } catch (error) {

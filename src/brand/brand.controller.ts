@@ -15,11 +15,13 @@ import {
   ApiOperation,
   ApiResponse,
 } from '@nestjs/swagger';
+import { Role } from '@prisma/client';
 import { BrandService } from './brand.service';
 import { CreateBrandDto, UpdateBrandDto } from './dto';
 import { PaginationDto } from '../shared/dto/pagination.dto';
 import { AdminGuard } from '../shared/guards/admin.guard';
 import { Public } from '../shared/decorator/public.decorator';
+import { Roles } from '../shared/decorator/roles.decorator';
 
 @ApiTags('Brands')
 @Controller('brands')
@@ -53,6 +55,7 @@ export class BrandController {
 
   @Get('deleted/list')
   @UseGuards(AdminGuard)
+  @Roles(Role.ADMIN)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get soft-deleted brands (Admin)' })
   @ApiResponse({ status: 200, description: 'Deleted brands retrieved' })
@@ -80,6 +83,7 @@ export class BrandController {
 
   @Delete(':id')
   @UseGuards(AdminGuard)
+  @Roles(Role.ADMIN)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Soft delete brand (Admin)' })
   @ApiResponse({ status: 200, description: 'Brand soft deleted successfully' })
@@ -89,6 +93,7 @@ export class BrandController {
 
   @Post(':id/restore')
   @UseGuards(AdminGuard)
+  @Roles(Role.ADMIN)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Restore soft-deleted brand within 7 days (Admin)' })
   @ApiResponse({ status: 200, description: 'Brand restored successfully' })

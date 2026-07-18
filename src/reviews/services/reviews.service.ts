@@ -8,7 +8,7 @@ import {
 import { PrismaService } from '../../shared/services/prisma.service';
 import { ReviewsCacheService } from './cache.service';
 import { Prisma } from '@prisma/client';
-import { CreateReviewDto, CreateGuestReviewDto } from '../dto';
+import { CreateReviewDto, CreateGuestReviewDto, UpdateReviewDto } from '../dto';
 
 @Injectable()
 export class ReviewsService {
@@ -126,6 +126,10 @@ export class ReviewsService {
     limit?: number;
     productId?: string;
     isActive?: boolean;
+    search?: string;
+    rating?: number;
+    sortBy?: 'createdAt' | 'rating';
+    sortOrder?: 'asc' | 'desc';
   }) {
     const page = params.page || 1;
     const limit = params.limit || 10;
@@ -149,12 +153,33 @@ export class ReviewsService {
       where.isActive = params.isActive;
     }
 
+    if (params.rating !== undefined && Number.isFinite(params.rating)) {
+      where.rating = params.rating;
+    }
+
+    if (params.search?.trim()) {
+      const query = params.search.trim();
+      where.OR = [
+        { comment: { contains: query, mode: 'insensitive' } },
+        { guestName: { contains: query, mode: 'insensitive' } },
+        { user: { is: { name: { contains: query, mode: 'insensitive' } } } },
+        {
+          product: { is: { name: { contains: query, mode: 'insensitive' } } },
+        },
+      ];
+    }
+
+    const orderBy =
+      params.sortBy === 'rating'
+        ? { rating: params.sortOrder || 'desc' }
+        : { createdAt: params.sortOrder || 'desc' };
+
     const [data, total] = await Promise.all([
       this.prisma.review.findMany({
         where,
         skip,
         take: limit,
-        orderBy: { createdAt: 'desc' },
+        orderBy,
         include: {
           user: {
             select: {
@@ -277,8 +302,7 @@ export class ReviewsService {
     });
 
     // Invalidate caches
-    await this.cacheService.invalidateReview(id);
-    await this.cacheService.invalidateStats();
+    await this.cacheService.invalidateAllCaches();
     this.logger.log(`Approved review: ${id}`);
 
     return updated;
@@ -297,9 +321,60 @@ export class ReviewsService {
     });
 
     // Invalidate caches
-    await this.cacheService.invalidateReview(id);
-    await this.cacheService.invalidateStats();
+    await this.cacheService.invalidateAllCaches();
     this.logger.log(`Rejected review: ${id}`);
+
+    return updated;
+  }
+
+  async update(id: string, dto: UpdateReviewDto) {
+    const review = await this.prisma.review.findUnique({ where: { id } });
+
+    if (!review) {
+      throw new NotFoundException('Review not found');
+    }
+
+    const payload: Prisma.ReviewUpdateInput = {};
+
+    if (dto.rating !== undefined) {
+      payload.rating = dto.rating;
+    }
+
+    if (dto.comment !== undefined) {
+      payload.comment = dto.comment;
+    }
+
+    if (dto.guestName !== undefined && review.userId === null) {
+      payload.guestName = dto.guestName;
+    }
+
+    if (Object.keys(payload).length === 0) {
+      throw new BadRequestException('No fields to update');
+    }
+
+    const updated = await this.prisma.review.update({
+      where: { id },
+      data: payload,
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+        product: {
+          select: {
+            id: true,
+            name: true,
+            images: true,
+          },
+        },
+      },
+    });
+
+    await this.cacheService.invalidateAllCaches();
+    this.logger.log(`Updated review: ${id}`);
 
     return updated;
   }

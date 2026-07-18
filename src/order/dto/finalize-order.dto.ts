@@ -5,10 +5,13 @@ import {
   IsString,
   IsEmail,
   IsEnum,
+  IsIn,
   IsOptional,
   IsUUID,
   IsDateString,
   IsBoolean,
+  IsNumber,
+  Min,
   ValidateIf,
 } from 'class-validator';
 
@@ -79,11 +82,13 @@ export class FinalizeOrderDto {
   // Payment options
   @ApiProperty({
     description: 'Payment method',
-    enum: PaymentMethod,
+    enum: ['ROBOKASSA', 'CASH'],
     example: 'CASH',
   })
   @IsNotEmpty()
-  @IsEnum(PaymentMethod)
+  @IsIn(['ROBOKASSA', 'CASH'], {
+    message: 'Payment method must be ROBOKASSA or CASH',
+  })
   paymentMethod: PaymentMethod;
 
   @ApiPropertyOptional({
@@ -109,6 +114,15 @@ export class FinalizeOrderDto {
   @IsOptional()
   @IsString()
   deliveryTime?: string;
+
+  @ApiPropertyOptional({
+    description: 'Delivery cost in rubles. 590 within MKAD, 990 outside MKAD.',
+    example: 590,
+  })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  deliveryCost?: number;
 }
 
 export class FinalizeOrderResponseDto {

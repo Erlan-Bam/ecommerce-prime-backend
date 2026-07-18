@@ -5,6 +5,7 @@ import {
   buildAmoCrmContactPayload,
   buildAmoCrmFormLead,
   buildAmoCrmLeadPayload,
+  buildAmoCrmOrderCancellationNote,
   buildAmoCrmOrderLead,
 } from './amocrm.mapper';
 import {
@@ -64,6 +65,29 @@ export class AmoCrmService {
     );
   }
 
+  async safeSubmitOrderCancellation(
+    order: AmoCrmOrderInput,
+    source = 'site',
+  ): Promise<void> {
+    await this.safeRun(`order #${order.id} cancellation`, async () => {
+      const note = buildAmoCrmOrderCancellationNote(order, source);
+      const leadId = await this.findLeadIdByOrderId(order.id);
+
+      if (!leadId) {
+        await this.createLeadWithContact({
+          ...buildAmoCrmOrderLead(order, ['cancelled', source]),
+          name: `Отмена заказа #${order.id} с сайта`,
+          note,
+          tags: ['site', 'order-cancelled', source],
+        });
+        return;
+      }
+
+      await this.addLeadNote(leadId, note);
+      await this.markLeadCancelled(leadId);
+    });
+  }
+
   async createLeadWithContact(lead: AmoCrmLeadInput): Promise<number | null> {
     if (!this.client) return null;
 
@@ -120,6 +144,27 @@ export class AmoCrmService {
     return null;
   }
 
+  private async findLeadIdByOrderId(orderId: number): Promise<number | null> {
+    if (!this.client) return null;
+
+    const marker = `#${orderId}`;
+    const queries = [`Заказ ${marker}`, marker, String(orderId)];
+
+    for (const query of queries) {
+      const response = await this.client.get('/api/v4/leads', {
+        params: { query, limit: 10 },
+      });
+      const leads = response.data?._embedded?.leads || [];
+      const matchedLead = leads.find((lead: { id?: number; name?: string }) =>
+        lead.name?.includes(marker),
+      );
+
+      if (matchedLead?.id) return matchedLead.id;
+    }
+
+    return null;
+  }
+
   private async addLeadNote(leadId: number, text: string): Promise<void> {
     if (!this.client) return;
 
@@ -129,6 +174,19 @@ export class AmoCrmService {
         params: { text },
       },
     ]);
+  }
+
+  private async markLeadCancelled(leadId: number): Promise<void> {
+    if (!this.client) return;
+
+    const cancelledStatusId = this.getOptionalNumber(
+      'AMOCRM_CANCELLED_STATUS_ID',
+    );
+    if (!cancelledStatusId) return;
+
+    await this.client.patch(`/api/v4/leads/${leadId}`, {
+      status_id: cancelledStatusId,
+    });
   }
 
   private async safeRun(

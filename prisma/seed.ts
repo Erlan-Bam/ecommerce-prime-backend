@@ -625,51 +625,53 @@ async function main() {
 
   // Create Pickup Points
   console.log('📍 Creating pickup points...');
-  let pickupPoint1 = await prisma.pickupPoint.findFirst({
-    where: { name: 'ТРЦ Мега Алматы' },
+  let pickupPoint = await prisma.pickupPoint.findFirst({
+    where: { address: 'г. Москва, улица Барклая, 6Ак1' },
   });
 
-  if (!pickupPoint1) {
-    pickupPoint1 = await prisma.pickupPoint.create({
+  if (pickupPoint) {
+    pickupPoint = await prisma.pickupPoint.update({
+      where: { id: pickupPoint.id },
       data: {
-        name: 'ТРЦ Мега Алматы',
-        address: 'ул. Абая 150, ТРЦ Мега, Алматы',
-        coords: '43.2380,76.9450',
+        name: 'Prime Electronics на Барклая',
+        address: 'г. Москва, улица Барклая, 6Ак1',
+        coords: '55.7422671,37.4992178',
         workingSchedule: {
-          Пн: { from: '10:00', to: '22:00' },
-          Вт: { from: '10:00', to: '22:00' },
-          Ср: { from: '10:00', to: '22:00' },
-          Чт: { from: '10:00', to: '22:00' },
-          Пт: { from: '10:00', to: '22:00' },
-          Сб: { from: '10:00', to: '22:00' },
-          Вс: { from: '10:00', to: '21:00' },
+          Пн: { from: '11:00', to: '21:00' },
+          Вт: { from: '11:00', to: '21:00' },
+          Ср: { from: '11:00', to: '21:00' },
+          Чт: { from: '11:00', to: '21:00' },
+          Пт: { from: '11:00', to: '21:00' },
+          Сб: { from: '11:00', to: '21:00' },
+          Вс: { from: '11:00', to: '21:00' },
         },
+        isActive: true,
+      },
+    });
+  } else {
+    pickupPoint = await prisma.pickupPoint.create({
+      data: {
+        name: 'Prime Electronics на Барклая',
+        address: 'г. Москва, улица Барклая, 6Ак1',
+        coords: '55.7422671,37.4992178',
+        workingSchedule: {
+          Пн: { from: '11:00', to: '21:00' },
+          Вт: { from: '11:00', to: '21:00' },
+          Ср: { from: '11:00', to: '21:00' },
+          Чт: { from: '11:00', to: '21:00' },
+          Пт: { from: '11:00', to: '21:00' },
+          Сб: { from: '11:00', to: '21:00' },
+          Вс: { from: '11:00', to: '21:00' },
+        },
+        isActive: true,
       },
     });
   }
 
-  let pickupPoint2 = await prisma.pickupPoint.findFirst({
-    where: { name: 'ТЦ Керуен Астана' },
+  await prisma.pickupPoint.updateMany({
+    where: { id: { not: pickupPoint.id } },
+    data: { isActive: false },
   });
-
-  if (!pickupPoint2) {
-    pickupPoint2 = await prisma.pickupPoint.create({
-      data: {
-        name: 'ТЦ Керуен Астана',
-        address: 'пр. Достык 5, ТЦ Керуен, Астана',
-        coords: '51.1280,71.4300',
-        workingSchedule: {
-          Пн: { from: '09:00', to: '21:00' },
-          Вт: { from: '09:00', to: '21:00' },
-          Ср: { from: '09:00', to: '21:00' },
-          Чт: { from: '09:00', to: '21:00' },
-          Пт: { from: '09:00', to: '21:00' },
-          Сб: { from: '10:00', to: '20:00' },
-          Вс: { from: '10:00', to: '20:00' },
-        },
-      },
-    });
-  }
 
   // Create Products
   console.log('📦 Creating products...');
@@ -1984,20 +1986,14 @@ async function main() {
     });
 
     // Add stock to pickup points
-    if (pickupPoint1 && pickupPoint2) {
+    if (pickupPoint) {
       await prisma.productStock.createMany({
         data: [
           {
             productId: product.id,
-            pointId: pickupPoint1.id,
+            pointId: pickupPoint.id,
             sku: `SKU-${product.slug}-1`,
             stockCount: Math.floor(Math.random() * 50) + 5,
-          },
-          {
-            productId: product.id,
-            pointId: pickupPoint2.id,
-            sku: `SKU-${product.slug}-2`,
-            stockCount: Math.floor(Math.random() * 30) + 3,
           },
         ],
       });

@@ -8,6 +8,7 @@ import {
   ValidationPipe,
 } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { getCorsOrigins } from './shared/lib/cors-origins';
 
 async function bootstrap() {
   const NODE_ENV = process.env.NODE_ENV;
@@ -15,16 +16,7 @@ async function bootstrap() {
   const logger = new Logger('Bootstrap');
   app.setGlobalPrefix('api');
   app.enableCors({
-    origin: [
-      'http://localhost:3000',
-      'http://localhost:3001',
-      'http://localhost:4200',
-      'https://e-commerce-production-bf09.up.railway.app',
-      'https://ecommerce-prime-backend-production.up.railway.app',
-      'https://e-commerce-admin-production-9e9f.up.railway.app',
-      'https://prime-electronics.ru',
-      'https://admin-panel.prime-electronics.ru',
-    ],
+    origin: getCorsOrigins(),
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: [
       'Content-Type',

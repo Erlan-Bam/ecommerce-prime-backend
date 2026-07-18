@@ -5,9 +5,10 @@ import { AdminOrderController } from './controllers/admin.controller';
 import { SharedModule } from '../shared/shared.module';
 import { OrderCacheService } from './services/cache.service';
 import { LoyaltyModule } from '../loyalty/loyalty.module';
+import { AmoCrmModule } from '../amocrm';
 
 @Module({
-  imports: [SharedModule, LoyaltyModule],
+  imports: [SharedModule, LoyaltyModule, AmoCrmModule],
   providers: [OrderService, OrderCacheService],
   controllers: [OrderController, AdminOrderController],
 })

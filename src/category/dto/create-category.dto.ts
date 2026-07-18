@@ -29,6 +29,21 @@ export class CreateCategoryDto {
   @IsString()
   image?: string;
 
+  @ApiPropertyOptional({ description: 'Manual SEO title override' })
+  @IsOptional()
+  @IsString()
+  seoTitle?: string;
+
+  @ApiPropertyOptional({ description: 'Manual SEO description override' })
+  @IsOptional()
+  @IsString()
+  seoDescription?: string;
+
+  @ApiPropertyOptional({ description: 'Manual page H1 override' })
+  @IsOptional()
+  @IsString()
+  seoH1?: string;
+
   @ApiPropertyOptional({ description: 'Is category active', default: true })
   @IsOptional()
   @IsBoolean()

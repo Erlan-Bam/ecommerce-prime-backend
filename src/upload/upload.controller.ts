@@ -1,5 +1,6 @@
 import {
   Controller,
+  Body,
   Post,
   UploadedFile,
   UploadedFiles,
@@ -26,6 +27,11 @@ export class UploadController {
         file: {
           type: 'string',
           format: 'binary',
+        },
+        withWatermark: {
+          type: 'boolean',
+          description:
+            'Embed PRIME watermark into image during upload (default: false)',
         },
       },
     },
@@ -55,14 +61,21 @@ export class UploadController {
       },
     }),
   )
-  async uploadImage(@UploadedFile() file: Express.Multer.File) {
+  async uploadImage(
+    @UploadedFile() file: Express.Multer.File,
+    @Body('withWatermark') withWatermark?: string | boolean,
+  ) {
     if (!file) {
       throw new HttpException('No file uploaded', HttpStatus.BAD_REQUEST);
     }
 
+    const withWatermarkEnabled =
+      withWatermark === true || withWatermark === 'true';
     const ext = file.originalname.substring(file.originalname.lastIndexOf('.'));
     const filename = `${Math.floor(Math.random() * 100000)}_${Date.now()}${ext}`;
-    const url = await this.uploadService.saveImage(file, filename);
+    const url = await this.uploadService.saveImage(file, filename, {
+      withWatermark: withWatermarkEnabled,
+    });
 
     return {
       filename,
@@ -85,6 +98,11 @@ export class UploadController {
             type: 'string',
             format: 'binary',
           },
+        },
+        withWatermark: {
+          type: 'boolean',
+          description:
+            'Embed PRIME watermark into images during upload (default: false)',
         },
       },
     },
@@ -114,18 +132,25 @@ export class UploadController {
       },
     }),
   )
-  async uploadImages(@UploadedFiles() files: Express.Multer.File[]) {
+  async uploadImages(
+    @UploadedFiles() files: Express.Multer.File[],
+    @Body('withWatermark') withWatermark?: string | boolean,
+  ) {
     if (!files || files.length === 0) {
       throw new HttpException('No files uploaded', HttpStatus.BAD_REQUEST);
     }
 
+    const withWatermarkEnabled =
+      withWatermark === true || withWatermark === 'true';
     return Promise.all(
       files.map(async (file) => {
         const ext = file.originalname.substring(
           file.originalname.lastIndexOf('.'),
         );
         const filename = `${Math.floor(Math.random() * 100000)}_${Date.now()}${ext}`;
-        const url = await this.uploadService.saveImage(file, filename);
+        const url = await this.uploadService.saveImage(file, filename, {
+          withWatermark: withWatermarkEnabled,
+        });
 
         return {
           filename,

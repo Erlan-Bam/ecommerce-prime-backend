@@ -20,10 +20,14 @@ describe('OrderService cancellation rules', () => {
     const loyaltyService = {
       scheduleCashbackAccrual: jest.fn(),
     };
+    const amoCrmService = {
+      safeSubmitOrderCancellation: jest.fn(),
+    };
     const service = new OrderService(
       prisma as any,
       cacheService as any,
       loyaltyService as any,
+      amoCrmService as any,
     );
 
     await expect(
@@ -47,10 +51,14 @@ describe('OrderService cancellation rules', () => {
       invalidateUserOrders: jest.fn(),
       invalidateOrder: jest.fn(),
     };
+    const amoCrmService = {
+      safeSubmitOrderCancellation: jest.fn(),
+    };
     const service = new OrderService(
       prisma as any,
       cacheService as any,
       {} as any,
+      amoCrmService as any,
     );
 
     await expect(service.cancelOrder('user-1', 1)).rejects.toThrow(
@@ -80,10 +88,14 @@ describe('OrderService cancellation rules', () => {
       invalidateUserOrders: jest.fn(),
       invalidateOrder: jest.fn(),
     };
+    const amoCrmService = {
+      safeSubmitOrderCancellation: jest.fn(),
+    };
     const service = new OrderService(
       prisma as any,
       cacheService as any,
       {} as any,
+      amoCrmService as any,
     );
 
     await expect(service.cancelOrder('user-1', 1)).resolves.toBe(updatedOrder);
@@ -95,5 +107,9 @@ describe('OrderService cancellation rules', () => {
     );
     expect(cacheService.invalidateUserOrders).toHaveBeenCalledWith('user-1');
     expect(cacheService.invalidateOrder).toHaveBeenCalledWith('user-1', 1);
+    expect(amoCrmService.safeSubmitOrderCancellation).toHaveBeenCalledWith(
+      updatedOrder,
+      'user-cancel',
+    );
   });
 });

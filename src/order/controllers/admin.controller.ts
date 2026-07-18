@@ -120,6 +120,19 @@ export class AdminOrderController {
     return this.orderService.getOrderByIdAdmin(orderId);
   }
 
+  @Post(':id/amocrm/sync')
+  @ApiOperation({ summary: 'Manually sync order to amoCRM (Admin)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Order sync to amoCRM triggered successfully',
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden - Admin only' })
+  @ApiResponse({ status: 404, description: 'Order not found' })
+  syncOrderToAmoCrm(@Param('id', ParseIntPipe) orderId: number) {
+    return this.orderService.syncOrderToAmoCrm(orderId);
+  }
+
   @Patch(':id/status')
   @ApiOperation({ summary: 'Update order status (Admin)' })
   @ApiResponse({

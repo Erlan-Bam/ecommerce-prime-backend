@@ -74,6 +74,24 @@ export class ProductFilterDto {
   @IsBoolean()
   onSale?: boolean;
 
+  @ApiPropertyOptional({
+    description:
+      'Include inactive products (for admin use, default: false)',
+    default: false,
+  })
+  @IsOptional()
+  @Transform(({ value }) => value === 'true' || value === true)
+  @IsBoolean()
+  includeInactive?: boolean;
+
+  @ApiPropertyOptional({
+    description: 'Filter by product activity status',
+  })
+  @IsOptional()
+  @Transform(({ value }) => value === 'true' || value === true)
+  @IsBoolean()
+  isActive?: boolean;
+
   @ApiPropertyOptional({ description: 'Minimum rating (1-5)' })
   @IsOptional()
   @Type(() => Number)

@@ -103,6 +103,26 @@ describe('CategoryService - Soft Delete', () => {
         }),
       );
     });
+
+    it('should include inactive categories when requested', async () => {
+      mockPrisma.category.findMany.mockResolvedValue([]);
+      mockPrisma.category.count.mockResolvedValue(0);
+
+      await service.findAll({ page: 1, limit: 10, includeInactive: true });
+
+      expect(mockPrisma.category.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            isDeleted: false,
+          },
+        }),
+      );
+      expect(mockPrisma.category.count).toHaveBeenCalledWith({
+        where: {
+          isDeleted: false,
+        },
+      });
+    });
   });
 
   describe('findTree', () => {
@@ -116,6 +136,53 @@ describe('CategoryService - Soft Delete', () => {
           where: expect.objectContaining({
             isDeleted: false,
           }),
+        }),
+      );
+    });
+
+    it('should build a recursive tree for categories deeper than three levels', async () => {
+      mockPrisma.category.findMany.mockResolvedValue([
+        {
+          id: 'root',
+          title: 'Beats',
+          slug: 'beats',
+          parentId: null,
+          sortOrder: 1,
+          _count: { products: 0 },
+        },
+        {
+          id: 'child',
+          title: 'Наушники',
+          slug: 'naushniki-3',
+          parentId: 'root',
+          sortOrder: 1,
+          _count: { products: 0 },
+        },
+        {
+          id: 'grandchild',
+          title: 'Studio Pro',
+          slug: 'studio-pro',
+          parentId: 'child',
+          sortOrder: 1,
+          _count: { products: 5 },
+        },
+        {
+          id: 'great-grandchild',
+          title: 'Limited',
+          slug: 'limited',
+          parentId: 'grandchild',
+          sortOrder: 1,
+          _count: { products: 1 },
+        },
+      ]);
+
+      const result = await service.findTree();
+
+      expect(result).toHaveLength(1);
+      expect(result[0].children[0].children[0].children[0]).toEqual(
+        expect.objectContaining({
+          id: 'great-grandchild',
+          title: 'Limited',
         }),
       );
     });

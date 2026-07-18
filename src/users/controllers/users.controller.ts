@@ -7,7 +7,6 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
-  HttpException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -17,7 +16,6 @@ import {
 } from '@nestjs/swagger';
 import { UsersService } from '../users.service';
 import { UpdateProfileDto } from '../dto/update-profile.dto';
-import { ChangePasswordDto } from '../../auth/dto';
 import { FormDto } from '../../email/dto';
 import { UserGuard } from '../../shared/guards/user.guard';
 import { User } from '../../shared/decorator/user.decorator';
@@ -52,27 +50,6 @@ export class UsersController {
     @Body() dto: UpdateProfileDto,
   ) {
     return this.usersService.updateProfile(userId, dto);
-  }
-
-  @UseGuards(UserGuard)
-  @Post('change-password')
-  @HttpCode(HttpStatus.OK)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Change user password' })
-  @ApiResponse({ status: 200, description: 'Password changed successfully' })
-  @ApiResponse({
-    status: 400,
-    description: 'Bad request - Passwords do not match',
-  })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  async changePassword(
-    @User('id') userId: string,
-    @Body() dto: ChangePasswordDto,
-  ) {
-    if (dto.newPassword !== dto.confirmPassword) {
-      throw new HttpException('Passwords do not match', HttpStatus.BAD_REQUEST);
-    }
-    return this.usersService.changePassword(userId, dto.newPassword);
   }
 
   @Post('form')

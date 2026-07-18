@@ -59,14 +59,49 @@ export class CategoryService {
       .replace(/[^a-z0-9\s-]/g, '')
       .replace(/\s+/g, '-')
       .replace(/-+/g, '-')
+      .replace(/^-+|-+$/g, '')
       .trim();
+  }
+
+  private buildCategoryTree<T extends { id: string; parentId: string | null; title: string; sortOrder?: number }>(
+    categories: T[],
+  ): Array<T & { children: Array<T & { children: any[] }> }> {
+    const nodes = new Map<string, T & { children: any[] }>();
+    const roots: Array<T & { children: any[] }> = [];
+
+    categories.forEach((category) => {
+      nodes.set(category.id, { ...category, children: [] });
+    });
+
+    nodes.forEach((category) => {
+      if (category.parentId && nodes.has(category.parentId)) {
+        nodes.get(category.parentId)!.children.push(category);
+      } else {
+        roots.push(category);
+      }
+    });
+
+    const sortNodes = (items: Array<T & { children: any[] }>) => {
+      items.sort((a, b) => {
+        const orderDiff = (a.sortOrder ?? 0) - (b.sortOrder ?? 0);
+        if (orderDiff !== 0) return orderDiff;
+
+        return a.title.localeCompare(b.title, 'ru');
+      });
+      items.forEach((item) => sortNodes(item.children));
+    };
+
+    sortNodes(roots);
+    return roots;
   }
 
   async create(createCategoryDto: CreateCategoryDto) {
     try {
       this.logger.log(`Creating category: ${createCategoryDto.title}`);
 
-      const slug = this.generateSlug(createCategoryDto.title);
+      const slug = createCategoryDto.slug?.trim()
+        ? this.generateSlug(createCategoryDto.slug)
+        : this.generateSlug(createCategoryDto.title);
 
       const category = await this.prisma.category.create({
         data: {
@@ -98,16 +133,22 @@ export class CategoryService {
     }
   }
 
-  async findAll(paginationDto: PaginationDto) {
+  async findAll(
+    paginationDto: PaginationDto & { includeInactive?: boolean },
+  ) {
     try {
       this.logger.log(
         `Finding all categories with pagination: ${JSON.stringify(paginationDto)}`,
       );
 
       const { page = 1, limit = 10 } = paginationDto;
+      const includeInactive = paginationDto.includeInactive === true;
       const skip = (page - 1) * limit;
+      const where = includeInactive
+        ? { isDeleted: false }
+        : { isActive: true, isDeleted: false };
 
-      const cacheKey = `category:all:page:${page}:limit:${limit}`;
+      const cacheKey = `category:all:page:${page}:limit:${limit}:includeInactive:${includeInactive}`;
 
       const cached = await this.cacheService.getCachedCategories(cacheKey);
       if (cached) {
@@ -117,22 +158,22 @@ export class CategoryService {
 
       const [data, total] = await Promise.all([
         this.prisma.category.findMany({
-          where: { isActive: true, isDeleted: false },
+          where,
           skip,
           take: limit,
           include: {
             parent: { select: { id: true, title: true, slug: true } },
             children: {
-              where: { isActive: true, isDeleted: false },
+              where,
               select: { id: true, title: true, slug: true, image: true },
               orderBy: { sortOrder: 'asc' },
             },
-            _count: { select: { products: true } },
+            _count: { select: { products: true, children: true } },
           },
           orderBy: [{ sortOrder: 'asc' }, { title: 'asc' }],
         }),
         this.prisma.category.count({
-          where: { isActive: true, isDeleted: false },
+          where,
         }),
       ]);
 
@@ -176,29 +217,16 @@ export class CategoryService {
       }
 
       const categories = await this.prisma.category.findMany({
-        where: { isActive: true, isDeleted: false, parentId: null },
+        where: { isActive: true, isDeleted: false },
         include: {
-          children: {
-            where: { isActive: true, isDeleted: false },
-            include: {
-              children: {
-                where: { isActive: true, isDeleted: false },
-                orderBy: { sortOrder: 'asc' },
-                include: {
-                  _count: { select: { products: true } },
-                },
-              },
-              _count: { select: { products: true } },
-            },
-            orderBy: { sortOrder: 'asc' },
-          },
-          _count: { select: { products: true } },
+          _count: { select: { products: true, children: true } },
         },
-        orderBy: { sortOrder: 'asc' },
+        orderBy: [{ sortOrder: 'asc' }, { title: 'asc' }],
       });
+      const tree = this.buildCategoryTree(categories);
 
-      await this.cacheService.cacheCategories(cacheKey, categories);
-      return categories;
+      await this.cacheService.cacheCategories(cacheKey, tree);
+      return tree;
     } catch (error) {
       this.logger.error(
         `Error finding category tree: ${error.message}`,
@@ -305,7 +333,9 @@ export class CategoryService {
       await this.findOne(id);
 
       const updateData: any = { ...updateCategoryDto };
-      if (updateCategoryDto.title) {
+      if (updateCategoryDto.slug?.trim()) {
+        updateData.slug = this.generateSlug(updateCategoryDto.slug);
+      } else if (updateCategoryDto.title) {
         updateData.slug = this.generateSlug(updateCategoryDto.title);
       }
 

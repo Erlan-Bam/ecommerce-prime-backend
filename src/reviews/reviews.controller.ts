@@ -15,7 +15,7 @@ import {
 import { ReviewsService } from './services/reviews.service';
 import { AdminGuard } from '../shared/guards/admin.guard';
 import { UserGuard } from '../shared/guards/user.guard';
-import { CreateReviewDto, CreateGuestReviewDto } from './dto';
+import { CreateReviewDto, CreateGuestReviewDto, UpdateReviewDto } from './dto';
 import { ApiTags, ApiQuery, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 
 @ApiTags('Reviews')
@@ -51,18 +51,38 @@ export class ReviewsController {
   @ApiQuery({ name: 'limit', required: false, type: Number })
   @ApiQuery({ name: 'productId', required: false, type: String })
   @ApiQuery({ name: 'isActive', required: false, type: Boolean })
+  @ApiQuery({ name: 'search', required: false, type: String })
+  @ApiQuery({ name: 'rating', required: false, type: Number })
+  @ApiQuery({
+    name: 'sortBy',
+    required: false,
+    enum: ['createdAt', 'rating'],
+  })
+  @ApiQuery({
+    name: 'sortOrder',
+    required: false,
+    enum: ['asc', 'desc'],
+  })
   @ApiResponse({ status: 200, description: 'Reviews retrieved successfully' })
   async findAll(
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
     @Query('limit', new DefaultValuePipe(10), ParseIntPipe) limit: number,
     @Query('productId') productId?: string,
     @Query('isActive') isActive?: string,
+    @Query('search') search?: string,
+    @Query('rating') rating?: string,
+    @Query('sortBy') sortBy?: 'createdAt' | 'rating',
+    @Query('sortOrder') sortOrder?: 'asc' | 'desc',
   ) {
     return this.reviewsService.findAll({
       page,
       limit,
       productId,
       isActive: isActive !== undefined ? isActive === 'true' : undefined,
+      search,
+      rating: rating ? Number(rating) : undefined,
+      sortBy,
+      sortOrder,
     });
   }
 
@@ -99,6 +119,14 @@ export class ReviewsController {
   @ApiResponse({ status: 200, description: 'Review rejected successfully' })
   async reject(@Param('id') id: string) {
     return this.reviewsService.reject(id);
+  }
+
+  @Patch(':id')
+  @UseGuards(AdminGuard)
+  @ApiBearerAuth()
+  @ApiResponse({ status: 200, description: 'Review updated successfully' })
+  async update(@Param('id') id: string, @Body() dto: UpdateReviewDto) {
+    return this.reviewsService.update(id, dto);
   }
 
   @Delete(':id')

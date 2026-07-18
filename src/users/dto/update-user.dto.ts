@@ -3,6 +3,8 @@ import { IsEnum, IsOptional, IsString, IsBoolean } from 'class-validator';
 
 export enum UserRole {
   USER = 'USER',
+  EDITOR = 'EDITOR',
+  MANAGER = 'MANAGER',
   ADMIN = 'ADMIN',
 }
 

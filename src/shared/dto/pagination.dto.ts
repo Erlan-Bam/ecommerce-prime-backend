@@ -21,14 +21,14 @@ export class PaginationDto {
     description: 'Items per page',
     example: 20,
     minimum: 1,
-    maximum: 100,
+    maximum: 1000,
     default: 20,
     type: Number,
   })
   @IsOptional()
   @IsInt()
   @Min(1)
-  @Max(100)
+  @Max(1000)
   @Transform(({ value }) => Number(value))
   limit?: number = 20;
 }

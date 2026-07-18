@@ -1,8 +1,13 @@
 import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
+import Redis from 'ioredis';
 import * as dotenv from 'dotenv';
 import * as path from 'path';
+import * as fs from 'fs/promises';
+import { createHash } from 'crypto';
+import { v2 as cloudinary } from 'cloudinary';
+import { normalizeParsedCategoryPath } from '../src/shared/lib/catalog-classification';
 
 dotenv.config();
 
@@ -11,6 +16,27 @@ const EXCEL_FILE = path.join(__dirname, '..', 'public', 'products.xlsx');
 const BATCH_SIZE = 50; // Products per DB batch
 const DRY_RUN = process.argv.includes('--dry-run');
 const SKIP_TRUNCATE = process.argv.includes('--skip-truncate');
+const WATERMARK_DISABLED = process.argv.includes('--no-watermark');
+const WATERMARK_PUBLIC_ID =
+  process.env.CLOUDINARY_WATERMARK_PUBLIC_ID ||
+  'ecommerce/watermarks/prime-logo';
+const WATERMARK_FILE = path.join(
+  __dirname,
+  '..',
+  'public',
+  'watermarks',
+  'prime.svg',
+);
+const CLOUDINARY_ENABLED = Boolean(
+  process.env.CLOUDINARY_CLOUD_NAME &&
+  process.env.CLOUDINARY_API_KEY &&
+  process.env.CLOUDINARY_API_SECRET,
+);
+const FORCE_REWATERMARK = process.env.IMPORT_FORCE_REWATERMARK === 'true';
+const DEFAULT_STOCK_PER_POINT = (() => {
+  const parsed = Number.parseInt(process.env.IMPORT_DEFAULT_STOCK || '5', 10);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : 5;
+})();
 
 // ─── Columns that map directly to the Product model ────────────────────────
 // These columns are NOT stored in ProductAttribute – they go into Product fields
@@ -28,6 +54,30 @@ const PRODUCT_FIELD_COLUMNS = new Set([
   'Описание',
   'Вариант',
   'Старая цена',
+  'Категория источника',
+  'Путь источника',
+  'ID оффера',
+  'Группа оффера',
+]);
+
+const TECHNICAL_ATTRIBUTE_COLUMNS = new Set([
+  'id оффера',
+  'группа оффера',
+  'категория источника',
+  'путь источника',
+  'source id',
+  'source slug',
+  'offer id',
+  'offer group',
+]);
+
+const CONFIGURATION_ATTRIBUTE_COLUMNS = new Set([
+  'конфигурации',
+  'конфигурации товара',
+  'конфигурации цены',
+  'variant configurations',
+  'product configurations',
+  'configurations',
 ]);
 
 // ─── Categories to skip during import ──────────────────────────────────────
@@ -106,6 +156,17 @@ async function withRetry<T>(fn: () => Promise<T>, label: string): Promise<T> {
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+if (CLOUDINARY_ENABLED) {
+  cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET,
+  });
+}
+
+const parserImageCache = new Map<string, Promise<string>>();
+let watermarkAssetPromise: Promise<string | null> | null = null;
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -192,6 +253,74 @@ function slugify(text: string): string {
     .substring(0, 180);
 }
 
+function normalizeAttributeName(rawName: string): string | null {
+  const cleanName = rawName.replace(/\s+/g, ' ').trim();
+  if (!cleanName) return null;
+
+  const withoutPrefix = cleanName.replace(/^параметр\s*:\s*/i, '').trim();
+  const normalizedName = withoutPrefix || cleanName;
+  if (!normalizedName) return null;
+
+  const lookupKey = normalizedName
+    .toLowerCase()
+    .replace(/ё/g, 'е')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (TECHNICAL_ATTRIBUTE_COLUMNS.has(lookupKey)) {
+    return null;
+  }
+
+  return normalizedName;
+}
+
+function normalizeLookupKey(value: string): string {
+  return value.toLowerCase().replace(/ё/g, 'е').replace(/\s+/g, ' ').trim();
+}
+
+function isConfigurationAttributeName(name: string): boolean {
+  return CONFIGURATION_ATTRIBUTE_COLUMNS.has(normalizeLookupKey(name));
+}
+
+function dedupeAttributes(
+  attributes: Array<{ name: string; value: string }>,
+): Array<{ name: string; value: string }> {
+  const unique = new Map<string, { name: string; value: string }>();
+
+  attributes.forEach((attr) => {
+    const normalizedName = normalizeAttributeName(attr.name);
+    const normalizedValue = attr.value?.trim();
+    if (!normalizedName || !normalizedValue) return;
+
+    const key = `${normalizeLookupKey(normalizedName)}::${normalizeLookupKey(normalizedValue)}`;
+    if (!unique.has(key)) {
+      unique.set(key, { name: normalizedName, value: normalizedValue });
+    }
+  });
+
+  return Array.from(unique.values());
+}
+
+function mergeConfigurationAttributes(
+  incoming: Array<{ name: string; value: string }>,
+  existing: Array<{ name: string; value: string }>,
+): Array<{ name: string; value: string }> {
+  const hasIncomingConfigurations = incoming.some((attr) =>
+    isConfigurationAttributeName(attr.name),
+  );
+  if (hasIncomingConfigurations) {
+    return dedupeAttributes(incoming);
+  }
+
+  const existingConfigurations = existing.filter((attr) =>
+    isConfigurationAttributeName(attr.name),
+  );
+  if (existingConfigurations.length === 0) {
+    return dedupeAttributes(incoming);
+  }
+
+  return dedupeAttributes([...incoming, ...existingConfigurations]);
+}
+
 function getCellValue(cell: any): string {
   if (cell === null || cell === undefined) return '';
   if (typeof cell === 'object') {
@@ -209,6 +338,239 @@ function getCellValue(cell: any): string {
   return String(cell).trim();
 }
 
+function getNormalizedRowCategoryPath(row: Map<string, string>) {
+  const topName = row.get('Категория')?.trim() || null;
+  const midName = row.get('Подкатегория')?.trim() || null;
+  const leafName = row.get('Раздел')?.trim() || null;
+  const sourcePath =
+    row.get('Путь источника')?.trim() ||
+    row.get('Категория источника')?.trim() ||
+    null;
+  const attributes = Array.from(row.entries())
+    .filter(([key]) => !PRODUCT_FIELD_COLUMNS.has(key))
+    .map(([name, value]) => ({ name, value }));
+
+  return normalizeParsedCategoryPath({
+    productName: row.get('Название')?.trim() || '',
+    topCategory: topName,
+    subcategory: midName,
+    section: leafName,
+    sourcePath,
+    categoryPath: [topName, midName, leafName].filter(
+      (value): value is string => Boolean(value),
+    ),
+    attributes,
+  });
+}
+
+function isCloudinaryUrl(value: string): boolean {
+  return (
+    value.includes('res.cloudinary.com') && value.includes('/image/upload/')
+  );
+}
+
+function buildWatermarkTransformation(watermarkPublicId: string) {
+  return [
+    {
+      overlay: watermarkPublicId.replace(/\//g, ':'),
+      width: 0.2,
+      flags: 'relative',
+    },
+    {
+      flags: 'layer_apply',
+      gravity: 'south_east',
+      x: 18,
+      y: 18,
+      opacity: 78,
+    },
+  ];
+}
+
+async function ensureWatermarkAsset(): Promise<string | null> {
+  if (!CLOUDINARY_ENABLED || WATERMARK_DISABLED) return null;
+  if (watermarkAssetPromise) return watermarkAssetPromise;
+
+  watermarkAssetPromise = (async () => {
+    try {
+      const svg = await fs.readFile(WATERMARK_FILE, 'utf8');
+      const dataUri = `data:image/svg+xml;base64,${Buffer.from(svg, 'utf8').toString('base64')}`;
+      await cloudinary.uploader.upload(dataUri, {
+        public_id: WATERMARK_PUBLIC_ID,
+        resource_type: 'image',
+        overwrite: true,
+        invalidate: true,
+      });
+      console.log(`✅ Watermark asset refreshed: ${WATERMARK_PUBLIC_ID}`);
+      return WATERMARK_PUBLIC_ID;
+    } catch (error: any) {
+      console.warn(
+        `⚠️  Watermark asset unavailable, continue without watermark: ${error.message || error}`,
+      );
+      return null;
+    }
+  })();
+
+  return watermarkAssetPromise;
+}
+
+async function watermarkParserImage(sourceUrl: string): Promise<string> {
+  const normalized = sourceUrl.trim();
+  if (!normalized) return normalized;
+  if (!CLOUDINARY_ENABLED || WATERMARK_DISABLED) return normalized;
+  if (isCloudinaryUrl(normalized)) return normalized;
+
+  const cached = parserImageCache.get(normalized);
+  if (cached) return cached;
+
+  const uploadPromise = (async () => {
+    const watermarkId = await ensureWatermarkAsset();
+    if (!watermarkId) return normalized;
+
+    const imageHash = createHash('sha1')
+      .update(normalized)
+      .digest('hex')
+      .slice(0, 20);
+    const publicId = `ecommerce/parser/${imageHash}`;
+
+    try {
+      const result = await cloudinary.uploader.upload(normalized, {
+        public_id: publicId,
+        resource_type: 'image',
+        overwrite: FORCE_REWATERMARK,
+        ...(FORCE_REWATERMARK ? { invalidate: true } : {}),
+        timeout: 30_000,
+        transformation: buildWatermarkTransformation(watermarkId),
+      });
+      return result.secure_url;
+    } catch (error: any) {
+      const message = String(error?.message || '');
+      if (message.toLowerCase().includes('already exists')) {
+        try {
+          const existing = await cloudinary.api.resource(publicId, {
+            resource_type: 'image',
+          });
+          if (existing?.secure_url) return existing.secure_url;
+        } catch (_) {
+          return cloudinary.url(publicId, { secure: true });
+        }
+      }
+
+      console.warn(
+        `⚠️  Failed to watermark image, using source URL: ${normalized.substring(0, 120)}`,
+      );
+      return normalized;
+    }
+  })();
+
+  parserImageCache.set(normalized, uploadPromise);
+  return uploadPromise;
+}
+
+async function ensureDefaultStockCoverage() {
+  const points = await withRetry(
+    () =>
+      prisma.pickupPoint.findMany({
+        where: { isActive: true },
+        select: { id: true },
+      }),
+    'pickup points fetch',
+  );
+
+  if (!points.length) {
+    console.warn('⚠️  No active pickup points found, stock backfill skipped');
+    return;
+  }
+
+  const products = await withRetry(
+    () =>
+      prisma.product.findMany({
+        where: { isActive: true },
+        select: { id: true, slug: true },
+      }),
+    'products fetch for stock',
+  );
+
+  if (!products.length) return;
+
+  const stockRows = products.flatMap((product) =>
+    points.map((point) => ({
+      productId: product.id,
+      pointId: point.id,
+      sku: product.slug,
+      stockCount: DEFAULT_STOCK_PER_POINT,
+    })),
+  );
+
+  const BATCH = 1000;
+  let inserted = 0;
+  for (let i = 0; i < stockRows.length; i += BATCH) {
+    const batch = stockRows.slice(i, i + BATCH);
+    const result = await withRetry(
+      () =>
+        prisma.productStock.createMany({
+          data: batch,
+          skipDuplicates: true,
+        }),
+      'stock createMany',
+    );
+    inserted += result.count;
+  }
+
+  console.log(
+    `✅ Stock coverage ensured: ${products.length} products × ${points.length} points, inserted ${inserted} rows`,
+  );
+}
+
+async function clearCatalogCaches() {
+  const redisUrl =
+    process.env.REDIS_URL ||
+    (process.env.REDIS_HOST
+      ? `redis://:${process.env.REDIS_PASSWORD || ''}@${process.env.REDIS_HOST}:${process.env.REDIS_PORT || '6379'}`
+      : null);
+
+  if (!redisUrl) {
+    console.warn('⚠️  Redis URL not found, cache invalidation skipped');
+    return;
+  }
+
+  const redis = new Redis(redisUrl, { maxRetriesPerRequest: 2 });
+  try {
+    const patterns = [
+      'products:*',
+      'product:*',
+      'category:*',
+      'brand:*',
+      'dashboard:*',
+    ];
+    let removed = 0;
+
+    for (const pattern of patterns) {
+      let cursor = '0';
+      do {
+        const [next, keys] = await redis.scan(
+          cursor,
+          'MATCH',
+          pattern,
+          'COUNT',
+          '500',
+        );
+        cursor = next;
+        if (keys.length > 0) {
+          removed += await redis.del(...keys);
+        }
+      } while (cursor !== '0');
+    }
+
+    console.log(`✅ Redis cache invalidated: ${removed} keys removed`);
+  } catch (error: any) {
+    console.warn(
+      `⚠️  Failed to invalidate Redis cache: ${error.message || error}`,
+    );
+  } finally {
+    await redis.quit();
+  }
+}
+
 // ─── Main import logic ─────────────────────────────────────────────────────
 
 async function main() {
@@ -218,6 +580,9 @@ async function main() {
   console.log(`  File: ${EXCEL_FILE}`);
   console.log(`  Dry run: ${DRY_RUN}`);
   console.log(`  Skip truncate: ${SKIP_TRUNCATE}`);
+  console.log(
+    `  Watermark mode: ${!WATERMARK_DISABLED ? 'ON' : 'OFF (--no-watermark)'}`,
+  );
   console.log('');
 
   // ── Step 1: Read Excel via streaming ────────────────────────────────────
@@ -291,6 +656,14 @@ async function main() {
     return;
   }
 
+  if (!WATERMARK_DISABLED && CLOUDINARY_ENABLED) {
+    await ensureWatermarkAsset();
+  } else if (!WATERMARK_DISABLED && !CLOUDINARY_ENABLED) {
+    console.warn(
+      '⚠️  CLOUDINARY env is missing, parser images will be saved without watermark',
+    );
+  }
+
   // ── Step 2: Clean existing product data ─────────────────────────────────
   if (!SKIP_TRUNCATE) {
     console.log('🧹 Cleaning existing product data...');
@@ -355,9 +728,10 @@ async function main() {
   const categoryMap = new Map<string, string>(); // "key" → id
 
   for (const row of rows) {
-    const topName = row.get('Категория')?.trim();
-    const midName = row.get('Подкатегория')?.trim();
-    const leafName = row.get('Раздел')?.trim();
+    const normalizedPath = getNormalizedRowCategoryPath(row);
+    const topName = normalizedPath.topCategory || undefined;
+    const midName = normalizedPath.subcategory || undefined;
+    const leafName = normalizedPath.section || undefined;
 
     // Top-level category (same as brand usually, e.g. "Apple")
     if (topName && !categoryMap.has(topName)) {
@@ -467,6 +841,9 @@ async function main() {
   let imported = 0;
   let skipped = 0;
   let errors = 0;
+  let totalSourceImages = 0;
+  let totalWatermarkedImages = 0;
+  let totalImageFallbacks = 0;
 
   for (let i = 0; i < rows.length; i += BATCH_SIZE) {
     const batch = rows.slice(i, i + BATCH_SIZE);
@@ -499,7 +876,39 @@ async function main() {
         const availability = row.get('Наличие')?.trim() || '';
         const isActive = availability.toLowerCase() !== 'нет';
         const isOnSale = oldPrice !== null && oldPrice > price;
-        const imageUrl = row.get('Изображения')?.trim() || null;
+        const rawImageValue = row.get('Изображения')?.trim() || '';
+        const sourceImageUrls = Array.from(
+          new Set(
+            rawImageValue
+              .split(';')
+              .map((url) => url.trim())
+              .filter((url) => Boolean(url)),
+          ),
+        );
+
+        const preparedImageUrls =
+          sourceImageUrls.length > 0
+            ? await Promise.all(
+                sourceImageUrls.map((sourceUrl) =>
+                  watermarkParserImage(sourceUrl),
+                ),
+              )
+            : [];
+        totalSourceImages += sourceImageUrls.length;
+        if (!WATERMARK_DISABLED && CLOUDINARY_ENABLED) {
+          sourceImageUrls.forEach((sourceUrl, idx) => {
+            const targetUrl = preparedImageUrls[idx];
+            if (
+              targetUrl &&
+              targetUrl !== sourceUrl &&
+              isCloudinaryUrl(targetUrl)
+            ) {
+              totalWatermarkedImages++;
+            } else if (targetUrl) {
+              totalImageFallbacks++;
+            }
+          });
+        }
 
         // Build slug from SKU or name
         let baseSlug = sku ? `product-${sku}` : slugify(name);
@@ -514,9 +923,10 @@ async function main() {
 
         // Category IDs to link
         const categoryIds: string[] = [];
-        const topName = row.get('Категория')?.trim();
-        const midName = row.get('Подкатегория')?.trim();
-        const leafName = row.get('Раздел')?.trim();
+        const normalizedPath = getNormalizedRowCategoryPath(row);
+        const topName = normalizedPath.topCategory || undefined;
+        const midName = normalizedPath.subcategory || undefined;
+        const leafName = normalizedPath.section || undefined;
 
         if (topName && categoryMap.has(topName)) {
           categoryIds.push(categoryMap.get(topName)!);
@@ -534,10 +944,20 @@ async function main() {
 
         // Collect attributes — everything NOT in the direct-mapping set
         const attributes: { name: string; value: string }[] = [];
+        const uniqueAttributes = new Set<string>();
         for (const [key, value] of row.entries()) {
           if (PRODUCT_FIELD_COLUMNS.has(key)) continue;
           if (!value || value.trim() === '') continue;
-          attributes.push({ name: key, value: value.trim() });
+
+          const normalizedName = normalizeAttributeName(key);
+          if (!normalizedName) continue;
+
+          const normalizedValue = value.trim();
+          const dedupeKey = `${normalizedName.toLowerCase()}::${normalizedValue.toLowerCase()}`;
+          if (uniqueAttributes.has(dedupeKey)) continue;
+
+          uniqueAttributes.add(dedupeKey);
+          attributes.push({ name: normalizedName, value: normalizedValue });
         }
 
         // Upsert product (idempotent – safe to re-run)
@@ -556,16 +976,11 @@ async function main() {
           isPrimary: idx === 0,
         }));
 
-        const imagesCreate = imageUrl
-          ? imageUrl
-              .split(';')
-              .filter((u) => u.trim())
-              .map((url, idx) => ({
-                url: url.trim(),
-                alt: `${name} - image ${idx + 1}`,
-                sortOrder: idx,
-              }))
-          : [];
+        const imagesCreate = preparedImageUrls.map((url, idx) => ({
+          url: url.trim(),
+          alt: `${name} - image ${idx + 1}`,
+          sortOrder: idx,
+        }));
 
         const attributesCreate =
           attributes.length > 0
@@ -574,6 +989,23 @@ async function main() {
                 value: attr.value,
               }))
             : [];
+
+        const existingProductAttributes = await withRetry(
+          () =>
+            prisma.product.findUnique({
+              where: { slug },
+              select: {
+                attributes: {
+                  select: { name: true, value: true },
+                },
+              },
+            }),
+          `lookup existing product attributes: ${slug}`,
+        );
+        const mergedAttributesForUpdate = mergeConfigurationAttributes(
+          attributesCreate,
+          existingProductAttributes?.attributes || [],
+        );
 
         await withRetry(
           () =>
@@ -605,8 +1037,8 @@ async function main() {
                 },
                 attributes: {
                   deleteMany: {},
-                  ...(attributesCreate.length > 0
-                    ? { create: attributesCreate }
+                  ...(mergedAttributesForUpdate.length > 0
+                    ? { create: mergedAttributesForUpdate }
                     : {}),
                 },
               },
@@ -627,7 +1059,7 @@ async function main() {
     }
 
     const progress = Math.min(i + BATCH_SIZE, rows.length);
-    if (progress % 500 === 0 || progress >= rows.length) {
+    if (progress % 100 === 0 || progress >= rows.length) {
       console.log(
         `   📊 Progress: ${progress}/${rows.length} (imported: ${imported}, skipped: ${skipped}, errors: ${errors})`,
       );
@@ -638,6 +1070,9 @@ async function main() {
       await sleep(BATCH_DELAY);
     }
   }
+
+  await ensureDefaultStockCoverage();
+  await clearCatalogCaches();
 
   // ── Step 6: Summary ─────────────────────────────────────────────────────
   console.log('');
@@ -650,6 +1085,11 @@ async function main() {
   console.log(`  Errors:                 ${errors}`);
   console.log(`  Brands created:         ${brandMap.size}`);
   console.log(`  Categories created:     ${categoryMap.size}`);
+  console.log(`  Source images found:    ${totalSourceImages}`);
+  if (!WATERMARK_DISABLED) {
+    console.log(`  Watermarked images:     ${totalWatermarkedImages}`);
+    console.log(`  Fallback image URLs:    ${totalImageFallbacks}`);
+  }
   console.log('');
   console.log('  Database counts:');
   try {

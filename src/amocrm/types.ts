@@ -21,6 +21,7 @@ export interface AmoCrmOrderInput {
   buyer?: string | null;
   email?: string | null;
   phone?: string | null;
+  status?: string | null;
   deliveryMethod?: string | null;
   paymentMethod?: string | null;
   address?: string | null;

@@ -2,6 +2,7 @@ import { Injectable, HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { PrismaService } from '../../shared/services/prisma.service';
 import { GuestCacheService } from './cache.service';
 import { AddGuestCartItemDto } from '../dto';
+import { resolveCartPricing } from '../../shared/lib/cart-variant-pricing';
 
 @Injectable()
 export class GuestCartService {
@@ -63,6 +64,9 @@ export class GuestCartService {
             image: item.product.images[0]?.url || null,
             category: primaryCategory || null,
           },
+          variantKey: item.variantKey,
+          variantLabel: item.variantLabel,
+          unitPrice: item.unitPrice || item.product.price,
           subtotal: Number(item.price),
         };
       });
@@ -96,17 +100,25 @@ export class GuestCartService {
       // Verify product exists and is active
       const product = await this.prisma.product.findUnique({
         where: { id: dto.productId },
+        include: {
+          attributes: {
+            select: { name: true, value: true },
+          },
+        },
       });
 
       if (!product || !product.isActive || product.isDeleted) {
         throw new HttpException('Product not found', HttpStatus.NOT_FOUND);
       }
 
+      const pricing = resolveCartPricing(product, dto);
+
       // Check if item already exists in cart
       const existingItem = await this.prisma.orderItem.findFirst({
         where: {
           sessionId,
           productId: dto.productId,
+          variantKey: pricing.variantKey,
           orderId: null,
         },
       });
@@ -118,7 +130,10 @@ export class GuestCartService {
           where: { id: existingItem.id },
           data: {
             quantity: newQuantity,
-            price: product.price.toNumber() * newQuantity,
+            unitPrice: pricing.unitPrice,
+            price: pricing.unitPrice * newQuantity,
+            variantKey: pricing.variantKey,
+            variantLabel: pricing.variantLabel,
           },
           include: {
             product: {
@@ -136,10 +151,13 @@ export class GuestCartService {
           id: updatedItem.id,
           productId: updatedItem.productId,
           quantity: updatedItem.quantity,
+          variantKey: updatedItem.variantKey,
+          variantLabel: updatedItem.variantLabel,
+          unitPrice: updatedItem.unitPrice,
           product: {
             id: updatedItem.product.id,
             name: updatedItem.product.name,
-            price: updatedItem.product.price,
+            price: updatedItem.unitPrice || updatedItem.product.price,
             image: updatedItem.product.images[0]?.url || null,
           },
         };
@@ -151,7 +169,10 @@ export class GuestCartService {
           sessionId,
           productId: dto.productId,
           quantity: dto.quantity,
-          price: product.price.toNumber() * dto.quantity,
+          unitPrice: pricing.unitPrice,
+          price: pricing.unitPrice * dto.quantity,
+          variantKey: pricing.variantKey,
+          variantLabel: pricing.variantLabel,
         },
         include: {
           product: {
@@ -175,10 +196,13 @@ export class GuestCartService {
         id: cartItem.id,
         productId: cartItem.productId,
         quantity: cartItem.quantity,
+        variantKey: cartItem.variantKey,
+        variantLabel: cartItem.variantLabel,
+        unitPrice: cartItem.unitPrice,
         product: {
           id: cartItem.product.id,
           name: cartItem.product.name,
-          price: cartItem.product.price,
+          price: cartItem.unitPrice || cartItem.product.price,
           image: cartItem.product.images[0]?.url || null,
         },
       };
@@ -197,17 +221,21 @@ export class GuestCartService {
     }
   }
 
-  async updateItem(sessionId: string, productId: string, quantity: number) {
+  async updateItem(
+    sessionId: string,
+    itemIdOrProductId: string,
+    quantity: number,
+  ) {
     try {
       this.logger.log(
-        `Updating cart item: ${productId}, quantity: ${quantity}`,
+        `Updating cart item: ${itemIdOrProductId}, quantity: ${quantity}`,
       );
 
       const existingItem = await this.prisma.orderItem.findFirst({
         where: {
           sessionId,
-          productId,
           orderId: null,
+          OR: [{ id: itemIdOrProductId }, { productId: itemIdOrProductId }],
         },
       });
 
@@ -226,16 +254,13 @@ export class GuestCartService {
         return { deleted: true };
       }
 
-      // Get product price for recalculation
-      const product = await this.prisma.product.findUnique({
-        where: { id: productId },
-      });
-
       const updatedItem = await this.prisma.orderItem.update({
         where: { id: existingItem.id },
         data: {
           quantity,
-          price: product.price.toNumber() * quantity,
+          price:
+            (existingItem.unitPrice?.toNumber() ||
+              existingItem.price.toNumber() / existingItem.quantity) * quantity,
         },
         include: {
           product: {
@@ -253,10 +278,13 @@ export class GuestCartService {
         id: updatedItem.id,
         productId: updatedItem.productId,
         quantity: updatedItem.quantity,
+        variantKey: updatedItem.variantKey,
+        variantLabel: updatedItem.variantLabel,
+        unitPrice: updatedItem.unitPrice,
         product: {
           id: updatedItem.product.id,
           name: updatedItem.product.name,
-          price: updatedItem.product.price,
+          price: updatedItem.unitPrice || updatedItem.product.price,
           image: updatedItem.product.images[0]?.url || null,
         },
       };
@@ -275,15 +303,15 @@ export class GuestCartService {
     }
   }
 
-  async removeItem(sessionId: string, productId: string) {
+  async removeItem(sessionId: string, itemIdOrProductId: string) {
     try {
-      this.logger.log(`Removing item from cart: ${productId}`);
+      this.logger.log(`Removing item from cart: ${itemIdOrProductId}`);
 
       const existingItem = await this.prisma.orderItem.findFirst({
         where: {
           sessionId,
-          productId,
           orderId: null,
+          OR: [{ id: itemIdOrProductId }, { productId: itemIdOrProductId }],
         },
       });
 

@@ -4,6 +4,7 @@ import {
   HttpStatus,
   Logger,
   InternalServerErrorException,
+  Optional,
 } from '@nestjs/common';
 import { PrismaService } from '../../shared/services/prisma.service';
 import { GuestCacheService } from './cache.service';
@@ -13,6 +14,11 @@ import {
   SelectPickupDto,
   QuickBuyDto,
 } from '../../order/dto';
+import {
+  calculateFinalTotalWithPayment,
+  normalizeDeliveryCost,
+} from '../../order/utils/delivery-cost';
+import { AmoCrmService } from '../../amocrm';
 
 @Injectable()
 export class GuestOrderService {
@@ -21,6 +27,7 @@ export class GuestOrderService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly cacheService: GuestCacheService,
+    @Optional() private readonly amoCrmService?: AmoCrmService,
   ) {}
 
   /**
@@ -78,8 +85,9 @@ export class GuestOrderService {
         // Recalculate prices based on current product prices
         const updatedItems = await Promise.all(
           cartItems.map(async (item) => {
-            const currentPrice = item.product.price;
-            const calculatedPrice = currentPrice.toNumber() * item.quantity;
+            const unitPrice =
+              item.unitPrice?.toNumber() || item.product.price.toNumber();
+            const calculatedPrice = unitPrice * item.quantity;
 
             // Update item price if it changed
             if (item.price.toNumber() !== calculatedPrice) {
@@ -541,6 +549,11 @@ export class GuestOrderService {
           );
         }
 
+        const deliveryCost = normalizeDeliveryCost(
+          dto.deliveryCost,
+          dto.deliveryMethod,
+        );
+
         // Prepare common update data
         const updateData: any = {
           deliveryMethod: dto.deliveryMethod,
@@ -551,6 +564,12 @@ export class GuestOrderService {
           comment: dto.comment || null,
           entrance: dto.entrance || null,
           deliveryTime: dto.deliveryTime || null,
+          finalTotal: calculateFinalTotalWithPayment(
+            order.total.toNumber(),
+            order.discount.toNumber(),
+            deliveryCost,
+            dto.paymentMethod,
+          ),
           status: 'PROCESSING',
         };
 
@@ -744,6 +763,7 @@ export class GuestOrderService {
       this.logger.log(
         `Order ${orderId} finalized successfully with ${dto.deliveryMethod} delivery`,
       );
+      await this.amoCrmService?.safeSubmitOrder(result, ['guest-checkout']);
 
       return {
         ...result,
@@ -1181,6 +1201,15 @@ export class GuestOrderService {
 
       this.logger.log(
         `Quick buy order created successfully: ${result.id} for ${dto.buyer}`,
+      );
+      await this.amoCrmService?.safeSubmitOrder(
+        {
+          ...result,
+          buyer: dto.buyer,
+          phone: dto.phone,
+          items: cartItems,
+        },
+        ['guest-quick-buy'],
       );
 
       return {

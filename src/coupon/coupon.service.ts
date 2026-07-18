@@ -13,6 +13,34 @@ export class CouponService {
     private readonly cacheService: CouponCacheService,
   ) {}
 
+  private normalizeCouponType(
+    type?: CreateCouponDto['type'],
+    legacyType?: CreateCouponDto['discountType'],
+  ) {
+    return type ?? legacyType;
+  }
+
+  private normalizeCouponValue(
+    value?: CreateCouponDto['value'],
+    legacyValue?: CreateCouponDto['discountValue'],
+  ) {
+    return value ?? legacyValue;
+  }
+
+  private normalizeCouponDateRange(dto: CreateCouponDto) {
+    const now = new Date();
+    const defaultValidTo = new Date(now);
+    defaultValidTo.setFullYear(defaultValidTo.getFullYear() + 1);
+
+    const validFromRaw = dto.validFrom ?? dto.startDate;
+    const validToRaw = dto.validTo ?? dto.endDate;
+
+    const validFrom = validFromRaw ? new Date(validFromRaw) : now;
+    const validTo = validToRaw ? new Date(validToRaw) : defaultValidTo;
+
+    return { validFrom, validTo };
+  }
+
   async create(dto: CreateCouponDto) {
     try {
       this.logger.log(`Creating coupon: ${dto.code}`);
@@ -30,9 +58,31 @@ export class CouponService {
         );
       }
 
-      // Validate dates
-      const validFrom = new Date(dto.validFrom);
-      const validTo = new Date(dto.validTo);
+      const type = this.normalizeCouponType(dto.type, dto.discountType);
+      const value = this.normalizeCouponValue(dto.value, dto.discountValue);
+      const usageLimit = dto.usageLimit ?? dto.maxUses ?? 0;
+      const { validFrom, validTo } = this.normalizeCouponDateRange(dto);
+
+      if (!type) {
+        throw new HttpException(
+          'type is required (or discountType for legacy clients)',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      if (value === undefined || value === null) {
+        throw new HttpException(
+          'value is required (or discountValue for legacy clients)',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      if (Number.isNaN(validFrom.getTime()) || Number.isNaN(validTo.getTime())) {
+        throw new HttpException(
+          'validFrom/validTo must be valid ISO dates',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
 
       if (validTo <= validFrom) {
         throw new HttpException(
@@ -42,7 +92,7 @@ export class CouponService {
       }
 
       // Validate percentage value
-      if (dto.type === 'PERCENTAGE' && dto.value > 100) {
+      if (type === 'PERCENTAGE' && value > 100) {
         throw new HttpException(
           'Percentage value cannot exceed 100',
           HttpStatus.BAD_REQUEST,
@@ -52,11 +102,11 @@ export class CouponService {
       const coupon = await this.prisma.coupon.create({
         data: {
           code: normalizedCode,
-          type: dto.type,
-          value: dto.value,
+          type,
+          value,
           validFrom,
           validTo,
-          usageLimit: dto.usageLimit ?? 0,
+          usageLimit,
           isActive: dto.isActive ?? true,
         },
       });
@@ -329,23 +379,33 @@ export class CouponService {
         updateData.code = normalizedCode;
       }
 
-      if (dto.type !== undefined) updateData.type = dto.type;
-      if (dto.value !== undefined) {
-        if (
-          (dto.type === 'PERCENTAGE' || existing.type === 'PERCENTAGE') &&
-          dto.value > 100
-        ) {
+      const normalizedType = this.normalizeCouponType(dto.type, dto.discountType);
+      const normalizedValue = this.normalizeCouponValue(
+        dto.value,
+        dto.discountValue,
+      );
+      const normalizedUsageLimit = dto.usageLimit ?? dto.maxUses;
+      const normalizedValidFrom = dto.validFrom ?? dto.startDate;
+      const normalizedValidTo = dto.validTo ?? dto.endDate;
+
+      if (normalizedType !== undefined) updateData.type = normalizedType;
+
+      if (normalizedValue !== undefined) {
+        const nextType = normalizedType ?? existing.type;
+        if (nextType === 'PERCENTAGE' && normalizedValue > 100) {
           throw new HttpException(
             'Percentage value cannot exceed 100',
             HttpStatus.BAD_REQUEST,
           );
         }
-        updateData.value = dto.value;
+        updateData.value = normalizedValue;
       }
-      if (dto.validFrom !== undefined)
-        updateData.validFrom = new Date(dto.validFrom);
-      if (dto.validTo !== undefined) updateData.validTo = new Date(dto.validTo);
-      if (dto.usageLimit !== undefined) updateData.usageLimit = dto.usageLimit;
+      if (normalizedValidFrom !== undefined)
+        updateData.validFrom = new Date(normalizedValidFrom);
+      if (normalizedValidTo !== undefined)
+        updateData.validTo = new Date(normalizedValidTo);
+      if (normalizedUsageLimit !== undefined)
+        updateData.usageLimit = normalizedUsageLimit;
       if (dto.isActive !== undefined) updateData.isActive = dto.isActive;
 
       // Validate dates if both are being updated

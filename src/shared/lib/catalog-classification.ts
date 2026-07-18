@@ -115,6 +115,8 @@ const REAL_DEVICE_NAME_TERMS = [
   'mac studio',
   'mac pro',
   'airpods',
+  'beats',
+  'powerbeats',
   'apple watch',
   'galaxy s',
   'galaxy z',
@@ -131,6 +133,37 @@ const REAL_DEVICE_NAME_TERMS = [
   'honor',
   'dyson',
   'garmin',
+];
+
+const NON_APPLE_DEVICE_BRAND_RULES = [
+  {
+    brand: 'Samsung',
+    terms: ['samsung', 'galaxy'],
+  },
+  {
+    brand: 'Xiaomi',
+    terms: ['xiaomi', 'redmi', 'poco'],
+  },
+  {
+    brand: 'OnePlus',
+    terms: ['oneplus', 'one plus'],
+  },
+  {
+    brand: 'Honor',
+    terms: ['honor'],
+  },
+  {
+    brand: 'Huawei',
+    terms: ['huawei'],
+  },
+  {
+    brand: 'Pixel',
+    terms: ['google pixel', 'pixel'],
+  },
+  {
+    brand: 'Nothing',
+    terms: ['nothing phone', 'nothing'],
+  },
 ];
 
 function clean(value?: string | null): string | null {
@@ -155,6 +188,20 @@ function containsTerm(text: string, term: string): boolean {
 
 function containsAnyTerm(text: string, terms: string[]): boolean {
   return terms.some((term) => containsTerm(text, term));
+}
+
+export function inferNonAppleDeviceBrandFromProductName(
+  productName?: string | null,
+  brandName?: string | null,
+): string | null {
+  const text = normalizeCatalogText(`${brandName || ''} ${productName || ''}`);
+  if (!text.trim()) return null;
+
+  return (
+    NON_APPLE_DEVICE_BRAND_RULES.find((rule) =>
+      containsAnyTerm(text, rule.terms),
+    )?.brand ?? null
+  );
 }
 
 function isRealProductCasePhraseOnly(
@@ -318,6 +365,17 @@ function inferAccessorySection(input: CategoryPathInput): string {
   return ACCESSORIES_CATEGORY_NAME;
 }
 
+function inferBeatsSection(productText: string): string | null {
+  if (containsTerm(productText, 'powerbeats pro')) return 'Powerbeats Pro';
+  if (containsTerm(productText, 'studio pro')) return 'Studio Pro';
+  if (containsTerm(productText, 'studio buds')) return 'Studio Buds';
+  if (containsTerm(productText, 'fit pro')) return 'Fit Pro';
+  if (containsTerm(productText, 'solo')) return 'Solo';
+  if (containsTerm(productText, 'flex')) return 'Flex';
+
+  return null;
+}
+
 export function normalizeParsedCategoryPath(
   input: CategoryPathInput,
 ): NormalizedCategoryPath {
@@ -325,6 +383,35 @@ export function normalizeParsedCategoryPath(
   const subcategory = clean(input.subcategory);
   const section = clean(input.section);
   const isAccessory = isAccessoryLikeProduct(input);
+  const productText = normalizeCatalogText(input.productName || '');
+  const brandPathText = normalizeCatalogText(
+    `${input.topCategory || ''} ${input.subcategory || ''} ${
+      input.section || ''
+    } ${input.sourcePath || ''} ${(input.categoryPath || []).join(' ')}`,
+  );
+  const isBeatsHeadphones =
+    containsTerm(productText, 'beats') &&
+    containsAnyTerm(productText, [
+      'наушник',
+      'headphone',
+      'earbud',
+      'buds',
+      'studio',
+      'solo',
+      'fit',
+      'flex',
+      'powerbeats',
+    ]) &&
+    containsAnyTerm(brandPathText, ['apple', 'airpods', 'beats', 'наушники']);
+
+  if (isBeatsHeadphones && !isAccessory) {
+    return {
+      topCategory: 'Beats',
+      subcategory: 'Наушники',
+      section: inferBeatsSection(productText),
+      isAccessory: false,
+    };
+  }
 
   if (!isAccessory) {
     return {
@@ -335,8 +422,12 @@ export function normalizeParsedCategoryPath(
     };
   }
 
+  const accessoryBrand =
+    inferNonAppleDeviceBrandFromProductName(input.productName, topCategory) ||
+    topCategory;
+
   return {
-    topCategory,
+    topCategory: accessoryBrand,
     subcategory: ACCESSORIES_CATEGORY_NAME,
     section: inferAccessorySection(input),
     isAccessory: true,

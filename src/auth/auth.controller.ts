@@ -29,6 +29,7 @@ import {
   VerifyCodeDto,
   ResendCodeDto,
   RefreshTokenDto,
+  MergeGuestCartDto,
 } from './dto';
 import { Public } from '../shared/decorator/public.decorator';
 import { User } from '../shared/decorator/user.decorator';
@@ -175,14 +176,17 @@ export class AuthController {
   @Public()
   @Post('admin/login')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Login as admin' })
+  @ApiOperation({ summary: 'Login as admin or manager' })
   @ApiResponse({
     status: 200,
-    description: 'Admin logged in successfully',
+    description: 'Admin/manager logged in successfully',
     type: AuthResponseDto,
   })
   @ApiResponse({ status: 401, description: 'Invalid credentials' })
-  @ApiResponse({ status: 403, description: 'Access denied: Admins only' })
+  @ApiResponse({
+    status: 403,
+    description: 'Access denied: admins/managers only',
+  })
   async loginAdmin(@Body() dto: LoginAdminDto) {
     return this.authService.loginAdmin(dto);
   }
@@ -230,5 +234,22 @@ export class AuthController {
   @ApiResponse({ status: 401, description: 'Invalid refresh token' })
   async refreshGuestTokens(@Body() dto: RefreshTokenDto) {
     return this.authService.refreshGuestTokens(dto.refreshToken);
+  }
+
+  @Post('guest/merge')
+  @UseGuards(UserGuard)
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Merge guest cart into current user cart' })
+  @ApiResponse({
+    status: 200,
+    description: 'Guest cart merged into user cart',
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  async mergeGuestCart(
+    @User('id') userId: string,
+    @Body() dto: MergeGuestCartDto,
+  ) {
+    return this.authService.mergeGuestCartToUser(userId, dto.guestSessionId);
   }
 }

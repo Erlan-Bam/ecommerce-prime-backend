@@ -1,4 +1,10 @@
-import { Injectable, HttpException, HttpStatus, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  HttpException,
+  HttpStatus,
+  Logger,
+  Optional,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../../shared/services/prisma.service';
 import {
@@ -18,6 +24,8 @@ import { Role } from '@prisma/client';
 import { AuthRedisService } from './auth-redis.service';
 import { AuthSmsService } from './auth-sms.service';
 import { randomUUID } from 'crypto';
+import { RedisService } from '../../shared/services/redis.service';
+import { AmoCrmService } from '../../amocrm';
 
 @Injectable()
 export class AuthService {
@@ -29,6 +37,8 @@ export class AuthService {
     private readonly configService: ConfigService,
     private readonly authRedisService: AuthRedisService,
     private readonly authSmsService: AuthSmsService,
+    private readonly redisService: RedisService,
+    @Optional() private readonly amoCrmService?: AmoCrmService,
   ) {}
 
   // ==================== SMS OTP AUTH ====================
@@ -46,10 +56,25 @@ export class AuthService {
     return normalized;
   }
 
+  private async syncAmoCrmUser(user: {
+    name?: string | null;
+    email?: string | null;
+    phone?: string | null;
+  }) {
+    await this.amoCrmService?.safeSyncRegisteredUser({
+      name: user.name,
+      email: user.email,
+      phone: user.phone,
+    });
+  }
+
   async enterUser(dto: EnterUserDto) {
     const phone = this.normalizePhone(dto.phone);
 
     try {
+      // New auth flow should always start with a clean attempts counter
+      await this.authRedisService.resetAttempts(phone);
+
       // Generate and store verification code
       const code = this.authRedisService.generateCode();
       await this.authRedisService.storeCode(phone, code);
@@ -108,6 +133,7 @@ export class AuthService {
         update: {},
         create: { phone, name: phone, role: Role.USER },
       });
+      await this.syncAmoCrmUser(user);
 
       const tokens = await this.generateTokens(user.id, user.role);
 
@@ -158,6 +184,8 @@ export class AuthService {
 
       // Generate new code and store it
       const code = this.authRedisService.generateCode();
+      // Unlock phone after issuing a fresh code
+      await this.authRedisService.resetAttempts(phone);
       await this.authRedisService.storeCode(phone, code);
 
       // Send SMS with new verification code
@@ -241,6 +269,7 @@ export class AuthService {
           role: Role.USER,
         },
       });
+      await this.syncAmoCrmUser(user);
 
       const tokens = await this.generateTokens(user.id, user.role);
 
@@ -294,6 +323,7 @@ export class AuthService {
       }
 
       const tokens = await this.generateTokens(user.id, user.role);
+      await this.syncAmoCrmUser(user);
 
       this.logger.log(`User logged in successfully: ${user.id}`);
 
@@ -333,9 +363,10 @@ export class AuthService {
         throw new HttpException('Invalid credentials', HttpStatus.UNAUTHORIZED);
       }
 
-      if (admin.role !== Role.ADMIN) {
+      const adminPanelRoles: Role[] = [Role.ADMIN, Role.MANAGER, Role.EDITOR];
+      if (!adminPanelRoles.includes(admin.role as Role)) {
         throw new HttpException(
-          'Access denied: Admins only',
+          'Access denied: admins/managers only',
           HttpStatus.FORBIDDEN,
         );
       }
@@ -420,9 +451,7 @@ export class AuthService {
         this.logger.log(`Existing Telegram user logged in: ${user.id}`);
       } else {
         // New user — create account from Telegram data
-        const name = [dto.first_name, dto.last_name]
-          .filter(Boolean)
-          .join(' ');
+        const name = [dto.first_name, dto.last_name].filter(Boolean).join(' ');
 
         user = await this.prisma.user.create({
           data: {
@@ -437,6 +466,7 @@ export class AuthService {
       }
 
       const tokens = await this.generateTokens(user.id, user.role);
+      await this.syncAmoCrmUser(user);
 
       return {
         user: {
@@ -485,10 +515,7 @@ export class AuthService {
       .join('\n');
 
     // SHA256 hash of bot token is used as secret key
-    const secretKey = crypto
-      .createHash('sha256')
-      .update(botToken)
-      .digest();
+    const secretKey = crypto.createHash('sha256').update(botToken).digest();
 
     // HMAC-SHA256 of check string with the secret key
     const hmac = crypto
@@ -832,6 +859,127 @@ export class AuthService {
       }
       throw new HttpException(
         error.message || 'Failed to get guest session',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  async mergeGuestCartToUser(userId: string, guestSessionId: string) {
+    try {
+      if (!guestSessionId) {
+        throw new HttpException(
+          'Guest session id is required',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      const result = await this.prisma.$transaction(async (tx) => {
+        const guestSession = await tx.guestSession.findUnique({
+          where: { id: guestSessionId },
+          select: { id: true },
+        });
+
+        if (!guestSession) {
+          return { merged: 0 };
+        }
+
+        const guestItems = await tx.orderItem.findMany({
+          where: {
+            sessionId: guestSessionId,
+            orderId: null,
+          },
+          include: {
+            product: {
+              select: {
+                price: true,
+              },
+            },
+          },
+          orderBy: { createdAt: 'asc' },
+        });
+
+        let merged = 0;
+
+        for (const guestItem of guestItems) {
+          const existingUserItem = await tx.orderItem.findFirst({
+            where: {
+              userId,
+              productId: guestItem.productId,
+              variantKey: guestItem.variantKey,
+              orderId: null,
+            },
+            include: {
+              product: {
+                select: {
+                  price: true,
+                },
+              },
+            },
+          });
+
+          const productPrice =
+            guestItem.unitPrice?.toNumber() ||
+            guestItem.product.price.toNumber();
+
+          if (existingUserItem) {
+            const quantity = existingUserItem.quantity + guestItem.quantity;
+
+            await tx.orderItem.update({
+              where: { id: existingUserItem.id },
+              data: {
+                quantity,
+                unitPrice: productPrice,
+                price: productPrice * quantity,
+                variantKey: guestItem.variantKey,
+                variantLabel: guestItem.variantLabel,
+              },
+            });
+
+            await tx.orderItem.delete({
+              where: { id: guestItem.id },
+            });
+          } else {
+            await tx.orderItem.update({
+              where: { id: guestItem.id },
+              data: {
+                userId,
+                sessionId: null,
+                unitPrice: productPrice,
+                price: productPrice * guestItem.quantity,
+                variantKey: guestItem.variantKey,
+                variantLabel: guestItem.variantLabel,
+              },
+            });
+          }
+
+          merged += 1;
+        }
+
+        return { merged };
+      });
+
+      await Promise.allSettled([
+        this.redisService.remove(`cart:${userId}`),
+        this.redisService.remove(`guest:cart:${guestSessionId}`),
+      ]);
+
+      this.logger.log(
+        `Merged ${result.merged} guest cart item(s) from session ${guestSessionId} to user ${userId}`,
+      );
+
+      return result;
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      this.logger.error(
+        `Error merging guest cart ${guestSessionId} into user cart ${userId}: ${error.message}`,
+        error.stack,
+      );
+
+      throw new HttpException(
+        'Failed to merge guest cart',
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }

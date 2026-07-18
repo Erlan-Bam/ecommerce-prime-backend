@@ -127,6 +127,22 @@ export const buildAmoCrmOrderNote = (order: AmoCrmOrderInput): string => {
   return lines.filter((line) => line !== null).join('\n');
 };
 
+export const buildAmoCrmOrderCancellationNote = (
+  order: AmoCrmOrderInput,
+  source = 'site',
+): string => {
+  const lines = [
+    `Заказ #${order.id} отменён`,
+    `Источник отмены: ${source}`,
+    order.buyer ? `Покупатель: ${order.buyer}` : null,
+    order.email ? `Email: ${order.email}` : null,
+    order.phone ? `Телефон: ${order.phone}` : null,
+    `Сумма: ${normalizeAmoCrmPrice(order.finalTotal || order.total)} ₽`,
+  ];
+
+  return lines.filter((line) => line !== null).join('\n');
+};
+
 export const buildAmoCrmOrderLead = (
   order: AmoCrmOrderInput,
   tags: string[],

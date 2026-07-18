@@ -9,6 +9,7 @@ datasource db {
 enum Role {
   USER
   EDITOR
+  MANAGER
   ADMIN
 }
 
@@ -31,6 +32,14 @@ enum PaymentStatus {
   PENDING
   COMPLETED
   REFUNDED
+}
+
+enum SeoPageType {
+  HOME
+  CATEGORY
+  PRODUCT
+  STATIC
+  BLOG
 }
 
 enum OrderStatus {
@@ -75,6 +84,9 @@ model Category {
   parentId  String?
   title     String
   slug      String    @unique
+  seoTitle  String?
+  seoDescription String?
+  seoH1     String?
   image     String?
   isActive  Boolean   @default(true)
   sortOrder Int       @default(0)
@@ -86,6 +98,8 @@ model Category {
   parent    Category?  @relation("CategoryChildren", fields: [parentId], references: [id])
   children  Category[] @relation("CategoryChildren")
   products  ProductCategory[]
+  seoCollections SeoCollection[]
+  seoTagTiles SeoTagTile[]
 
   @@index([parentId])
   @@index([slug])
@@ -112,21 +126,30 @@ model Brand {
 model Product {
   id          String    @id @default(uuid())
   brandId     String?
+  variantGroupId String?
   name        String
   slug        String    @unique
   description String?
+  seoTitle    String?
+  seoDescription String?
+  seoH1       String?
   price       Decimal   @db.Decimal(10, 2)
   oldPrice    Decimal?  @db.Decimal(10, 2)
   isActive    Boolean   @default(true)
   isOnSale    Boolean   @default(false)
+  isPopular   Boolean   @default(false)
   viewCount   Int       @default(0)
   soldCount   Int       @default(0)
   isDeleted   Boolean   @default(false)
   deletedAt   DateTime?
+  variantColor String?
+  variantMemory String?
+  variantSim   String?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
   brand       Brand?    @relation(fields: [brandId], references: [id])
+  variantGroup ProductVariantGroup? @relation(fields: [variantGroupId], references: [id], onDelete: SetNull)
   categories  ProductCategory[]
   images      ProductImage[]
   attributes  ProductAttribute[]
@@ -134,13 +157,29 @@ model Product {
   productStock ProductStock[]
   orderItems  OrderItem[]
   favorites   Favorite[]
+  relatedProducts ProductRelation[] @relation("SourceRelatedProducts")
+  relatedFromProducts ProductRelation[] @relation("TargetRelatedProducts")
 
   @@index([brandId])
+  @@index([variantGroupId])
   @@index([slug])
   @@index([price])
   @@index([createdAt])
+  @@index([isPopular])
   @@index([isActive, isOnSale])
   @@index([isDeleted])
+  @@index([variantColor, variantMemory, variantSim])
+}
+
+model ProductVariantGroup {
+  id        String    @id @default(uuid())
+  name      String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  products  Product[]
+
+  @@index([name])
 }
 
 model ProductCategory {
@@ -156,6 +195,22 @@ model ProductCategory {
   @@unique([productId, categoryId])
   @@index([productId])
   @@index([categoryId])
+}
+
+model ProductRelation {
+  id              String   @id @default(uuid())
+  sourceProductId String
+  targetProductId String
+  sortOrder       Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  sourceProduct Product @relation("SourceRelatedProducts", fields: [sourceProductId], references: [id], onDelete: Cascade)
+  targetProduct Product @relation("TargetRelatedProducts", fields: [targetProductId], references: [id], onDelete: Cascade)
+
+  @@unique([sourceProductId, targetProductId])
+  @@index([sourceProductId, sortOrder])
+  @@index([targetProductId])
 }
 
 model ProductImage {
@@ -210,6 +265,9 @@ model OrderItem {
   productId String
   quantity  Int
   price     Decimal  @db.Decimal(10, 2)
+  unitPrice Decimal? @db.Decimal(10, 2)
+  variantKey String?
+  variantLabel String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -222,6 +280,7 @@ model OrderItem {
   @@index([userId])
   @@index([sessionId])
   @@index([orderId])
+  @@index([variantKey])
 }
 
 model Order {
@@ -356,6 +415,45 @@ model ProductStock {
   @@index([sku])
 }
 
+model ProductImportBatch {
+  id                String               @id @default(uuid())
+  fileName          String
+  status            String               @default("PROCESSING")
+  totalRows         Int                  @default(0)
+  processedRows     Int                  @default(0)
+  createdCount      Int                  @default(0)
+  updatedCount      Int                  @default(0)
+  skippedCount      Int                  @default(0)
+  summary           Json?
+  createdCategories Json?
+  createdBrands     Json?
+  completedAt       DateTime?
+  undoneAt          DateTime?
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+
+  entries ProductImportEntry[]
+
+  @@index([status, completedAt])
+  @@index([createdAt])
+}
+
+model ProductImportEntry {
+  id             String             @id @default(uuid())
+  batchId        String
+  productId      String
+  action         String
+  beforeSnapshot Json?
+  afterUpdatedAt DateTime
+  createdAt      DateTime           @default(now())
+
+  batch ProductImportBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+
+  @@unique([batchId, productId])
+  @@index([batchId])
+  @@index([productId])
+}
+
 model Coupon {
   id         String     @id @default(uuid())
   code       String     @unique
@@ -413,6 +511,87 @@ model Blog {
   @@index([slug])
   @@index([isActive])
   @@index([createdAt])
+}
+
+model SeoTemplate {
+  id                  String      @id @default(uuid())
+  type                SeoPageType @unique
+  titleTemplate       String?
+  descriptionTemplate String?
+  h1Template          String?
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
+}
+
+model StaticPageSeo {
+  id             String   @id @default(uuid())
+  path           String   @unique
+  name           String?
+  title          String?
+  seoTitle       String?
+  seoDescription String?
+  seoH1          String?
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([path])
+  @@index([isActive])
+}
+
+model RobotsSettings {
+  id        String   @id
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model SeoCollection {
+  id             String   @id @default(uuid())
+  name           String
+  slug           String   @unique
+  categoryId     String?
+  brandIds       String[] @default([])
+  minPrice       Decimal? @db.Decimal(10, 2)
+  maxPrice       Decimal? @db.Decimal(10, 2)
+  inStock        Boolean  @default(false)
+  isOnSale       Boolean  @default(false)
+  attributes     Json?
+  sortBy         String?
+  description    String?
+  seoTitle       String?
+  seoDescription String?
+  seoH1          String?
+  isActive       Boolean  @default(true)
+  sortOrder      Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  category Category?    @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  tagTiles SeoTagTile[]
+
+  @@index([categoryId])
+  @@index([isActive, sortOrder])
+}
+
+model SeoTagTile {
+  id           String   @id @default(uuid())
+  title        String
+  image        String?
+  categoryId   String?
+  collectionId String?
+  url          String?
+  isActive     Boolean  @default(true)
+  sortOrder    Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  category   Category?      @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  collection SeoCollection? @relation(fields: [collectionId], references: [id], onDelete: SetNull)
+
+  @@index([categoryId])
+  @@index([collectionId])
+  @@index([isActive, sortOrder])
 }
 
 model Favorite {

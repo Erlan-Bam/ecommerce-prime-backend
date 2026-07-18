@@ -71,7 +71,7 @@ services:
       - ./logs:/app/logs
       - ./public/images:/app/public/images
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/healthz"]
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:6001/api/healthz"]
       interval: 30s
       timeout: 10s
       retries: 3

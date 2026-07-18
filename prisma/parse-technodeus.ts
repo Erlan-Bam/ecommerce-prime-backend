@@ -5,6 +5,7 @@ import * as path from 'path';
 import { TextDecoder } from 'util';
 import * as XLSX from 'xlsx';
 import {
+  inferNonAppleDeviceBrandFromProductName,
   isAccessoryLikeProduct,
   normalizeParsedCategoryPath,
 } from '../src/shared/lib/catalog-classification';
@@ -537,24 +538,66 @@ function classifyOffer(
   });
   const hasAccessoryWords =
     isCatalogAccessory || containsAny(productNameCombined, ACCESSORY_TERMS);
+  const explicitNonAppleDeviceBrand = inferNonAppleDeviceBrandFromProductName(
+    offer.name,
+    offer.vendorPath,
+  );
 
-  const isApple = containsAny(combined, [
-    'apple',
-    'iphone',
-    'airpods',
-    'macbook',
-    'imac',
-    'mac mini',
-    'mac studio',
-    'mac pro',
-    'ipad',
-    'airtag',
-    'homepod',
-    'vision pro',
-    'trackpad',
-    'magic keyboard',
-    'apple watch',
-  ]);
+  if (explicitNonAppleDeviceBrand && hasAccessoryWords) {
+    return {
+      include: true,
+      brand: explicitNonAppleDeviceBrand,
+      subcategory: 'Аксессуары',
+      reason: `${explicitNonAppleDeviceBrand.toLowerCase()} accessories`,
+    };
+  }
+
+  const isApple =
+    !explicitNonAppleDeviceBrand &&
+    containsAny(combined, [
+      'apple',
+      'iphone',
+      'airpods',
+      'macbook',
+      'imac',
+      'mac mini',
+      'mac studio',
+      'mac pro',
+      'ipad',
+      'airtag',
+      'homepod',
+      'vision pro',
+      'trackpad',
+      'magic keyboard',
+      'apple watch',
+    ]);
+
+  const isBeats = containsAny(productNameCombined, [' beats ', 'beats']);
+  if (isBeats) {
+    const headphoneTerms = [
+      'наушник',
+      'headphone',
+      'earbud',
+      'buds',
+      'studio',
+      'solo',
+      'fit',
+      'powerbeats',
+    ];
+    if (
+      containsAny(combined, [' pro ']) &&
+      containsAny(combined, headphoneTerms) &&
+      !hasAccessoryWords
+    ) {
+      return {
+        include: true,
+        brand: 'Beats',
+        subcategory: 'Наушники',
+        reason: 'beats pro only',
+      };
+    }
+    return { include: false, reason: 'beats только pro модели' };
+  }
 
   if (isApple) {
     const isPhone = containsAny(combined, ['iphone']);
@@ -1094,33 +1137,6 @@ function classifyOffer(
       };
     }
     return { include: false, reason: 'whoop вне браслетов' };
-  }
-
-  const isBeats = containsAny(combined, [' beats ', 'beats']);
-  if (isBeats) {
-    const headphoneTerms = [
-      'наушник',
-      'headphone',
-      'earbud',
-      'buds',
-      'studio',
-      'solo',
-      'fit',
-      'powerbeats',
-    ];
-    if (
-      containsAny(combined, [' pro ']) &&
-      containsAny(combined, headphoneTerms) &&
-      !hasAccessoryWords
-    ) {
-      return {
-        include: true,
-        brand: 'Beats',
-        subcategory: 'Наушники',
-        reason: 'beats pro only',
-      };
-    }
-    return { include: false, reason: 'beats только pro модели' };
   }
 
   const isRayBan = containsAny(combined, ['rayban', 'ray ban', 'ray-ban']);

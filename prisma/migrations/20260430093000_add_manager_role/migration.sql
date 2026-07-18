@@ -1,0 +1,2 @@
+-- Add MANAGER role for admin panel RBAC
+ALTER TYPE "Role" ADD VALUE IF NOT EXISTS 'MANAGER';
