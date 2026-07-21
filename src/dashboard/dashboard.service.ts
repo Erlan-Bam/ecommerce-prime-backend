@@ -34,7 +34,9 @@ interface ParsedImportRow {
   isActive: boolean;
   isOnSale: boolean;
   brandName: string | null;
+  categoryIds: string[];
   categoryNames: string[];
+  shouldReplaceCategories: boolean;
   images: string[];
   attributes: Array<{ name: string; value: string }>;
   sku: string | null;
@@ -395,8 +397,14 @@ export class DashboardService {
       const rows = products.map((product) => {
         const primaryCategory =
           product.categories.find((item) => item.isPrimary)?.category ?? null;
+        const primaryCategoryId =
+          product.categories.find((item) => item.isPrimary)?.categoryId ?? '';
         const allCategories = product.categories
           .map((item) => item.category?.title)
+          .filter(Boolean)
+          .join(' | ');
+        const allCategoryIds = product.categories
+          .map((item) => item.categoryId)
           .filter(Boolean)
           .join(' | ');
         const images = product.images.map((image) => image.url).join('\n');
@@ -424,7 +432,9 @@ export class DashboardService {
           'Старая цена': product.oldPrice?.toNumber() ?? '',
           Бренд: product.brand?.name || '',
           'Категория (основная)': primaryCategory?.title || '',
+          'Категория ID (основная)': primaryCategoryId,
           Категории: allCategories,
+          'Категории ID': allCategoryIds,
           Изображения: images,
           Атрибуты: attributes,
           SKU: skus,
@@ -460,7 +470,9 @@ export class DashboardService {
         'Старая цена',
         'Бренд',
         'Категория (основная)',
+        'Категория ID (основная)',
         'Категории',
+        'Категории ID',
         'Изображения',
         'Атрибуты',
         'SKU',
@@ -641,22 +653,16 @@ export class DashboardService {
               )
             : null;
 
-          const categoryIds = await this.resolveCategoryIds(
-            tx,
-            parsed.categoryNames,
-            categoryCache,
-            undoContext,
-          );
-          const fallbackCategoryIds =
-            categoryIds.length > 0
-              ? categoryIds
+          const categoryIds = parsed.shouldReplaceCategories
+            ? parsed.categoryIds.length > 0
+              ? await this.resolveCategoryIdsById(tx, parsed.categoryIds)
               : await this.resolveCategoryIds(
                   tx,
-                  ['Без категории'],
+                  parsed.categoryNames,
                   categoryCache,
                   undoContext,
-                );
-
+                )
+            : [];
           const baseSlug = parsed.sourceSlug || this.slugify(parsed.name);
           const productSlug = await this.ensureUniqueProductSlug(
             tx,
@@ -698,16 +704,18 @@ export class DashboardService {
               select: { id: true, updatedAt: true },
             });
 
-            await tx.productCategory.deleteMany({
-              where: { productId: existing.id },
-            });
-            await tx.productCategory.createMany({
-              data: fallbackCategoryIds.map((categoryId, idx) => ({
-                productId: existing.id,
-                categoryId,
-                isPrimary: idx === 0,
-              })),
-            });
+            if (parsed.shouldReplaceCategories && categoryIds.length > 0) {
+              await tx.productCategory.deleteMany({
+                where: { productId: existing.id },
+              });
+              await tx.productCategory.createMany({
+                data: categoryIds.map((categoryId, idx) => ({
+                  productId: existing.id,
+                  categoryId,
+                  isPrimary: idx === 0,
+                })),
+              });
+            }
 
             await tx.productImage.deleteMany({
               where: { productId: existing.id },
@@ -785,6 +793,15 @@ export class DashboardService {
             normalizedIncomingAttributes,
             row,
           );
+          const categoryIdsForCreate =
+            categoryIds.length > 0
+              ? categoryIds
+              : await this.resolveCategoryIds(
+                  tx,
+                  ['Без категории'],
+                  categoryCache,
+                  undoContext,
+                );
 
           const created = await tx.product.create({
             data: {
@@ -797,7 +814,7 @@ export class DashboardService {
               isActive: parsed.isActive,
               isOnSale: shouldBeOnSale,
               categories: {
-                create: fallbackCategoryIds.map((categoryId, idx) => ({
+                create: categoryIdsForCreate.map((categoryId, idx) => ({
                   categoryId,
                   isPrimary: idx === 0,
                 })),
@@ -1372,6 +1389,8 @@ export class DashboardService {
       'Stock',
       'Наличие',
     ]);
+    const categoryIds = this.extractCategoryIds(row);
+    const categoryNames = this.extractCategoryNames(row);
 
     return {
       rowNumber,
@@ -1384,7 +1403,10 @@ export class DashboardService {
       isActive: isActiveRaw ?? true,
       isOnSale: isOnSaleRaw ?? false,
       brandName,
-      categoryNames: this.extractCategoryNames(row),
+      categoryIds,
+      categoryNames,
+      shouldReplaceCategories:
+        categoryIds.length > 0 || this.hasCategoryAssignment(row),
       images: this.extractImages(row),
       attributes: this.extractAttributes(row),
       sku,
@@ -1512,6 +1534,27 @@ export class DashboardService {
     return resolvedIds;
   }
 
+  private async resolveCategoryIdsById(
+    tx: PrismaTx,
+    categoryIds: string[],
+  ): Promise<string[]> {
+    const uniqueIds = Array.from(new Set(categoryIds));
+    const categories = await tx.category.findMany({
+      where: { id: { in: uniqueIds }, isDeleted: false },
+      select: { id: true },
+    });
+    const resolvedIds = new Set(categories.map((category) => category.id));
+    const missingIds = uniqueIds.filter((id) => !resolvedIds.has(id));
+
+    if (missingIds.length > 0) {
+      throw new Error(
+        `Категории из выгрузки не найдены: ${missingIds.join(', ')}`,
+      );
+    }
+
+    return uniqueIds;
+  }
+
   private async ensureUniqueProductSlug(
     tx: PrismaTx,
     value: string,
@@ -1628,6 +1671,44 @@ export class DashboardService {
     }
 
     return uniqueNames;
+  }
+
+  private extractCategoryIds(row: ImportRow): string[] {
+    const values = [
+      this.readString(row, [
+        'Категория ID (основная)',
+        'Category ID (primary)',
+      ]),
+      this.readString(row, ['Категории ID', 'Category IDs']),
+    ].filter((value): value is string => Boolean(value));
+
+    return Array.from(
+      new Set(
+        values
+          .flatMap((value) => value.split(/\r?\n|\||,|;/))
+          .map((value) => this.cleanValue(value))
+          .filter((value): value is string => Boolean(value))
+          .filter((value) => this.isUuid(value)),
+      ),
+    );
+  }
+
+  private hasCategoryAssignment(row: ImportRow): boolean {
+    return [
+      'Категория (основная)',
+      'Категория',
+      'Category',
+      'Категории',
+      'Categories',
+      'Подкатегория',
+      'Subcategory',
+      'Раздел',
+      'Section',
+      'Категория источника',
+      'Путь источника',
+      'Source Path',
+      'SourcePath',
+    ].some((header) => Boolean(this.readString(row, [header])));
   }
 
   private extractImages(row: ImportRow): string[] {

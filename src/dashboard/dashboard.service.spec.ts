@@ -99,6 +99,91 @@ describe('DashboardService product XLSX import cache invalidation', () => {
       undoAvailable: true,
     });
   });
+
+  it('does not remove an existing product from categories when the XLSX has no category values', async () => {
+    jest.spyOn(fs, 'mkdir').mockResolvedValue(undefined as any);
+    jest.spyOn(fs, 'writeFile').mockResolvedValue(undefined);
+
+    const existingProduct = {
+      brandId: 'brand-apple',
+      name: 'iPhone 17 Pro',
+      slug: 'iphone-17-pro',
+      description: 'До обновления',
+      price: { toString: () => '1000' },
+      oldPrice: null,
+      isActive: true,
+      isOnSale: false,
+      categories: [{ categoryId: 'category-iphone', isPrimary: true }],
+      images: [],
+      attributes: [],
+      productStock: [],
+    };
+    const tx = {
+      product: {
+        findUnique: jest
+          .fn()
+          .mockResolvedValueOnce({ id: 'product-1' })
+          .mockResolvedValueOnce(existingProduct)
+          .mockResolvedValue(null),
+        update: jest
+          .fn()
+          .mockResolvedValue({ id: 'product-1', updatedAt: new Date() }),
+      },
+      productAttribute: {
+        findMany: jest.fn().mockResolvedValue([]),
+        deleteMany: jest.fn().mockResolvedValue(undefined),
+      },
+      productCategory: {
+        deleteMany: jest.fn().mockResolvedValue(undefined),
+        createMany: jest.fn().mockResolvedValue(undefined),
+      },
+      productImage: {
+        deleteMany: jest.fn().mockResolvedValue(undefined),
+      },
+      productImportEntry: {
+        upsert: jest.fn().mockResolvedValue(undefined),
+      },
+    };
+    const prisma = {
+      pickupPoint: {
+        findFirst: jest.fn().mockResolvedValue(null),
+      },
+      productImportBatch: {
+        create: jest.fn().mockResolvedValue({ id: 'batch-1' }),
+        update: jest.fn().mockResolvedValue(undefined),
+      },
+      $transaction: jest.fn(async (callback: (transaction: any) => unknown) =>
+        callback(tx),
+      ),
+    };
+    const categoryCache = {
+      invalidateAllCaches: jest.fn().mockResolvedValue(undefined),
+    };
+    const productCache = {
+      invalidateAllCaches: jest.fn().mockResolvedValue(undefined),
+    };
+    const service = new (DashboardService as any)(
+      prisma,
+      categoryCache,
+      productCache,
+    );
+    const worksheet = XLSX.utils.json_to_sheet([
+      {
+        Название: 'iPhone 17 Pro',
+        Slug: 'iphone-17-pro',
+        Цена: 1100,
+      },
+    ]);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Products');
+    const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+
+    await service.importProductsXlsx(buffer, 'products.xlsx');
+
+    expect(tx.product.update).toHaveBeenCalledTimes(1);
+    expect(tx.productCategory.deleteMany).not.toHaveBeenCalled();
+    expect(tx.productCategory.createMany).not.toHaveBeenCalled();
+  });
 });
 
 describe('DashboardService XLSX import rollback', () => {
