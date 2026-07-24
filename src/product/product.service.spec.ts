@@ -3,6 +3,7 @@ import { HttpException } from '@nestjs/common';
 import { ProductService } from './product.service';
 import { PrismaService } from '../shared/services/prisma.service';
 import { ProductCacheService } from './services/cache.service';
+import { CategoryCacheService } from '../category/services/cache.service';
 
 const mockPrisma = {
   product: {
@@ -54,6 +55,10 @@ const mockCacheService = {
   invalidateAllCaches: jest.fn().mockResolvedValue(undefined),
 };
 
+const mockCategoryCacheService = {
+  invalidateAllCaches: jest.fn().mockResolvedValue(undefined),
+};
+
 describe('ProductService - Soft Delete', () => {
   let service: ProductService;
 
@@ -65,6 +70,7 @@ describe('ProductService - Soft Delete', () => {
         ProductService,
         { provide: PrismaService, useValue: mockPrisma },
         { provide: ProductCacheService, useValue: mockCacheService },
+        { provide: CategoryCacheService, useValue: mockCategoryCacheService },
       ],
     }).compile();
 
@@ -230,7 +236,9 @@ describe('ProductService - Soft Delete', () => {
           totalStock: 3,
         }),
       ]);
-      expect(result.variantGroup.products[0]).not.toHaveProperty('productStock');
+      expect(result.variantGroup.products[0]).not.toHaveProperty(
+        'productStock',
+      );
     });
 
     it('deletes a variant group and unlinks its products', async () => {
@@ -246,10 +254,12 @@ describe('ProductService - Soft Delete', () => {
         callback(mockPrisma),
       );
 
-      await expect(service.deleteVariantGroup('iphone-group')).resolves.toEqual({
-        id: 'iphone-group',
-        unlinkedProducts: 2,
-      });
+      await expect(service.deleteVariantGroup('iphone-group')).resolves.toEqual(
+        {
+          id: 'iphone-group',
+          unlinkedProducts: 2,
+        },
+      );
 
       expect(mockPrisma.product.updateMany).toHaveBeenCalledWith({
         where: { variantGroupId: 'iphone-group' },
@@ -601,6 +611,44 @@ describe('ProductService - Soft Delete', () => {
       );
       expect(saveCall?.[0].data).not.toHaveProperty('variantGroupId');
     });
+
+    it('clears category counts after changing product categories', async () => {
+      const productId = 'prod-categories';
+      const existingProduct = {
+        id: productId,
+        name: 'Test Product',
+        slug: 'test-product',
+        price: 100,
+        isDeleted: false,
+        reviews: [],
+        productStock: [],
+        categories: [],
+        brand: null,
+        images: [],
+        attributes: [],
+      };
+
+      mockPrisma.product.findUnique.mockResolvedValue(existingProduct);
+      mockPrisma.product.update.mockResolvedValue(existingProduct);
+      mockPrisma.productCategory.deleteMany.mockResolvedValue({ count: 1 });
+      mockPrisma.productCategory.createMany.mockResolvedValue({ count: 1 });
+
+      await service.update(productId, { categoryIds: ['category-new'] });
+
+      expect(mockPrisma.productCategory.deleteMany).toHaveBeenCalledWith({
+        where: { productId },
+      });
+      expect(mockPrisma.productCategory.createMany).toHaveBeenCalledWith({
+        data: [
+          {
+            productId,
+            categoryId: 'category-new',
+            isPrimary: true,
+          },
+        ],
+      });
+      expect(mockCategoryCacheService.invalidateAllCaches).toHaveBeenCalled();
+    });
   });
 
   describe('bulkUpdateCategories', () => {
@@ -736,11 +784,7 @@ describe('ProductService - Soft Delete', () => {
       });
       mockPrisma.productAttribute.groupBy.mockResolvedValue([]);
 
-      await service.getFilters(
-        'category-samsung',
-        ['brand-honor'],
-        'samsung',
-      );
+      await service.getFilters('category-samsung', ['brand-honor'], 'samsung');
 
       expect(mockPrisma.product.aggregate).toHaveBeenCalledWith({
         where: {

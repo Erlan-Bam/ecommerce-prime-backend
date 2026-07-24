@@ -20,6 +20,11 @@ export class CreateCategoryDto {
   @IsString()
   slug?: string;
 
+  @ApiPropertyOptional({ description: 'Category description' })
+  @IsOptional()
+  @IsString()
+  description?: string;
+
   @ApiPropertyOptional({ description: 'Parent category ID' })
   @IsOptional()
   @IsUUID()
@@ -65,4 +70,19 @@ export class CreateCategoryDto {
   @IsInt()
   @Min(0)
   sortOrder?: number;
+
+  @ApiPropertyOptional({
+    description: 'Show category in the main category grid',
+    default: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  isMain?: boolean;
+
+  @ApiPropertyOptional({ description: 'Main category display priority', default: 0 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  mainSortOrder?: number;
 }

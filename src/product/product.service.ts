@@ -2,6 +2,7 @@ import { Injectable, Logger, HttpException, HttpStatus } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../shared/services/prisma.service';
 import { ProductCacheService } from './services/cache.service';
+import { CategoryCacheService } from '../category/services/cache.service';
 import { inferNonAppleDeviceBrandFromProductName } from '../shared/lib/catalog-classification';
 import { normalizeRelatedProductIds } from '../seo/seo-management';
 import {
@@ -145,6 +146,7 @@ export class ProductService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly cacheService: ProductCacheService,
+    private readonly categoryCacheService: CategoryCacheService,
   ) {}
 
   private cleanOptionalString(value: string | undefined | null): string | null {
@@ -162,17 +164,19 @@ export class ProductService {
       ...productWithGroup,
       variantGroup: {
         ...productWithGroup.variantGroup,
-        products: productWithGroup.variantGroup.products.map((linkedProduct: any) => {
-          const { productStock, ...rest } = linkedProduct;
-          return {
-            ...rest,
-            totalStock: (productStock || []).reduce(
-              (sum: number, stock: { stockCount?: number | null }) =>
-                sum + (stock.stockCount || 0),
-              0,
-            ),
-          };
-        }),
+        products: productWithGroup.variantGroup.products.map(
+          (linkedProduct: any) => {
+            const { productStock, ...rest } = linkedProduct;
+            return {
+              ...rest,
+              totalStock: (productStock || []).reduce(
+                (sum: number, stock: { stockCount?: number | null }) =>
+                  sum + (stock.stockCount || 0),
+                0,
+              ),
+            };
+          },
+        ),
       },
     } as T;
   }
@@ -185,22 +189,25 @@ export class ProductService {
 
     return {
       ...productWithRelations,
-      relatedProducts: productWithRelations.relatedProducts.map((relation: any) => {
-        const { productStock, ...targetProduct } = relation.targetProduct || {};
-        const totalStock = (productStock || []).reduce(
-          (sum: number, stock: { stockCount?: number | null }) =>
-            sum + (stock.stockCount || 0),
-          0,
-        );
+      relatedProducts: productWithRelations.relatedProducts.map(
+        (relation: any) => {
+          const { productStock, ...targetProduct } =
+            relation.targetProduct || {};
+          const totalStock = (productStock || []).reduce(
+            (sum: number, stock: { stockCount?: number | null }) =>
+              sum + (stock.stockCount || 0),
+            0,
+          );
 
-        return {
-          ...relation,
-          targetProduct: {
-            ...targetProduct,
-            totalStock,
-          },
-        };
-      }),
+          return {
+            ...relation,
+            targetProduct: {
+              ...targetProduct,
+              totalStock,
+            },
+          };
+        },
+      ),
     } as T;
   }
 
@@ -474,10 +481,7 @@ export class ProductService {
     return this.getCatalogFacetDefinition(attributeName)?.label ?? null;
   }
 
-  private normalizeCatalogFacetValue(
-    facetName: string,
-    value: string,
-  ): string {
+  private normalizeCatalogFacetValue(facetName: string, value: string): string {
     const cleanValue = value.replace(/\s+/g, ' ').trim();
     if (facetName !== 'Объём памяти' && facetName !== 'Оперативная память') {
       return cleanValue;
@@ -531,7 +535,10 @@ export class ProductService {
     }
   }
 
-  private sortCatalogFacetValues(facetName: string, values: string[]): string[] {
+  private sortCatalogFacetValues(
+    facetName: string,
+    values: string[],
+  ): string[] {
     return [...values].sort((left, right) => {
       const leftKey = this.getCatalogFacetValueSortKey(facetName, left);
       const rightKey = this.getCatalogFacetValueSortKey(facetName, right);
@@ -1300,7 +1307,10 @@ export class ProductService {
       const slug = await this.generateUniqueSlug(dto.name);
       const attributes = this.sanitizeAttributes(dto.attributes);
       const variantGroupId = this.cleanOptionalString(dto.variantGroupId);
-      const relatedProductIds = normalizeRelatedProductIds('', dto.relatedProductIds);
+      const relatedProductIds = normalizeRelatedProductIds(
+        '',
+        dto.relatedProductIds,
+      );
       await this.ensureRelatedProductsExist(relatedProductIds);
 
       const product = await this.prisma.product.create({
@@ -1379,7 +1389,7 @@ export class ProductService {
         });
       }
 
-      await this.invalidateProductCaches();
+      await this.invalidateCatalogCaches();
       this.logger.log(`Created product ${product.id}`);
 
       return product;
@@ -1661,13 +1671,15 @@ export class ProductService {
         0,
       );
 
-      const result = this.enrichProductVariantGroup(this.enrichRelatedProducts({
-        ...product,
-        attributes: this.sanitizeAttributes(product.attributes),
-        rating: Math.round(avgRating * 10) / 10,
-        reviewCount: ratings.length,
-        totalStock,
-      }));
+      const result = this.enrichProductVariantGroup(
+        this.enrichRelatedProducts({
+          ...product,
+          attributes: this.sanitizeAttributes(product.attributes),
+          rating: Math.round(avgRating * 10) / 10,
+          reviewCount: ratings.length,
+          totalStock,
+        }),
+      );
 
       await this.cacheService.cacheProduct(id, result);
       return result;
@@ -1753,13 +1765,15 @@ export class ProductService {
         0,
       );
 
-      return this.enrichProductVariantGroup(this.enrichRelatedProducts({
-        ...product,
-        attributes: this.sanitizeAttributes(product.attributes),
-        rating: Math.round(avgRating * 10) / 10,
-        reviewCount: ratings.length,
-        totalStock,
-      }));
+      return this.enrichProductVariantGroup(
+        this.enrichRelatedProducts({
+          ...product,
+          attributes: this.sanitizeAttributes(product.attributes),
+          rating: Math.round(avgRating * 10) / 10,
+          reviewCount: ratings.length,
+          totalStock,
+        }),
+      );
     } catch (error) {
       this.logger.error(
         `Error finding product by slug ${slug}: ${error.message}`,
@@ -1784,7 +1798,10 @@ export class ProductService {
       const shouldUpdateSlug =
         shouldUpdateName && dto.name !== existingProduct.name;
       const variantGroupId = this.cleanOptionalString(dto.variantGroupId);
-      const relatedProductIds = normalizeRelatedProductIds(id, dto.relatedProductIds);
+      const relatedProductIds = normalizeRelatedProductIds(
+        id,
+        dto.relatedProductIds,
+      );
 
       const updateData: any = {
         ...(dto.brandId && { brand: { connect: { id: dto.brandId } } }),
@@ -1903,7 +1920,7 @@ export class ProductService {
         },
       });
 
-      await this.invalidateProductCaches();
+      await this.invalidateCatalogCaches();
       await this.cacheService.invalidateProduct(id);
 
       this.logger.log(`Updated product ${id}`);
@@ -1978,7 +1995,7 @@ export class ProductService {
         }),
       ]);
 
-      await this.invalidateProductCaches();
+      await this.invalidateCatalogCaches();
       await Promise.all(
         productIds.map((productId) =>
           this.cacheService.invalidateProduct(productId),
@@ -2182,7 +2199,7 @@ export class ProductService {
         }),
       ]);
 
-      await this.invalidateProductCaches();
+      await this.invalidateCatalogCaches();
       await Promise.all(
         productIds.map((productId) =>
           this.cacheService.invalidateProduct(productId),
@@ -2221,7 +2238,7 @@ export class ProductService {
           deletedAt: new Date(),
         },
       });
-      await this.invalidateProductCaches();
+      await this.invalidateCatalogCaches();
       await this.cacheService.invalidateProduct(id);
 
       this.logger.log(`Soft deleted product ${id}`);
@@ -2278,7 +2295,7 @@ export class ProductService {
         data: { isDeleted: false, deletedAt: null },
       });
 
-      await this.invalidateProductCaches();
+      await this.invalidateCatalogCaches();
       await this.cacheService.invalidateProduct(id);
       this.logger.log(`Restored product ${id}`);
 
@@ -2650,5 +2667,12 @@ export class ProductService {
 
   private async invalidateProductCaches() {
     await this.cacheService.invalidateAllCaches();
+  }
+
+  private async invalidateCatalogCaches() {
+    await Promise.all([
+      this.cacheService.invalidateAllCaches(),
+      this.categoryCacheService.invalidateAllCaches(),
+    ]);
   }
 }

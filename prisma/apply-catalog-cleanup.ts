@@ -55,6 +55,12 @@ function createNoopProductCacheService() {
   };
 }
 
+function createNoopCategoryCacheService() {
+  return {
+    invalidateAllCaches: async () => undefined,
+  };
+}
+
 function shouldUseSsl(connectionString: string): boolean {
   const url = new URL(connectionString);
   const sslMode = url.searchParams.get('sslmode');
@@ -100,6 +106,7 @@ async function main() {
   const service = new ProductService(
     prisma as any,
     createNoopProductCacheService() as any,
+    createNoopCategoryCacheService() as any,
   );
 
   try {

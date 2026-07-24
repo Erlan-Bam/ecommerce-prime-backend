@@ -21,6 +21,7 @@ import { CategoryService } from './services/category.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 import { ReorderCategoriesDto } from './dto/reorder-categories.dto';
+import { ReorderMainCategoriesDto } from './dto/reorder-main-categories.dto';
 import { CategoryListQueryDto } from './dto/category-list-query.dto';
 import { PaginationDto } from '../shared/dto/pagination.dto';
 import { AdminGuard } from '../shared/guards/admin.guard';
@@ -64,6 +65,17 @@ export class CategoryController {
     return this.categoryService.findTree();
   }
 
+  @Public()
+  @Get('main')
+  @ApiOperation({ summary: 'Get categories selected for the main category grid' })
+  @ApiResponse({
+    status: 200,
+    description: 'Main categories retrieved successfully',
+  })
+  async findMain() {
+    return this.categoryService.findMain();
+  }
+
   @Get('deleted/list')
   @UseGuards(AdminGuard)
   @Roles(Role.ADMIN)
@@ -100,6 +112,16 @@ export class CategoryController {
   @ApiResponse({ status: 200, description: 'Categories reordered successfully' })
   async reorder(@Body() reorderCategoriesDto: ReorderCategoriesDto) {
     return this.categoryService.reorder(reorderCategoriesDto);
+  }
+
+  @Patch('reorder-main')
+  @UseGuards(AdminGuard)
+  @ApiBearerAuth()
+  @ApiBody({ type: ReorderMainCategoriesDto })
+  @ApiOperation({ summary: 'Reorder main categories (Admin)' })
+  @ApiResponse({ status: 200, description: 'Main categories reordered successfully' })
+  async reorderMain(@Body() reorderMainCategoriesDto: ReorderMainCategoriesDto) {
+    return this.categoryService.reorderMain(reorderMainCategoriesDto);
   }
 
   @Patch(':id')

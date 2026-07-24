@@ -2,12 +2,13 @@ import { Module } from '@nestjs/common';
 import { ProductController } from './product.controller';
 import { ProductService } from './product.service';
 import { ProductCacheService } from './services/cache.service';
+import { CategoryCacheService } from '../category/services/cache.service';
 import { SharedModule } from '../shared/shared.module';
 
 @Module({
   imports: [SharedModule],
   controllers: [ProductController],
-  providers: [ProductService, ProductCacheService],
+  providers: [ProductService, ProductCacheService, CategoryCacheService],
   exports: [ProductService],
 })
 export class ProductModule {}

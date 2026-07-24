@@ -8,6 +8,7 @@ const mockPrisma = {
   category: {
     findUnique: jest.fn(),
     findMany: jest.fn(),
+    findFirst: jest.fn(),
     count: jest.fn(),
     update: jest.fn(),
     delete: jest.fn(),
@@ -15,6 +16,7 @@ const mockPrisma = {
   },
   productCategory: {
     count: jest.fn(),
+    findMany: jest.fn(),
   },
   $transaction: jest.fn(),
 };
@@ -33,6 +35,7 @@ describe('CategoryService - Soft Delete', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    mockPrisma.productCategory.findMany.mockResolvedValue([]);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -186,6 +189,149 @@ describe('CategoryService - Soft Delete', () => {
         }),
       );
     });
+
+    it('counts a product linked to a parent and child category only once', async () => {
+      mockPrisma.category.findMany.mockResolvedValue([
+        {
+          id: 'root',
+          title: 'Apple',
+          slug: 'apple',
+          parentId: null,
+          sortOrder: 1,
+          _count: { products: 1 },
+        },
+        {
+          id: 'child',
+          title: 'iPhone',
+          slug: 'iphone',
+          parentId: 'root',
+          sortOrder: 1,
+          _count: { products: 1 },
+        },
+      ]);
+      mockPrisma.productCategory.findMany.mockResolvedValue([
+        { categoryId: 'root', productId: 'iphone-1' },
+        { categoryId: 'child', productId: 'iphone-1' },
+      ]);
+
+      const result = await service.findTree();
+
+      expect(result[0]).toEqual(expect.objectContaining({ productCount: 1 }));
+      expect(result[0].children[0]).toEqual(
+        expect.objectContaining({ productCount: 1 }),
+      );
+    });
+  });
+
+  describe('findMain', () => {
+    it('returns only selected categories in their independent display order', async () => {
+      mockPrisma.category.findMany.mockResolvedValue([
+        {
+          id: 'apple',
+          title: 'Apple',
+          slug: 'apple',
+          parentId: null,
+          sortOrder: 1,
+          isMain: true,
+          mainSortOrder: 2,
+          _count: { products: 1, children: 0 },
+        },
+        {
+          id: 'samsung',
+          title: 'Samsung',
+          slug: 'samsung',
+          parentId: null,
+          sortOrder: 2,
+          isMain: true,
+          mainSortOrder: 1,
+          _count: { products: 1, children: 0 },
+        },
+        {
+          id: 'marshall-model',
+          title: 'Marshall ACTON III',
+          slug: 'acton-3',
+          parentId: null,
+          sortOrder: 0,
+          isMain: false,
+          mainSortOrder: 0,
+          _count: { products: 1, children: 0 },
+        },
+      ]);
+      mockPrisma.productCategory.findMany.mockResolvedValue([
+        { categoryId: 'apple', productId: 'iphone-1' },
+        { categoryId: 'samsung', productId: 'galaxy-1' },
+        { categoryId: 'marshall-model', productId: 'speaker-1' },
+      ]);
+
+      const result = await service.findMain();
+
+      expect(result.map((category) => category.id)).toEqual([
+        'samsung',
+        'apple',
+      ]);
+      expect(mockCacheService.cacheCategories).toHaveBeenCalledWith(
+        'category:main',
+        result,
+      );
+    });
+  });
+
+  describe('description', () => {
+    it('should persist the category description when creating a category', async () => {
+      const description = 'Новые поступления Apple и актуальные цены.';
+
+      mockPrisma.category.create.mockResolvedValue({
+        id: 'cat-123',
+        title: 'Apple',
+        slug: 'apple',
+        description,
+      });
+
+      await service.create({ title: 'Apple', description });
+
+      expect(mockPrisma.category.create).toHaveBeenCalledWith({
+        data: {
+          title: 'Apple',
+          description,
+          slug: 'apple',
+        },
+        include: {
+          parent: true,
+          children: true,
+        },
+      });
+      expect(mockCacheService.invalidateAllCaches).toHaveBeenCalled();
+    });
+
+    it('should persist the category description when updating a category', async () => {
+      const categoryId = 'cat-123';
+      const description = 'Новые поступления Apple и актуальные цены.';
+
+      mockPrisma.category.findUnique.mockResolvedValue({
+        id: categoryId,
+        title: 'Apple',
+        slug: 'apple',
+        isDeleted: false,
+      });
+      mockPrisma.category.update.mockResolvedValue({
+        id: categoryId,
+        title: 'Apple',
+        slug: 'apple',
+        description,
+      });
+
+      await service.update(categoryId, { description });
+
+      expect(mockPrisma.category.update).toHaveBeenCalledWith({
+        where: { id: categoryId },
+        data: { description },
+        include: {
+          parent: true,
+          children: true,
+        },
+      });
+      expect(mockCacheService.invalidateAllCaches).toHaveBeenCalled();
+    });
   });
 
   describe('restore', () => {
@@ -284,17 +430,21 @@ describe('CategoryService - Soft Delete', () => {
         { id: 'cat-1', sortOrder: 2 },
       ];
 
-      mockPrisma.category.count.mockResolvedValue(items.length);
+      mockPrisma.category.findMany.mockResolvedValue([
+        { id: 'cat-2', parentId: null },
+        { id: 'cat-1', parentId: null },
+      ]);
       mockPrisma.category.update.mockImplementation((args) => args);
       mockPrisma.$transaction.mockResolvedValue([]);
 
       const result = await (service as any).reorder({ items });
 
-      expect(mockPrisma.category.count).toHaveBeenCalledWith({
+      expect(mockPrisma.category.findMany).toHaveBeenCalledWith({
         where: {
           id: { in: ['cat-2', 'cat-1'] },
           isDeleted: false,
         },
+        select: { id: true, parentId: true },
       });
       expect(mockPrisma.category.update).toHaveBeenCalledWith({
         where: { id: 'cat-2' },
@@ -319,7 +469,9 @@ describe('CategoryService - Soft Delete', () => {
     });
 
     it('should reject reorder when any category is missing', async () => {
-      mockPrisma.category.count.mockResolvedValue(1);
+      mockPrisma.category.findMany.mockResolvedValue([
+        { id: 'cat-1', parentId: null },
+      ]);
 
       await expect(
         (service as any).reorder({
@@ -333,6 +485,63 @@ describe('CategoryService - Soft Delete', () => {
       });
 
       expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('should reject a reorder that mixes main categories and subcategories', async () => {
+      mockPrisma.category.findMany.mockResolvedValue([
+        { id: 'main-category', parentId: null },
+        { id: 'sub-category', parentId: 'main-category' },
+      ]);
+
+      await expect(
+        (service as any).reorder({
+          items: [
+            { id: 'main-category', sortOrder: 1 },
+            { id: 'sub-category', sortOrder: 2 },
+          ],
+        }),
+      ).rejects.toMatchObject({
+        status: HttpStatus.BAD_REQUEST,
+      });
+
+      expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('reorderMain', () => {
+    it('updates only the independent main category order', async () => {
+      mockPrisma.category.findMany.mockResolvedValue([
+        { id: 'samsung' },
+        { id: 'apple' },
+      ]);
+      mockPrisma.category.update.mockImplementation((args) => args);
+      mockPrisma.$transaction.mockResolvedValue([]);
+
+      const result = await service.reorderMain({
+        items: [
+          { id: 'samsung', mainSortOrder: 1 },
+          { id: 'apple', mainSortOrder: 2 },
+        ],
+      });
+
+      expect(mockPrisma.category.findMany).toHaveBeenCalledWith({
+        where: {
+          id: { in: ['samsung', 'apple'] },
+          isMain: true,
+          isDeleted: false,
+        },
+        select: { id: true },
+      });
+      expect(mockPrisma.category.update).toHaveBeenCalledWith({
+        where: { id: 'samsung' },
+        data: { mainSortOrder: 1 },
+      });
+      expect(mockPrisma.category.update).toHaveBeenCalledWith({
+        where: { id: 'apple' },
+        data: { mainSortOrder: 2 },
+      });
+      expect(mockCacheService.invalidateAllCaches).toHaveBeenCalled();
+      expect(result).toEqual({ updated: 2 });
     });
   });
 });

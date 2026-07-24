@@ -3,6 +3,7 @@ import { PrismaService } from '../../shared/services/prisma.service';
 import { CreateCategoryDto } from '../dto/create-category.dto';
 import { UpdateCategoryDto } from '../dto/update-category.dto';
 import { ReorderCategoriesDto } from '../dto/reorder-categories.dto';
+import { ReorderMainCategoriesDto } from '../dto/reorder-main-categories.dto';
 import { PaginationDto } from '../../shared/dto/pagination.dto';
 import { CategoryCacheService } from './cache.service';
 
@@ -63,9 +64,14 @@ export class CategoryService {
       .trim();
   }
 
-  private buildCategoryTree<T extends { id: string; parentId: string | null; title: string; sortOrder?: number }>(
-    categories: T[],
-  ): Array<T & { children: Array<T & { children: any[] }> }> {
+  private buildCategoryTree<
+    T extends {
+      id: string;
+      parentId: string | null;
+      title: string;
+      sortOrder?: number;
+    },
+  >(categories: T[]): Array<T & { children: Array<T & { children: any[] }> }> {
     const nodes = new Map<string, T & { children: any[] }>();
     const roots: Array<T & { children: any[] }> = [];
 
@@ -95,6 +101,49 @@ export class CategoryService {
     return roots;
   }
 
+  private addDistinctProductCounts(
+    tree: Array<any>,
+    productCategories: Array<{ categoryId: string; productId: string }>,
+  ) {
+    const productIdsByCategory = new Map<string, Set<string>>();
+    for (const relation of productCategories) {
+      const productIds =
+        productIdsByCategory.get(relation.categoryId) ?? new Set<string>();
+      productIds.add(relation.productId);
+      productIdsByCategory.set(relation.categoryId, productIds);
+    }
+
+    const addCounts = (category: any): [any, Set<string>] => {
+      const productIds = new Set(productIdsByCategory.get(category.id) ?? []);
+      const children = (category.children ?? []).map((child: any) => {
+        const [childWithCount, childProductIds] = addCounts(child);
+        childProductIds.forEach((productId) => productIds.add(productId));
+        return childWithCount;
+      });
+
+      return [
+        {
+          ...category,
+          children,
+          productCount: productIds.size,
+        },
+        productIds,
+      ];
+    };
+
+    return tree.map((category) => addCounts(category)[0]);
+  }
+
+  private async getNextMainSortOrder(): Promise<number> {
+    const lastMainCategory = await this.prisma.category.findFirst({
+      where: { isMain: true, isDeleted: false },
+      orderBy: { mainSortOrder: 'desc' },
+      select: { mainSortOrder: true },
+    });
+
+    return (lastMainCategory?.mainSortOrder ?? 0) + 1;
+  }
+
   async create(createCategoryDto: CreateCategoryDto) {
     try {
       this.logger.log(`Creating category: ${createCategoryDto.title}`);
@@ -103,10 +152,15 @@ export class CategoryService {
         ? this.generateSlug(createCategoryDto.slug)
         : this.generateSlug(createCategoryDto.title);
 
+      const mainSortOrder =
+        createCategoryDto.isMain && !createCategoryDto.mainSortOrder
+          ? await this.getNextMainSortOrder()
+          : createCategoryDto.mainSortOrder;
       const category = await this.prisma.category.create({
         data: {
           ...createCategoryDto,
           slug,
+          ...(mainSortOrder !== undefined ? { mainSortOrder } : {}),
         },
         include: {
           parent: true,
@@ -133,9 +187,7 @@ export class CategoryService {
     }
   }
 
-  async findAll(
-    paginationDto: PaginationDto & { includeInactive?: boolean },
-  ) {
+  async findAll(paginationDto: PaginationDto & { includeInactive?: boolean }) {
     try {
       this.logger.log(
         `Finding all categories with pagination: ${JSON.stringify(paginationDto)}`,
@@ -168,7 +220,16 @@ export class CategoryService {
               select: { id: true, title: true, slug: true, image: true },
               orderBy: { sortOrder: 'asc' },
             },
-            _count: { select: { products: true, children: true } },
+            _count: {
+              select: {
+                products: {
+                  where: {
+                    product: { isActive: true, isDeleted: false },
+                  },
+                },
+                children: true,
+              },
+            },
           },
           orderBy: [{ sortOrder: 'asc' }, { title: 'asc' }],
         }),
@@ -219,14 +280,37 @@ export class CategoryService {
       const categories = await this.prisma.category.findMany({
         where: { isActive: true, isDeleted: false },
         include: {
-          _count: { select: { products: true, children: true } },
+          _count: {
+            select: {
+              products: {
+                where: {
+                  product: { isActive: true, isDeleted: false },
+                },
+              },
+              children: true,
+            },
+          },
         },
         orderBy: [{ sortOrder: 'asc' }, { title: 'asc' }],
       });
       const tree = this.buildCategoryTree(categories);
+      const productCategories =
+        categories.length > 0
+          ? await this.prisma.productCategory.findMany({
+              where: {
+                categoryId: { in: categories.map((category) => category.id) },
+                product: { isActive: true, isDeleted: false },
+              },
+              select: { categoryId: true, productId: true },
+            })
+          : [];
+      const treeWithProductCounts = this.addDistinctProductCounts(
+        tree,
+        productCategories,
+      );
 
-      await this.cacheService.cacheCategories(cacheKey, tree);
-      return tree;
+      await this.cacheService.cacheCategories(cacheKey, treeWithProductCounts);
+      return treeWithProductCounts;
     } catch (error) {
       this.logger.error(
         `Error finding category tree: ${error.message}`,
@@ -237,6 +321,80 @@ export class CategoryService {
       }
       throw new HttpException(
         error.message || 'Failed to find category tree',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  async findMain() {
+    try {
+      this.logger.log('Finding main categories');
+
+      const cacheKey = 'category:main';
+      const cached = await this.cacheService.getCachedCategories(cacheKey);
+      if (cached) {
+        return cached;
+      }
+
+      const categories = await this.prisma.category.findMany({
+        where: { isActive: true, isDeleted: false },
+        include: {
+          _count: {
+            select: {
+              products: {
+                where: {
+                  product: { isActive: true, isDeleted: false },
+                },
+              },
+              children: true,
+            },
+          },
+        },
+        orderBy: [{ sortOrder: 'asc' }, { title: 'asc' }],
+      });
+      const tree = this.buildCategoryTree(categories);
+      const productCategories =
+        categories.length > 0
+          ? await this.prisma.productCategory.findMany({
+              where: {
+                categoryId: { in: categories.map((category) => category.id) },
+                product: { isActive: true, isDeleted: false },
+              },
+              select: { categoryId: true, productId: true },
+            })
+          : [];
+      const treeWithProductCounts = this.addDistinctProductCounts(
+        tree,
+        productCategories,
+      );
+      const allNodes: any[] = [];
+      const collectNodes = (nodes: any[]) => {
+        nodes.forEach((node) => {
+          allNodes.push(node);
+          collectNodes(node.children ?? []);
+        });
+      };
+      collectNodes(treeWithProductCounts);
+
+      const mainCategories = allNodes
+        .filter((category) => category.isMain)
+        .sort((a, b) => {
+          const orderDiff = a.mainSortOrder - b.mainSortOrder;
+          return orderDiff || a.title.localeCompare(b.title, 'ru');
+        });
+
+      await this.cacheService.cacheCategories(cacheKey, mainCategories);
+      return mainCategories;
+    } catch (error) {
+      this.logger.error(
+        `Error finding main categories: ${error.message}`,
+        error.stack,
+      );
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new HttpException(
+        error.message || 'Failed to find main categories',
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
@@ -330,9 +488,18 @@ export class CategoryService {
     try {
       this.logger.log(`Updating category: ${id}`);
 
-      await this.findOne(id);
+      const existingCategory = await this.findOne(id);
 
       const updateData: any = { ...updateCategoryDto };
+      if (updateCategoryDto.isMain === false) {
+        updateData.mainSortOrder = 0;
+      } else if (
+        updateCategoryDto.isMain === true &&
+        !existingCategory.isMain &&
+        !updateCategoryDto.mainSortOrder
+      ) {
+        updateData.mainSortOrder = await this.getNextMainSortOrder();
+      }
       if (updateCategoryDto.slug?.trim()) {
         updateData.slug = this.generateSlug(updateCategoryDto.slug);
       } else if (updateCategoryDto.title) {
@@ -374,17 +541,35 @@ export class CategoryService {
 
       this.logger.log(`Reordering categories: ${ids.join(', ')}`);
 
-      const existingCount = await this.prisma.category.count({
+      if (new Set(ids).size !== ids.length) {
+        throw new HttpException(
+          'A category can only appear once in the order',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      const categories = await this.prisma.category.findMany({
         where: {
           id: { in: ids },
           isDeleted: false,
         },
+        select: { id: true, parentId: true },
       });
 
-      if (existingCount !== items.length) {
+      if (categories.length !== items.length) {
         throw new HttpException(
           'One or more categories not found',
           HttpStatus.NOT_FOUND,
+        );
+      }
+
+      const parentIds = new Set(
+        categories.map((category) => category.parentId ?? null),
+      );
+      if (parentIds.size !== 1) {
+        throw new HttpException(
+          'Categories can only be reordered within the same level',
+          HttpStatus.BAD_REQUEST,
         );
       }
 
@@ -398,7 +583,9 @@ export class CategoryService {
       );
 
       await this.cacheService.invalidateAllCaches();
-      this.logger.log(`Reordered ${items.length} categories, cache invalidated`);
+      this.logger.log(
+        `Reordered ${items.length} categories, cache invalidated`,
+      );
 
       return { updated: items.length };
     } catch (error) {
@@ -411,6 +598,56 @@ export class CategoryService {
       }
       throw new HttpException(
         error.message || 'Failed to reorder categories',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  async reorderMain(reorderMainCategoriesDto: ReorderMainCategoriesDto) {
+    try {
+      const items = reorderMainCategoriesDto.items;
+      const ids = items.map((item) => item.id);
+
+      if (new Set(ids).size !== ids.length) {
+        throw new HttpException(
+          'A category can only appear once in the main order',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      const categories = await this.prisma.category.findMany({
+        where: { id: { in: ids }, isMain: true, isDeleted: false },
+        select: { id: true },
+      });
+
+      if (categories.length !== items.length) {
+        throw new HttpException(
+          'One or more main categories not found',
+          HttpStatus.NOT_FOUND,
+        );
+      }
+
+      await this.prisma.$transaction(
+        items.map((item) =>
+          this.prisma.category.update({
+            where: { id: item.id },
+            data: { mainSortOrder: item.mainSortOrder },
+          }),
+        ),
+      );
+
+      await this.cacheService.invalidateAllCaches();
+      return { updated: items.length };
+    } catch (error) {
+      this.logger.error(
+        `Error reordering main categories: ${error.message}`,
+        error.stack,
+      );
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new HttpException(
+        error.message || 'Failed to reorder main categories',
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }

@@ -84,6 +84,7 @@ model Category {
   parentId  String?
   title     String
   slug      String    @unique
+  description String?
   seoTitle  String?
   seoDescription String?
   seoH1     String?
@@ -91,6 +92,8 @@ model Category {
   image     String?
   isActive  Boolean   @default(true)
   sortOrder Int       @default(0)
+  isMain    Boolean   @default(false)
+  mainSortOrder Int   @default(0)
   isDeleted Boolean   @default(false)
   deletedAt DateTime?
   createdAt DateTime  @default(now())
@@ -104,6 +107,7 @@ model Category {
 
   @@index([parentId])
   @@index([slug])
+  @@index([isMain, mainSortOrder])
   @@index([isDeleted])
 }
 
