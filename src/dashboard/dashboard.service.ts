@@ -36,6 +36,7 @@ interface ParsedImportRow {
   brandName: string | null;
   categoryIds: string[];
   categoryNames: string[];
+  hasCategoryAssignment: boolean;
   shouldReplaceCategories: boolean;
   images: string[];
   attributes: Array<{ name: string; value: string }>;
@@ -73,6 +74,12 @@ const TECHNICAL_IMPORT_ATTRIBUTE_NAMES = new Set([
   'группа оффера',
   'категория источника',
   'путь источника',
+  'категория id (основная)',
+  'категории id',
+  'обновить категории',
+  'заменить категории',
+  'update categories',
+  'replace categories',
   'source id',
   'source slug',
   'offer id',
@@ -435,6 +442,7 @@ export class DashboardService {
           'Категория ID (основная)': primaryCategoryId,
           Категории: allCategories,
           'Категории ID': allCategoryIds,
+          'Обновить категории': '',
           Изображения: images,
           Атрибуты: attributes,
           SKU: skus,
@@ -473,6 +481,7 @@ export class DashboardService {
         'Категория ID (основная)',
         'Категории',
         'Категории ID',
+        'Обновить категории',
         'Изображения',
         'Атрибуты',
         'SKU',
@@ -501,6 +510,7 @@ export class DashboardService {
         { wch: 44 },
         { wch: 60 },
         { wch: 60 },
+        { wch: 20 },
         { wch: 28 },
         { wch: 16 },
         { wch: 10 },
@@ -513,6 +523,29 @@ export class DashboardService {
 
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, 'Products');
+      const instructionsWorksheet = XLSX.utils.json_to_sheet([
+        {
+          Правило: 'Обновление цен',
+          Описание:
+            'Меняйте цену в нужных строках. Категории существующих товаров останутся без изменений.',
+        },
+        {
+          Правило: 'Изменение категорий',
+          Описание:
+            'Чтобы заменить категории товара, укажите нужные категории и поставьте «Да» в столбце «Обновить категории».',
+        },
+        {
+          Правило: 'Новые товары',
+          Описание:
+            'Для нового товара категория берётся из колонок категорий даже без отметки «Обновить категории».',
+        },
+      ]);
+      instructionsWorksheet['!cols'] = [{ wch: 24 }, { wch: 110 }];
+      XLSX.utils.book_append_sheet(
+        workbook,
+        instructionsWorksheet,
+        'Инструкция',
+      );
 
       const fileBuffer = XLSX.write(workbook, {
         type: 'buffer',
@@ -599,6 +632,8 @@ export class DashboardService {
       created: number;
       updated: number;
       skipped: number;
+      categoriesChanged: number;
+      categoriesPreserved: number;
       errors: Array<{ row: number; reason: string }>;
     } = {
       fileName: originalFileName,
@@ -608,6 +643,8 @@ export class DashboardService {
       created: 0,
       updated: 0,
       skipped: 0,
+      categoriesChanged: 0,
+      categoriesPreserved: 0,
       errors: [],
     };
 
@@ -653,16 +690,18 @@ export class DashboardService {
               )
             : null;
 
-          const categoryIds = parsed.shouldReplaceCategories
-            ? parsed.categoryIds.length > 0
-              ? await this.resolveCategoryIdsById(tx, parsed.categoryIds)
-              : await this.resolveCategoryIds(
-                  tx,
-                  parsed.categoryNames,
-                  categoryCache,
-                  undoContext,
-                )
-            : [];
+          const categoryIds =
+            parsed.shouldReplaceCategories ||
+            (!existing && parsed.hasCategoryAssignment)
+              ? parsed.categoryIds.length > 0
+                ? await this.resolveCategoryIdsById(tx, parsed.categoryIds)
+                : await this.resolveCategoryIds(
+                    tx,
+                    parsed.categoryNames,
+                    categoryCache,
+                    undoContext,
+                  )
+              : [];
           const baseSlug = parsed.sourceSlug || this.slugify(parsed.name);
           const productSlug = await this.ensureUniqueProductSlug(
             tx,
@@ -704,7 +743,15 @@ export class DashboardService {
               select: { id: true, updatedAt: true },
             });
 
-            if (parsed.shouldReplaceCategories && categoryIds.length > 0) {
+            const categoriesChanged =
+              parsed.shouldReplaceCategories &&
+              categoryIds.length > 0 &&
+              !this.areCategoryAssignmentsEqual(
+                beforeSnapshot?.categories || [],
+                categoryIds,
+              );
+
+            if (categoriesChanged) {
               await tx.productCategory.deleteMany({
                 where: { productId: existing.id },
               });
@@ -786,7 +833,11 @@ export class DashboardService {
               },
             });
 
-            return 'updated' as const;
+            return {
+              kind: 'updated' as const,
+              categoriesChanged,
+              categoriesPreserved: !categoriesChanged,
+            };
           }
 
           const createdAttributes = applyVariantPriceColumnsToAttributes(
@@ -873,14 +924,24 @@ export class DashboardService {
             },
           });
 
-          return 'created' as const;
+          return {
+            kind: 'created' as const,
+            categoriesChanged: false,
+            categoriesPreserved: false,
+          };
         });
 
         summary.processedRows += 1;
-        if (operation === 'created') {
+        if (operation.kind === 'created') {
           summary.created += 1;
         } else {
           summary.updated += 1;
+        }
+        if (operation.categoriesChanged) {
+          summary.categoriesChanged += 1;
+        }
+        if (operation.categoriesPreserved) {
+          summary.categoriesPreserved += 1;
         }
       } catch (error) {
         summary.skipped += 1;
@@ -905,6 +966,8 @@ export class DashboardService {
         skippedCount: summary.skipped,
         summary: {
           sheetName: summary.sheetName,
+          categoriesChanged: summary.categoriesChanged,
+          categoriesPreserved: summary.categoriesPreserved,
           errors: summary.errors,
         } as any,
         createdCategories: this.toCreatedImportEntities(
@@ -979,122 +1042,138 @@ export class DashboardService {
   }
 
   async undoLatestProductsXlsxImport() {
-    const result = await this.prisma.$transaction(async (tx) => {
-      const batch = await tx.productImportBatch.findFirst({
-        orderBy: { createdAt: 'desc' },
-        include: { entries: true },
-      });
+    const result = await this.prisma.$transaction(
+      async (tx) => {
+        const batch = await tx.productImportBatch.findFirst({
+          orderBy: { createdAt: 'desc' },
+          include: { entries: true },
+        });
 
-      if (!batch || batch.status !== 'COMPLETED' || !batch.completedAt) {
-        throw new BadRequestException(
-          'Нет последней выгрузки, которую можно отменить',
-        );
-      }
-
-      const productIds = batch.entries.map((entry) => entry.productId);
-      const currentProducts = productIds.length
-        ? await tx.product.findMany({
-            where: { id: { in: productIds } },
-            select: {
-              id: true,
-              updatedAt: true,
-              _count: {
-                select: {
-                  orderItems: true,
-                  reviews: true,
-                  favorites: true,
-                  relatedProducts: true,
-                  relatedFromProducts: true,
-                },
-              },
-            },
-          })
-        : [];
-      const currentProductById = new Map(
-        currentProducts.map((product) => [product.id, product]),
-      );
-      const conflictedProductIds: string[] = [];
-
-      for (const entry of batch.entries) {
-        const product = currentProductById.get(entry.productId);
-        if (
-          !product ||
-          product.updatedAt.getTime() !== entry.afterUpdatedAt.getTime()
-        ) {
-          conflictedProductIds.push(entry.productId);
-          continue;
-        }
-
-        if (
-          entry.action === 'CREATED' &&
-          (product._count.orderItems > 0 ||
-            product._count.reviews > 0 ||
-            product._count.favorites > 0 ||
-            product._count.relatedProducts > 0 ||
-            product._count.relatedFromProducts > 0)
-        ) {
-          conflictedProductIds.push(entry.productId);
-        }
-      }
-
-      const conflictedProductIdSet = new Set(conflictedProductIds);
-
-      let restored = 0;
-      let removed = 0;
-
-      for (const entry of batch.entries.filter(
-        (item) =>
-          item.action === 'UPDATED' &&
-          !conflictedProductIdSet.has(item.productId),
-      )) {
-        const snapshot = this.parseProductImportSnapshot(entry.beforeSnapshot);
-        if (!snapshot) {
-          throw new ConflictException(
-            'Для одной из позиций не найден снимок до выгрузки',
+        if (!batch || batch.status !== 'COMPLETED' || !batch.completedAt) {
+          throw new BadRequestException(
+            'Нет последней выгрузки, которую можно отменить',
           );
         }
 
-        await this.restoreProductImportSnapshot(tx, entry.productId, snapshot);
-        restored += 1;
-      }
+        const productIds = batch.entries.map((entry) => entry.productId);
+        const currentProducts = productIds.length
+          ? await tx.product.findMany({
+              where: { id: { in: productIds } },
+              select: {
+                id: true,
+                updatedAt: true,
+                _count: {
+                  select: {
+                    orderItems: true,
+                    reviews: true,
+                    favorites: true,
+                    relatedProducts: true,
+                    relatedFromProducts: true,
+                  },
+                },
+              },
+            })
+          : [];
+        const currentProductById = new Map(
+          currentProducts.map((product) => [product.id, product]),
+        );
+        const conflictedProductIds: string[] = [];
 
-      for (const entry of batch.entries.filter(
-        (item) =>
-          item.action === 'CREATED' &&
-          !conflictedProductIdSet.has(item.productId),
-      )) {
-        await tx.product.delete({ where: { id: entry.productId } });
-        removed += 1;
-      }
+        for (const entry of batch.entries) {
+          const product = currentProductById.get(entry.productId);
+          if (
+            !product ||
+            product.updatedAt.getTime() !== entry.afterUpdatedAt.getTime()
+          ) {
+            conflictedProductIds.push(entry.productId);
+            continue;
+          }
 
-      const removedCategories = await this.removeUntouchedImportCategories(
-        tx,
-        batch.createdCategories,
-      );
-      const removedBrands = await this.removeUntouchedImportBrands(
-        tx,
-        batch.createdBrands,
-      );
+          if (
+            entry.action === 'CREATED' &&
+            (product._count.orderItems > 0 ||
+              product._count.reviews > 0 ||
+              product._count.favorites > 0 ||
+              product._count.relatedProducts > 0 ||
+              product._count.relatedFromProducts > 0)
+          ) {
+            conflictedProductIds.push(entry.productId);
+          }
+        }
 
-      await tx.productImportBatch.update({
-        where: { id: batch.id },
-        data: {
+        const conflictedProductIdSet = new Set(conflictedProductIds);
+
+        let restored = 0;
+        let removed = 0;
+
+        for (const entry of batch.entries.filter(
+          (item) =>
+            item.action === 'UPDATED' &&
+            !conflictedProductIdSet.has(item.productId),
+        )) {
+          const snapshot = this.parseProductImportSnapshot(
+            entry.beforeSnapshot,
+          );
+          if (!snapshot) {
+            throw new ConflictException(
+              'Для одной из позиций не найден снимок до выгрузки',
+            );
+          }
+
+          await this.restoreProductImportSnapshot(
+            tx,
+            entry.productId,
+            snapshot,
+          );
+          restored += 1;
+        }
+
+        for (const entry of batch.entries.filter(
+          (item) =>
+            item.action === 'CREATED' &&
+            !conflictedProductIdSet.has(item.productId),
+        )) {
+          await tx.product.delete({ where: { id: entry.productId } });
+          removed += 1;
+        }
+
+        const removedCategories = await this.removeUntouchedImportCategories(
+          tx,
+          batch.createdCategories,
+        );
+        const removedBrands = await this.removeUntouchedImportBrands(
+          tx,
+          batch.createdBrands,
+        );
+
+        await tx.productImportBatch.update({
+          where: { id: batch.id },
+          data: {
+            status:
+              conflictedProductIds.length > 0 ? 'PARTIALLY_UNDONE' : 'UNDONE',
+            undoneAt: new Date(),
+          },
+        });
+
+        return {
+          batchId: batch.id,
+          restored,
+          removed,
+          removedCategories,
+          removedBrands,
+          skipped: conflictedProductIds.length,
           status:
             conflictedProductIds.length > 0 ? 'PARTIALLY_UNDONE' : 'UNDONE',
-          undoneAt: new Date(),
-        },
-      });
-
-      return {
-        batchId: batch.id,
-        restored,
-        removed,
-        removedCategories,
-        removedBrands,
-        skipped: conflictedProductIds.length,
-        status: conflictedProductIds.length > 0 ? 'PARTIALLY_UNDONE' : 'UNDONE',
-      };
-    });
+        };
+      },
+      {
+        // A full XLSX import can contain thousands of products. Its rollback
+        // restores related records one product at a time, so Prisma's default
+        // five-second interactive transaction limit is too short.
+        maxWait: 10_000,
+        timeout: 300_000,
+      },
+    );
 
     await Promise.all([
       this.categoryCacheService.invalidateAllCaches(),
@@ -1391,6 +1470,21 @@ export class DashboardService {
     ]);
     const categoryIds = this.extractCategoryIds(row);
     const categoryNames = this.extractCategoryNames(row);
+    const hasCategoryAssignment =
+      categoryIds.length > 0 || this.hasCategoryAssignment(row);
+    const shouldReplaceCategories =
+      this.readBoolean(row, [
+        'Обновить категории',
+        'Заменить категории',
+        'Update categories',
+        'Replace categories',
+      ]) === true;
+
+    if (shouldReplaceCategories && !hasCategoryAssignment) {
+      throw new Error(
+        `Row ${rowNumber}: для обновления категорий укажите хотя бы одну категорию или её ID`,
+      );
+    }
 
     return {
       rowNumber,
@@ -1405,8 +1499,8 @@ export class DashboardService {
       brandName,
       categoryIds,
       categoryNames,
-      shouldReplaceCategories:
-        categoryIds.length > 0 || this.hasCategoryAssignment(row),
+      hasCategoryAssignment,
+      shouldReplaceCategories: shouldReplaceCategories && hasCategoryAssignment,
       images: this.extractImages(row),
       attributes: this.extractAttributes(row),
       sku,
@@ -1553,6 +1647,25 @@ export class DashboardService {
     }
 
     return uniqueIds;
+  }
+
+  private areCategoryAssignmentsEqual(
+    existing: Array<{ categoryId: string; isPrimary: boolean }>,
+    requestedCategoryIds: string[],
+  ): boolean {
+    if (existing.length !== requestedCategoryIds.length) return false;
+
+    const existingPrimaryId =
+      existing.find((category) => category.isPrimary)?.categoryId ||
+      existing[0]?.categoryId;
+    if (existingPrimaryId !== requestedCategoryIds[0]) return false;
+
+    const existingIds = new Set(
+      existing.map((category) => category.categoryId),
+    );
+    return requestedCategoryIds.every((categoryId) =>
+      existingIds.has(categoryId),
+    );
   }
 
   private async ensureUniqueProductSlug(
@@ -1768,7 +1881,13 @@ export class DashboardService {
         'Brand',
         'Категория',
         'Категория (основная)',
+        'Категория ID (основная)',
         'Категории',
+        'Категории ID',
+        'Обновить категории',
+        'Заменить категории',
+        'Update categories',
+        'Replace categories',
         'Подкатегория',
         'Раздел',
         'Категория источника',

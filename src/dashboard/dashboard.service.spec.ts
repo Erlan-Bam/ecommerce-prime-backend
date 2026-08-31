@@ -15,6 +15,81 @@ describe('DashboardService import category extraction', () => {
 
     expect(categoryNames).toEqual(['Аксессуары', 'Чехлы']);
   });
+
+  it('requires an explicit marker before replacing an existing product category', () => {
+    const withoutMarker = (service as any).parseImportRow(
+      {
+        Название: 'iPhone 17e',
+        Цена: 79990,
+        'Категория (основная)': 'Планшеты Apple',
+        'Категория ID (основная)': '4a0066d0-7a56-48bc-8428-d818cf97f88e',
+      },
+      2,
+    );
+    const withMarker = (service as any).parseImportRow(
+      {
+        Название: 'iPhone 17e',
+        Цена: 79990,
+        'Категория (основная)': 'Планшеты Apple',
+        'Категория ID (основная)': '4a0066d0-7a56-48bc-8428-d818cf97f88e',
+        'Обновить категории': 'Да',
+      },
+      2,
+    );
+
+    expect(withoutMarker).toMatchObject({
+      hasCategoryAssignment: true,
+      shouldReplaceCategories: false,
+    });
+    expect(withMarker).toMatchObject({
+      hasCategoryAssignment: true,
+      shouldReplaceCategories: true,
+    });
+  });
+
+  it('rejects an empty explicit category replacement', () => {
+    expect(() =>
+      (service as any).parseImportRow(
+        {
+          Название: 'MacBook Pro 16 M4',
+          Цена: 249990,
+          'Обновить категории': 'Да',
+        },
+        7,
+      ),
+    ).toThrow('Row 7: для обновления категорий укажите хотя бы одну категорию');
+  });
+
+  it('does not turn category control columns into product attributes', () => {
+    const attributes = (service as any).extractAttributes({
+      'Категория ID (основная)': '4a0066d0-7a56-48bc-8428-d818cf97f88e',
+      'Категории ID': '4a0066d0-7a56-48bc-8428-d818cf97f88e',
+      'Обновить категории': 'Да',
+      Атрибуты: 'Цвет: Серебристый',
+    });
+
+    expect(attributes).toEqual([{ name: 'Цвет', value: 'Серебристый' }]);
+  });
+
+  it('detects whether an explicit category assignment actually changed', () => {
+    const existing = [
+      { categoryId: 'macbook-pro-16-m4', isPrimary: true },
+      { categoryId: 'macbook', isPrimary: false },
+    ];
+
+    expect(
+      (service as any).areCategoryAssignmentsEqual(existing, [
+        'macbook-pro-16-m4',
+        'macbook',
+      ]),
+    ).toBe(true);
+    expect(
+      (service as any).areCategoryAssignmentsEqual(existing, [
+        'macbook-pro-16-m5',
+        'macbook',
+      ]),
+    ).toBe(false);
+  });
 });
 
 describe('DashboardService product XLSX import cache invalidation', () => {
@@ -100,7 +175,7 @@ describe('DashboardService product XLSX import cache invalidation', () => {
     });
   });
 
-  it('does not remove an existing product from categories when the XLSX has no category values', async () => {
+  it('does not remove an existing product from categories when the XLSX only updates prices', async () => {
     jest.spyOn(fs, 'mkdir').mockResolvedValue(undefined as any);
     jest.spyOn(fs, 'writeFile').mockResolvedValue(undefined);
 
@@ -172,17 +247,23 @@ describe('DashboardService product XLSX import cache invalidation', () => {
         Название: 'iPhone 17 Pro',
         Slug: 'iphone-17-pro',
         Цена: 1100,
+        'Категория (основная)': 'Планшеты Apple',
+        'Категория ID (основная)': '4a0066d0-7a56-48bc-8428-d818cf97f88e',
       },
     ]);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Products');
     const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
 
-    await service.importProductsXlsx(buffer, 'products.xlsx');
+    const result = await service.importProductsXlsx(buffer, 'products.xlsx');
 
     expect(tx.product.update).toHaveBeenCalledTimes(1);
     expect(tx.productCategory.deleteMany).not.toHaveBeenCalled();
     expect(tx.productCategory.createMany).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      categoriesChanged: 0,
+      categoriesPreserved: 1,
+    });
   });
 });
 
@@ -461,7 +542,11 @@ describe('DashboardService product XLSX export scopes', () => {
     };
     const service = new (DashboardService as any)(prisma, {} as any, {} as any);
 
-    await service.exportProductsXlsx('active', 'apple', 'brand-apple');
+    const exported = await service.exportProductsXlsx(
+      'active',
+      'apple',
+      'brand-apple',
+    );
 
     expect(prisma.product.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -474,5 +559,13 @@ describe('DashboardService product XLSX export scopes', () => {
         },
       }),
     );
+
+    const workbook = XLSX.read(exported.buffer, { type: 'buffer' });
+    expect(workbook.SheetNames).toEqual(['Products', 'Инструкция']);
+    const headers = XLSX.utils.sheet_to_json<string[]>(
+      workbook.Sheets.Products,
+      { header: 1 },
+    )[0];
+    expect(headers).toContain('Обновить категории');
   });
 });
