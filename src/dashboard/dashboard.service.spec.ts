@@ -90,6 +90,55 @@ describe('DashboardService import category extraction', () => {
       ]),
     ).toBe(false);
   });
+
+  it('resolves a category with accidental whitespace without creating a duplicate', async () => {
+    const tx = {
+      category: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 'macbook-m4-existing',
+            title: 'MacBook Pro 16 M4 ',
+            isActive: true,
+          },
+        ]),
+        create: jest.fn(),
+      },
+    };
+
+    await expect(
+      (service as any).resolveCategoryIds(
+        tx,
+        [' MacBook  Pro 16 M4 '],
+        new Map(),
+      ),
+    ).resolves.toEqual(['macbook-m4-existing']);
+    expect(tx.category.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects ambiguous normalized category names instead of guessing', async () => {
+    const tx = {
+      category: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 'macbook-m4-a',
+            title: 'MacBook Pro 16 M4',
+            isActive: true,
+          },
+          {
+            id: 'macbook-m4-b',
+            title: 'MacBook Pro 16 M4 ',
+            isActive: true,
+          },
+        ]),
+      },
+    };
+
+    await expect(
+      (service as any).resolveCategoryIds(tx, ['MacBook Pro 16 M4'], new Map()),
+    ).rejects.toThrow('Найдено несколько активных категорий');
+  });
 });
 
 describe('DashboardService product XLSX import cache invalidation', () => {

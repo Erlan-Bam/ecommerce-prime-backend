@@ -1584,7 +1584,8 @@ export class DashboardService {
 
     const resolvedIds: string[] = [];
     for (const categoryName of uniqueCategoryNames) {
-      const normalized = this.normalizeLookupKey(categoryName);
+      const cleanCategoryName = categoryName.replace(/\s+/g, ' ').trim();
+      const normalized = this.normalizeLookupKey(cleanCategoryName);
       const cached = cache.get(normalized);
       if (cached) {
         resolvedIds.push(cached);
@@ -1594,7 +1595,8 @@ export class DashboardService {
       const existing = await tx.category.findFirst({
         where: {
           isDeleted: false,
-          title: { equals: categoryName, mode: 'insensitive' },
+          isActive: true,
+          title: { equals: cleanCategoryName, mode: 'insensitive' },
         },
         select: { id: true },
       });
@@ -1605,13 +1607,40 @@ export class DashboardService {
         continue;
       }
 
+      const normalizedMatches = await tx.category.findMany({
+        where: { isDeleted: false },
+        select: { id: true, title: true, isActive: true },
+      });
+      const matchingCategories = normalizedMatches.filter(
+        (category) => this.normalizeLookupKey(category.title) === normalized,
+      );
+      const activeMatches = matchingCategories.filter(
+        (category) => category.isActive,
+      );
+
+      if (activeMatches.length === 1) {
+        cache.set(normalized, activeMatches[0].id);
+        resolvedIds.push(activeMatches[0].id);
+        continue;
+      }
+      if (activeMatches.length > 1) {
+        throw new Error(
+          `Найдено несколько активных категорий «${cleanCategoryName}». Укажите ID категории в выгрузке`,
+        );
+      }
+      if (matchingCategories.length > 0) {
+        throw new Error(
+          `Категория «${cleanCategoryName}» выключена. Активируйте её или укажите другую категорию`,
+        );
+      }
+
       const slug = await this.ensureUniqueCategorySlug(
         tx,
-        this.slugify(categoryName),
+        this.slugify(cleanCategoryName),
       );
       const created = await tx.category.create({
         data: {
-          title: categoryName,
+          title: cleanCategoryName,
           slug,
           isActive: true,
         },

@@ -1802,6 +1802,47 @@ export class ProductService {
         id,
         dto.relatedProductIds,
       );
+      const requestedCategoryIds = dto.categoryIds?.length
+        ? Array.from(new Set(dto.categoryIds))
+        : null;
+
+      if (requestedCategoryIds) {
+        const availableCategories = await this.prisma.category.findMany({
+          where: {
+            id: { in: requestedCategoryIds },
+            isDeleted: false,
+          },
+          select: { id: true },
+        });
+        const availableCategoryIds = new Set(
+          availableCategories.map((category) => category.id),
+        );
+        const missingCategoryIds = requestedCategoryIds.filter(
+          (categoryId) => !availableCategoryIds.has(categoryId),
+        );
+        if (missingCategoryIds.length > 0) {
+          throw new HttpException(
+            `Категории не найдены: ${missingCategoryIds.join(', ')}`,
+            HttpStatus.BAD_REQUEST,
+          );
+        }
+      }
+
+      const currentCategoryLinks = existingProduct.categories ?? [];
+      const currentPrimaryCategoryId =
+        currentCategoryLinks.find((category) => category.isPrimary)
+          ?.categoryId ?? currentCategoryLinks[0]?.categoryId;
+      const currentCategoryIds = new Set(
+        currentCategoryLinks.map((category) => category.categoryId),
+      );
+      const shouldReplaceCategories = Boolean(
+        requestedCategoryIds &&
+        (currentPrimaryCategoryId !== requestedCategoryIds[0] ||
+          currentCategoryIds.size !== requestedCategoryIds.length ||
+          requestedCategoryIds.some(
+            (categoryId) => !currentCategoryIds.has(categoryId),
+          )),
+      );
 
       const updateData: any = {
         ...(dto.brandId && { brand: { connect: { id: dto.brandId } } }),
@@ -1839,85 +1880,90 @@ export class ProductService {
 
       if (dto.relatedProductIds !== undefined) {
         await this.ensureRelatedProductsExist(relatedProductIds);
-        await this.prisma.productRelation.deleteMany({
-          where: { sourceProductId: id },
-        });
-        if (relatedProductIds.length > 0) {
-          await this.prisma.productRelation.createMany({
-            data: relatedProductIds.map((targetProductId, sortOrder) => ({
-              sourceProductId: id,
-              targetProductId,
-              sortOrder,
-            })),
+      }
+
+      const product = await this.prisma.$transaction(async (tx) => {
+        if (dto.relatedProductIds !== undefined) {
+          await tx.productRelation.deleteMany({
+            where: { sourceProductId: id },
           });
+          if (relatedProductIds.length > 0) {
+            await tx.productRelation.createMany({
+              data: relatedProductIds.map((targetProductId, sortOrder) => ({
+                sourceProductId: id,
+                targetProductId,
+                sortOrder,
+              })),
+            });
+          }
         }
-      }
 
-      // Handle categories update (many-to-many)
-      if (dto.categoryIds?.length) {
-        await this.prisma.productCategory.deleteMany({
-          where: { productId: id },
-        });
-        await this.prisma.productCategory.createMany({
-          data: dto.categoryIds.map((catId, idx) => ({
-            productId: id,
-            categoryId: catId,
-            isPrimary: idx === 0,
-          })),
-        });
-      }
-
-      // Handle images update
-      if (dto.images !== undefined) {
-        await this.prisma.productImage.deleteMany({ where: { productId: id } });
-        if (dto.images.length > 0) {
-          await this.prisma.productImage.createMany({
-            data: dto.images.map((img, idx) => ({
+        // Never delete the current assignment until every requested category
+        // has been validated. The transaction restores it if any later write
+        // fails, so a regular product edit cannot leave the product uncategorized.
+        if (shouldReplaceCategories && requestedCategoryIds) {
+          await tx.productCategory.deleteMany({
+            where: { productId: id },
+          });
+          await tx.productCategory.createMany({
+            data: requestedCategoryIds.map((categoryId, index) => ({
               productId: id,
-              url: img.url,
-              alt: img.alt,
-              sortOrder: img.sortOrder ?? idx,
+              categoryId,
+              isPrimary: index === 0,
             })),
           });
         }
-      }
 
-      // Handle attributes update
-      if (dto.attributes) {
-        await this.prisma.productAttribute.deleteMany({
-          where: { productId: id },
+        if (dto.images !== undefined) {
+          await tx.productImage.deleteMany({ where: { productId: id } });
+          if (dto.images.length > 0) {
+            await tx.productImage.createMany({
+              data: dto.images.map((img, idx) => ({
+                productId: id,
+                url: img.url,
+                alt: img.alt,
+                sortOrder: img.sortOrder ?? idx,
+              })),
+            });
+          }
+        }
+
+        if (dto.attributes) {
+          await tx.productAttribute.deleteMany({
+            where: { productId: id },
+          });
+          if (attributes.length > 0) {
+            await tx.productAttribute.createMany({
+              data: attributes.map((attr) => ({
+                productId: id,
+                name: attr.name,
+                value: attr.value,
+              })),
+            });
+          }
+        }
+
+        return tx.product.update({
+          where: { id },
+          data: updateData,
+          include: {
+            categories: {
+              include: {
+                category: true,
+              },
+              orderBy: { isPrimary: 'desc' },
+            },
+            brand: true,
+            images: { orderBy: { sortOrder: 'asc' } },
+            attributes: true,
+            productStock: {
+              include: {
+                pickupPoint: { select: { id: true, address: true } },
+              },
+            },
+            relatedProducts: this.getRelatedProductsInclude(),
+          },
         });
-        if (attributes.length > 0) {
-          await this.prisma.productAttribute.createMany({
-            data: attributes.map((attr) => ({
-              productId: id,
-              name: attr.name,
-              value: attr.value,
-            })),
-          });
-        }
-      }
-
-      const product = await this.prisma.product.update({
-        where: { id },
-        data: updateData,
-        include: {
-          categories: {
-            include: {
-              category: true,
-            },
-            orderBy: { isPrimary: 'desc' },
-          },
-          brand: true,
-          images: { orderBy: { sortOrder: 'asc' } },
-          attributes: true,
-          productStock: {
-            include: {
-              pickupPoint: { select: { id: true, address: true } },
-            },
-          },
-          relatedProducts: this.getRelatedProductsInclude(),
-        },
       });
 
       await this.invalidateCatalogCaches();

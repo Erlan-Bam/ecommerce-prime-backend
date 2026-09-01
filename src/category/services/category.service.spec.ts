@@ -35,6 +35,7 @@ describe('CategoryService - Soft Delete', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    mockPrisma.category.findMany.mockResolvedValue([]);
     mockPrisma.productCategory.findMany.mockResolvedValue([]);
 
     const module: TestingModule = await Test.createTestingModule({
@@ -331,6 +332,66 @@ describe('CategoryService - Soft Delete', () => {
         },
       });
       expect(mockCacheService.invalidateAllCaches).toHaveBeenCalled();
+    });
+  });
+
+  describe('normalized sibling titles', () => {
+    it('trims and collapses whitespace before creating a category', async () => {
+      mockPrisma.category.create.mockResolvedValue({
+        id: 'macbook-m4',
+        title: 'MacBook Pro 16 M4',
+        slug: 'macbook-pro-16-m4',
+      });
+
+      await service.create({
+        title: '  MacBook   Pro 16 M4  ',
+        parentId: '137c423a-be46-4b12-9acd-f9d564d98ca5',
+      });
+
+      expect(mockPrisma.category.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            title: 'MacBook Pro 16 M4',
+            slug: 'macbook-pro-16-m4',
+          }),
+        }),
+      );
+    });
+
+    it('rejects a visually identical category under the same parent', async () => {
+      mockPrisma.category.findMany.mockResolvedValue([
+        { id: 'existing-m4', title: 'MacBook Pro 16 M4' },
+      ]);
+
+      await expect(
+        service.create({
+          title: 'MacBook Pro  16 M4 ',
+          parentId: '137c423a-be46-4b12-9acd-f9d564d98ca5',
+        }),
+      ).rejects.toMatchObject({ status: HttpStatus.CONFLICT });
+
+      expect(mockPrisma.category.create).not.toHaveBeenCalled();
+    });
+
+    it('rejects moving or renaming a category into a duplicate sibling', async () => {
+      mockPrisma.category.findUnique.mockResolvedValue({
+        id: 'category-being-edited',
+        title: 'Old title',
+        slug: 'old-title',
+        parentId: 'parent-category',
+        isDeleted: false,
+      });
+      mockPrisma.category.findMany.mockResolvedValue([
+        { id: 'existing-m4', title: 'MacBook Pro 16 M4' },
+      ]);
+
+      await expect(
+        service.update('category-being-edited', {
+          title: ' MacBook Pro 16 M4 ',
+        }),
+      ).rejects.toMatchObject({ status: HttpStatus.CONFLICT });
+
+      expect(mockPrisma.category.update).not.toHaveBeenCalled();
     });
   });
 

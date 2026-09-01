@@ -64,6 +64,42 @@ export class CategoryService {
       .trim();
   }
 
+  private normalizeTitle(title: string): string {
+    return title.trim().replace(/\s+/g, ' ');
+  }
+
+  private normalizeTitleKey(title: string): string {
+    return this.normalizeTitle(title)
+      .toLocaleLowerCase('ru')
+      .replace(/ё/g, 'е');
+  }
+
+  private async ensureUniqueSiblingTitle(
+    title: string,
+    parentId: string | null,
+    excludeCategoryId?: string,
+  ) {
+    const siblings = await this.prisma.category.findMany({
+      where: {
+        parentId,
+        isDeleted: false,
+        ...(excludeCategoryId ? { id: { not: excludeCategoryId } } : {}),
+      },
+      select: { id: true, title: true },
+    });
+    const normalizedTitle = this.normalizeTitleKey(title);
+    const duplicate = (siblings ?? []).find(
+      (category) => this.normalizeTitleKey(category.title) === normalizedTitle,
+    );
+
+    if (duplicate) {
+      throw new HttpException(
+        `Категория «${this.normalizeTitle(title)}» уже существует на этом уровне`,
+        HttpStatus.CONFLICT,
+      );
+    }
+  }
+
   private buildCategoryTree<
     T extends {
       id: string;
@@ -148,9 +184,21 @@ export class CategoryService {
     try {
       this.logger.log(`Creating category: ${createCategoryDto.title}`);
 
+      const title = this.normalizeTitle(createCategoryDto.title);
+      if (!title) {
+        throw new HttpException(
+          'Название категории не может быть пустым',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+      await this.ensureUniqueSiblingTitle(
+        title,
+        createCategoryDto.parentId ?? null,
+      );
+
       const slug = createCategoryDto.slug?.trim()
         ? this.generateSlug(createCategoryDto.slug)
-        : this.generateSlug(createCategoryDto.title);
+        : this.generateSlug(title);
 
       const mainSortOrder =
         createCategoryDto.isMain && !createCategoryDto.mainSortOrder
@@ -159,6 +207,7 @@ export class CategoryService {
       const category = await this.prisma.category.create({
         data: {
           ...createCategoryDto,
+          title,
           slug,
           ...(mainSortOrder !== undefined ? { mainSortOrder } : {}),
         },
@@ -491,6 +540,29 @@ export class CategoryService {
       const existingCategory = await this.findOne(id);
 
       const updateData: any = { ...updateCategoryDto };
+      const title =
+        updateCategoryDto.title !== undefined
+          ? this.normalizeTitle(updateCategoryDto.title)
+          : this.normalizeTitle(existingCategory.title);
+      if (!title) {
+        throw new HttpException(
+          'Название категории не может быть пустым',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+      const parentId =
+        updateCategoryDto.parentId !== undefined
+          ? (updateCategoryDto.parentId ?? null)
+          : (existingCategory.parentId ?? null);
+      if (
+        updateCategoryDto.title !== undefined ||
+        updateCategoryDto.parentId !== undefined
+      ) {
+        await this.ensureUniqueSiblingTitle(title, parentId, id);
+      }
+      if (updateCategoryDto.title !== undefined) {
+        updateData.title = title;
+      }
       if (updateCategoryDto.isMain === false) {
         updateData.mainSortOrder = 0;
       } else if (
@@ -502,8 +574,8 @@ export class CategoryService {
       }
       if (updateCategoryDto.slug?.trim()) {
         updateData.slug = this.generateSlug(updateCategoryDto.slug);
-      } else if (updateCategoryDto.title) {
-        updateData.slug = this.generateSlug(updateCategoryDto.title);
+      } else if (updateCategoryDto.title !== undefined) {
+        updateData.slug = this.generateSlug(title);
       }
 
       const category = await this.prisma.category.update({
@@ -718,6 +790,12 @@ export class CategoryService {
           HttpStatus.BAD_REQUEST,
         );
       }
+
+      await this.ensureUniqueSiblingTitle(
+        category.title,
+        category.parentId ?? null,
+        category.id,
+      );
 
       const restored = await this.prisma.category.update({
         where: { id },

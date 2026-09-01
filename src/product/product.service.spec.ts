@@ -34,6 +34,12 @@ const mockPrisma = {
   },
   productAttribute: {
     groupBy: jest.fn(),
+    deleteMany: jest.fn(),
+    createMany: jest.fn(),
+  },
+  productRelation: {
+    deleteMany: jest.fn(),
+    createMany: jest.fn(),
   },
   productCategory: {
     deleteMany: jest.fn(),
@@ -64,6 +70,9 @@ describe('ProductService - Soft Delete', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    mockPrisma.$transaction.mockImplementation((input) =>
+      typeof input === 'function' ? input(mockPrisma) : Promise.all(input),
+    );
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -630,6 +639,7 @@ describe('ProductService - Soft Delete', () => {
 
       mockPrisma.product.findUnique.mockResolvedValue(existingProduct);
       mockPrisma.product.update.mockResolvedValue(existingProduct);
+      mockPrisma.category.findMany.mockResolvedValue([{ id: 'category-new' }]);
       mockPrisma.productCategory.deleteMany.mockResolvedValue({ count: 1 });
       mockPrisma.productCategory.createMany.mockResolvedValue({ count: 1 });
 
@@ -648,6 +658,68 @@ describe('ProductService - Soft Delete', () => {
         ],
       });
       expect(mockCategoryCacheService.invalidateAllCaches).toHaveBeenCalled();
+    });
+
+    it('keeps existing categories when a requested category does not exist', async () => {
+      const productId = 'prod-invalid-category';
+      const existingProduct = {
+        id: productId,
+        name: 'Test Product',
+        slug: 'test-product',
+        price: 100,
+        isDeleted: false,
+        reviews: [],
+        productStock: [],
+        categories: [{ categoryId: 'category-current', isPrimary: true }],
+        brand: null,
+        images: [],
+        attributes: [],
+      };
+
+      mockPrisma.product.findUnique.mockResolvedValue(existingProduct);
+      mockPrisma.category.findMany.mockResolvedValue([]);
+
+      await expect(
+        service.update(productId, { categoryIds: ['category-missing'] }),
+      ).rejects.toThrow('Категории не найдены');
+
+      expect(mockPrisma.productCategory.deleteMany).not.toHaveBeenCalled();
+      expect(mockPrisma.productCategory.createMany).not.toHaveBeenCalled();
+      expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('does not rewrite an unchanged category assignment', async () => {
+      const productId = 'prod-same-category';
+      const existingProduct = {
+        id: productId,
+        name: 'Test Product',
+        slug: 'test-product',
+        price: 100,
+        isDeleted: false,
+        reviews: [],
+        productStock: [],
+        categories: [{ categoryId: 'category-current', isPrimary: true }],
+        brand: null,
+        images: [],
+        attributes: [],
+      };
+
+      mockPrisma.product.findUnique.mockResolvedValue(existingProduct);
+      mockPrisma.category.findMany.mockResolvedValue([
+        { id: 'category-current' },
+      ]);
+      mockPrisma.product.update.mockResolvedValue(existingProduct);
+
+      await service.update(productId, {
+        price: 120,
+        categoryIds: ['category-current', 'category-current'],
+      });
+
+      expect(mockPrisma.productCategory.deleteMany).not.toHaveBeenCalled();
+      expect(mockPrisma.productCategory.createMany).not.toHaveBeenCalled();
+      expect(mockPrisma.$transaction).toHaveBeenCalledWith(
+        expect.any(Function),
+      );
     });
   });
 
