@@ -1,102 +1,125 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
 import {
-  IsNotEmpty,
-  IsString,
-  IsOptional,
-  IsBoolean,
-  IsObject,
   IsArray,
+  IsBoolean,
+  IsDateString,
+  IsEnum,
+  IsInt,
+  IsNotEmpty,
+  IsObject,
+  IsOptional,
+  IsString,
   Matches,
+  Min,
+  ValidateNested,
 } from 'class-validator';
-import { Prisma } from '@prisma/client';
+import { BlogProductPlacement, Prisma } from '@prisma/client';
+
+export class BlogProductBlockItemDto {
+  @ApiProperty({ description: 'Product ID' })
+  @IsString()
+  @IsNotEmpty()
+  productId: string;
+
+  @ApiPropertyOptional({ default: 0 })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  sortOrder?: number;
+}
+
+export class BlogProductBlockDto {
+  @ApiPropertyOptional({ description: 'Optional block title' })
+  @IsOptional()
+  @IsString()
+  title?: string;
+
+  @ApiPropertyOptional({ enum: BlogProductPlacement, default: BlogProductPlacement.AFTER_ARTICLE })
+  @IsOptional()
+  @IsEnum(BlogProductPlacement)
+  placement?: BlogProductPlacement;
+
+  @ApiPropertyOptional({ default: 0 })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  sortOrder?: number;
+
+  @ApiProperty({ type: [BlogProductBlockItemDto] })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => BlogProductBlockItemDto)
+  items: BlogProductBlockItemDto[];
+}
 
 export class CreateBlogDto {
-  @ApiProperty({
-    description: 'Blog post title',
-    example: 'Welcome to our store',
-  })
+  @ApiProperty({ description: 'Blog post title' })
   @IsNotEmpty()
   @IsString()
   title: string;
 
-  @ApiProperty({
-    description: 'Blog post content (HTML or markdown)',
-    example: '<p>Welcome to our amazing store...</p>',
-  })
+  @ApiProperty({ description: 'Blog post content (HTML or markdown)' })
   @IsNotEmpty()
   @IsString()
   text: string;
 
-  @ApiProperty({
-    description: 'URL-friendly slug',
-    example: 'welcome-to-our-store',
-  })
+  @ApiProperty({ description: 'URL-friendly slug' })
   @IsNotEmpty()
   @IsString()
-  @Matches(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, {
-    message:
-      'Slug must be URL-friendly (lowercase letters, numbers, and hyphens only)',
-  })
+  @Matches(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, { message: 'Slug must be URL-friendly (lowercase letters, numbers, and hyphens only)' })
   slug: string;
 
-  @ApiPropertyOptional({
-    description: 'Short description for blog list',
-    example: 'A brief overview of our new store features...',
-  })
+  @ApiPropertyOptional()
   @IsOptional()
   @IsString()
   excerpt?: string;
 
-  @ApiPropertyOptional({
-    description: 'Featured image URL',
-    example: '/images/blog/welcome.jpg',
-  })
+  @ApiPropertyOptional()
   @IsOptional()
   @IsString()
   imageUrl?: string;
 
-  @ApiPropertyOptional({
-    description: 'Author name',
-    example: 'Редакция Prime',
-  })
+  @ApiPropertyOptional({ description: 'Legacy author name fallback' })
   @IsOptional()
   @IsString()
   author?: string;
 
-  @ApiPropertyOptional({
-    description: 'Estimated read time',
-    example: '5 мин',
-  })
+  @ApiPropertyOptional({ description: 'BlogAuthor ID' })
+  @IsOptional()
+  @IsString()
+  authorId?: string;
+
+  @ApiPropertyOptional()
   @IsOptional()
   @IsString()
   readTime?: string;
 
-  @ApiPropertyOptional({
-    description: 'Tags for the blog post',
-    example: ['Apple', 'iPhone', 'Новинки'],
-  })
+  @ApiPropertyOptional()
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
   tags?: string[];
 
-  @ApiPropertyOptional({
-    description: 'SEO meta data (description, keywords, ogImage)',
-    example: {
-      description: 'SEO description',
-      keywords: 'key1, key2',
-      ogImage: 'https://example.com/image.jpg',
-    },
-  })
+  @ApiPropertyOptional()
   @IsOptional()
   @IsObject()
   meta?: Prisma.InputJsonValue;
 
-  @ApiPropertyOptional({
-    description: 'Whether the post is published',
-    default: true,
-  })
+  @ApiPropertyOptional({ default: true })
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  @ApiPropertyOptional({ description: 'Publication date/time in ISO 8601' })
+  @IsOptional()
+  @IsDateString()
+  publishedAt?: string;
+
+  @ApiPropertyOptional({ type: [BlogProductBlockDto] })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => BlogProductBlockDto)
+  productBlocks?: BlogProductBlockDto[];
 }

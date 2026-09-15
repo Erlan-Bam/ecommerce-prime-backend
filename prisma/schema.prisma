@@ -58,6 +58,11 @@ enum DeliveryMethod {
   DELIVERY
 }
 
+enum BlogProductPlacement {
+  AFTER_ARTICLE
+  INLINE
+}
+
 model User {
   id         String   @id @default(uuid())
   email      String?  @unique
@@ -164,6 +169,7 @@ model Product {
   favorites   Favorite[]
   relatedProducts ProductRelation[] @relation("SourceRelatedProducts")
   relatedFromProducts ProductRelation[] @relation("TargetRelatedProducts")
+  blogProductBlockItems BlogProductBlockItem[]
 
   @@index([brandId])
   @@index([variantGroupId])
@@ -191,7 +197,7 @@ model ProductCategory {
   id         String   @id @default(uuid())
   productId  String
   categoryId String
-  isPrimary  Boolean  @default(false) 
+  isPrimary  Boolean  @default(false)
   createdAt  DateTime @default(now())
 
   product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
@@ -352,7 +358,7 @@ model Review {
   id        String   @id @default(uuid())
   productId String
   userId    String?
-  guestName String?  // For guest reviews
+  guestName String?
   rating    Int
   comment   String?
   isActive  Boolean  @default(true)
@@ -388,8 +394,8 @@ model PickupPoint {
   id               String   @id @default(uuid())
   name             String
   address          String
-  coords           String   // "lat,lng" format
-  workingSchedule  Json     // {"Пн": {"from": "09:00", "to": "18:00"}, ...}
+  coords           String
+  workingSchedule  Json
   url              String?
   isActive         Boolean  @default(true)
   createdAt        DateTime @default(now())
@@ -466,13 +472,13 @@ model Coupon {
   value      Decimal    @db.Decimal(10, 2)
   validFrom  DateTime
   validTo    DateTime
-  usageLimit Int        @default(0) // 0 = unlimited
+  usageLimit Int        @default(0)
   usageCount Int        @default(0)
   isActive   Boolean    @default(true)
   isDeleted  Boolean    @default(false)
-  deletedAt  DateTime?
-  createdAt  DateTime   @default(now())
-  updatedAt  DateTime   @updatedAt
+  deletedAt DateTime?
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
 
   orders     Order[]
 
@@ -484,7 +490,7 @@ model Coupon {
 
 model GuestSession {
   id            String   @id @default(uuid())
-  fingerprint   String   @unique // Device fingerprint hash
+  fingerprint   String   @unique
   userAgent     String?
   ipAddress     String?
   lastActiveAt  DateTime @default(now())
@@ -498,24 +504,76 @@ model GuestSession {
   @@index([lastActiveAt])
 }
 
-model Blog {
+model BlogAuthor {
   id        String   @id @default(uuid())
-  title     String
-  text      String
-  slug      String   @unique
-  excerpt   String?  // Short description for blog list
-  imageUrl  String?  // Featured image URL
-  author    String   @default("Редакция Prime")
-  readTime  String   @default("5 мин")
-  tags      String[] @default([])
-  meta      Json?    // SEO meta data: { description, keywords, ogImage, etc. }
+  name      String   @unique
+  avatarUrl String?
+  bio       String?
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  posts Blog[]
+
+  @@index([isActive, name])
+}
+
+model Blog {
+  id          String   @id @default(uuid())
+  title       String
+  text        String
+  slug        String   @unique
+  excerpt     String?
+  imageUrl    String?
+  author      String   @default("Редакция Prime")
+  authorId    String?
+  readTime    String   @default("5 мин")
+  tags        String[] @default([])
+  meta        Json?
+  isActive    Boolean  @default(true)
+  publishedAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  authorProfile BlogAuthor?       @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  productBlocks BlogProductBlock[]
+
   @@index([slug])
   @@index([isActive])
+  @@index([publishedAt])
+  @@index([isActive, publishedAt])
+  @@index([authorId])
   @@index([createdAt])
+}
+
+model BlogProductBlock {
+  id        String               @id @default(uuid())
+  blogId    String
+  title     String?
+  placement BlogProductPlacement @default(AFTER_ARTICLE)
+  sortOrder Int                  @default(0)
+  createdAt DateTime             @default(now())
+  updatedAt DateTime             @updatedAt
+
+  blog  Blog                   @relation(fields: [blogId], references: [id], onDelete: Cascade)
+  items BlogProductBlockItem[]
+
+  @@index([blogId, placement, sortOrder])
+}
+
+model BlogProductBlockItem {
+  id        String   @id @default(uuid())
+  blockId   String
+  productId String
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+
+  block   BlogProductBlock @relation(fields: [blockId], references: [id], onDelete: Cascade)
+  product Product          @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([blockId, productId])
+  @@index([blockId, sortOrder])
+  @@index([productId])
 }
 
 model SeoTemplate {

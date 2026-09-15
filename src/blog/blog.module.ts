@@ -1,10 +1,13 @@
 import { Module } from '@nestjs/common';
+import { SharedModule } from '../shared/shared.module';
 import { BlogController } from './blog.controller';
-import { BlogService, BlogCacheService } from './services';
+import { BlogAuthorController } from './blog-author.controller';
+import { BlogService, BlogCacheService, BlogAuthorService } from './services';
 
 @Module({
-  controllers: [BlogController],
-  providers: [BlogService, BlogCacheService],
-  exports: [BlogService],
+  imports: [SharedModule],
+  controllers: [BlogController, BlogAuthorController],
+  providers: [BlogService, BlogCacheService, BlogAuthorService],
+  exports: [BlogService, BlogAuthorService],
 })
 export class BlogModule {}

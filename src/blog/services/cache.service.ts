@@ -5,7 +5,7 @@ import { RedisService } from '../../shared/services/redis.service';
 export class BlogCacheService {
   private readonly cacheLogger = new Logger(BlogCacheService.name);
   private readonly CACHE_PREFIX = 'blog';
-  private readonly CACHE_TTL = 3600; // 1 hour
+  private readonly CACHE_TTL = 3600; // 1 hour maximum
 
   constructor(private readonly redisService: RedisService) {}
 
@@ -39,8 +39,13 @@ export class BlogCacheService {
     await this.redisService.set(key, data, this.CACHE_TTL);
   }
 
-  async cachePosts(cacheKey: string, data: any): Promise<void> {
-    await this.redisService.set(cacheKey, data, this.CACHE_TTL);
+  async cachePosts(
+    cacheKey: string,
+    data: any,
+    ttlSeconds = this.CACHE_TTL,
+  ): Promise<void> {
+    const ttl = Math.max(1, Math.min(this.CACHE_TTL, ttlSeconds));
+    await this.redisService.set(cacheKey, data, ttl);
   }
 
   async invalidateAllCaches(): Promise<void> {
@@ -55,17 +60,14 @@ export class BlogCacheService {
 
   async invalidatePost(id: string, slug?: string): Promise<void> {
     try {
-      // Invalidate by ID
       const idKey = this.getCacheKey(`id:${id}`);
       await this.redisService.remove(idKey);
 
-      // Invalidate by slug if provided
       if (slug) {
         const slugKey = this.getCacheKey(`slug:${slug}`);
         await this.redisService.remove(slugKey);
       }
 
-      // Invalidate list caches
       await this.redisService.clearByPattern(`${this.CACHE_PREFIX}:list:*`);
 
       this.cacheLogger.log(`Invalidated cache for blog post ${id}`);
