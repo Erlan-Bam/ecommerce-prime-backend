@@ -19,13 +19,20 @@ import {
   UpdateStaticPageSeoDto,
   UpsertSeoCollectionDto,
   UpsertSeoTagTileDto,
+  UpsertStaticPageDto,
 } from './dto';
 import { SeoService } from './seo.service';
+import { SeoTagTileService } from './seo-tag-tile.service';
+import { StaticPageBuilderService } from './static-page-builder.service';
 
 @ApiTags('SEO')
 @Controller('seo')
 export class SeoController {
-  constructor(private readonly seoService: SeoService) {}
+  constructor(
+    private readonly seoService: SeoService,
+    private readonly seoTagTileService: SeoTagTileService,
+    private readonly staticPageBuilderService: StaticPageBuilderService,
+  ) {}
 
   @Public()
   @Get('templates')
@@ -99,7 +106,7 @@ export class SeoController {
   @Get('tag-tiles')
   @ApiOperation({ summary: 'Get active SEO tag tiles' })
   listPublicTagTiles(@Query('categoryId') categoryId?: string) {
-    return this.seoService.listTagTiles(false, categoryId);
+    return this.seoTagTileService.list(false, categoryId);
   }
 
   @UseGuards(AdminGuard)
@@ -107,7 +114,7 @@ export class SeoController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get all SEO tag tiles (Admin)' })
   listAdminTagTiles() {
-    return this.seoService.listTagTiles(true);
+    return this.seoTagTileService.list(true);
   }
 
   @UseGuards(AdminGuard)
@@ -115,7 +122,7 @@ export class SeoController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Create SEO tag tile (Admin)' })
   createTagTile(@Body() dto: UpsertSeoTagTileDto) {
-    return this.seoService.createTagTile(dto);
+    return this.seoTagTileService.create(dto);
   }
 
   @UseGuards(AdminGuard)
@@ -123,7 +130,7 @@ export class SeoController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update SEO tag tile (Admin)' })
   updateTagTile(@Param('id') id: string, @Body() dto: UpsertSeoTagTileDto) {
-    return this.seoService.updateTagTile(id, dto);
+    return this.seoTagTileService.update(id, dto);
   }
 
   @UseGuards(AdminGuard)
@@ -131,7 +138,7 @@ export class SeoController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Delete SEO tag tile (Admin)' })
   deleteTagTile(@Param('id') id: string) {
-    return this.seoService.removeTagTile(id);
+    return this.seoTagTileService.remove(id);
   }
 
   @Public()
@@ -155,6 +162,37 @@ export class SeoController {
   @ApiOperation({ summary: 'Upsert static page SEO record' })
   updateStaticPage(@Body() dto: UpdateStaticPageSeoDto) {
     return this.seoService.updateStaticPage(dto);
+  }
+
+  @Public()
+  @Get('page-builder')
+  @ApiOperation({ summary: 'Get rendered static page builder data by path' })
+  findBuilderPage(@Query('path') path = '/') {
+    return this.staticPageBuilderService.findPublicPage(path);
+  }
+
+  @UseGuards(AdminGuard)
+  @Get('admin/pages')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'List visual static pages (Admin)' })
+  listBuilderPages() {
+    return this.staticPageBuilderService.listAdminPages();
+  }
+
+  @UseGuards(AdminGuard)
+  @Post('admin/pages')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Create or update a visual static page (Admin)' })
+  upsertBuilderPage(@Body() dto: UpsertStaticPageDto) {
+    return this.staticPageBuilderService.upsertPage(dto);
+  }
+
+  @UseGuards(AdminGuard)
+  @Delete('admin/pages')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Delete a visual static page (Admin)' })
+  deleteBuilderPage(@Query('path') path: string) {
+    return this.staticPageBuilderService.removePage(path);
   }
 
   @UseGuards(AdminGuard)
