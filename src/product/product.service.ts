@@ -113,6 +113,74 @@ const EXCLUDED_DESCENDANT_SLUGS_BY_ROOT_SLUG: Record<string, Set<string>> = {
   ]),
 };
 
+const DEFAULT_IMPORTANT_ATTRIBUTES = ['бренд', 'модель', 'цвет']
+
+const DEFAULT_MEMORY_ATTRIBUTES = [
+  ['объём оперативной памяти', 'оперативная память'],
+  ['встроенная память', 'память', 'объём памяти'],
+]
+
+const DEFAULT_PHONE_IMPORTANT_ATTRIBUTES = [
+  ...DEFAULT_MEMORY_ATTRIBUTES,
+  'диагональ экрана',
+  'процессор'
+]
+
+// We show these attributes in ProductCard
+const IMPORTANT_ATTRIBUTES: { keywords: string[]; attributes: Array<string | string[]> }[] = [
+  {
+    keywords: ['смартфон', 'телефон'],
+    attributes: DEFAULT_PHONE_IMPORTANT_ATTRIBUTES,
+  },
+  {
+    keywords: ['планшет', 'ipad'],
+    attributes: DEFAULT_PHONE_IMPORTANT_ATTRIBUTES,
+  },
+  {
+    keywords: ['macbook', 'моноблок'],
+    attributes: DEFAULT_PHONE_IMPORTANT_ATTRIBUTES,
+  },
+  {
+    keywords: ["mac mini", "mac studio"],
+    attributes: [
+      ...DEFAULT_MEMORY_ATTRIBUTES,
+      'процессор',
+    ],
+  },
+  {
+    keywords: ["наушники"],
+    attributes: [
+      'вес устройства',
+      'количество микрофонов',
+      'тип разъёма зарядки',
+      'чип',
+    ],
+  },
+  {
+    keywords: ["часы", "watch", "garmin"],
+    attributes: [
+      ...DEFAULT_MEMORY_ATTRIBUTES,
+      'вес устройства',
+    ],
+  },
+  {
+    keywords: ["пылесос"],
+    attributes: [
+      'бренд',
+      'страна',
+      'категория',
+    ],
+  },
+];
+
+function findImportantAttributes(productName: string) {
+  const importantAttrs = IMPORTANT_ATTRIBUTES
+    .find((elem) =>
+      elem.keywords.findIndex(kw => productName.includes(kw)) !== -1,
+    );
+  return importantAttrs?.attributes || DEFAULT_IMPORTANT_ATTRIBUTES
+}
+
 type ProductListCandidate = {
   id: string;
   name: string;
@@ -597,6 +665,7 @@ export class ProductService {
       | Array<{ id?: string; name: string; value: string }>
       | undefined
       | null,
+    productName?: string,
   ): Array<{ id?: string; name: string; value: string }> {
     if (!attributes || attributes.length === 0) {
       return [];
@@ -610,6 +679,17 @@ export class ProductService {
       const name = this.normalizeAttributeName(attr.name);
       const value = attr.value?.toString().trim();
       if (!name || !value) continue;
+
+      if (productName) {
+        const searchName = name.toLowerCase();
+        const importantAttrs = findImportantAttributes(productName.toLowerCase())
+        const matchedAttr = importantAttrs.find(importantAttr =>
+          Array.isArray(importantAttr) ? importantAttr.includes(searchName) : importantAttr === searchName
+        )
+        if (!matchedAttr) {
+          continue;
+        }
+      }
 
       const key = `${this.normalizeText(name)}::${this.normalizeText(value)}`;
       if (!unique.has(key)) {
@@ -1471,8 +1551,8 @@ export class ProductService {
         },
         attributes: {
           select: { id: true, name: true, value: true },
-          take: 4,
         },
+        comingSoon: true,
       } as const;
 
       const shouldCollapseDuplicates = filter.includeInactive !== true;
@@ -1554,6 +1634,7 @@ export class ProductService {
       const productsWithRating = products.map((product) => {
         const sanitizedAttributes = this.sanitizeAttributes(
           product.attributes,
+          product.name,
         ).filter(
           (attribute) => !this.isConfigurationAttributeName(attribute.name),
         );

@@ -172,6 +172,7 @@ model Product {
   relatedFromProducts ProductRelation[] @relation("TargetRelatedProducts")
   blogProductBlockItems BlogProductBlockItem[]
   aiDescriptionDraft AiDescriptionDraft?
+  comingSoon Boolean @default(false)
 
   @@index([brandId])
   @@index([variantGroupId])
