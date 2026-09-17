@@ -52,8 +52,13 @@ export class AiDescriptionsController {
 
   @Post('batches')
   @ApiOperation({ summary: 'Start mass AI description generation' })
-  startBatch() {
-    return this.service.startBatch();
+  startBatch(
+    @Body()
+    body: {
+      statuses?: Array<'ACTIVE' | 'INACTIVE' | 'COMING_SOON'>;
+    },
+  ) {
+    return this.service.startBatch(body?.statuses);
   }
 
   @Get('batches/latest')

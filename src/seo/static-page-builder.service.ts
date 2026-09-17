@@ -19,6 +19,11 @@ const ALLOWED_BLOCK_TYPES = new Set([
   'productGrid',
 ]);
 
+const LEGACY_IMAGE_PATHS: Record<string, string> = {
+  '/About/company2.webp': '/images/prime_banner.png',
+  '/About/company3.webp': '/images/prime_banner.png',
+};
+
 @Injectable()
 export class StaticPageBuilderService {
   constructor(private readonly prisma: PrismaService) {}
@@ -37,6 +42,15 @@ export class StaticPageBuilderService {
     return cleaned || null;
   }
 
+  private normalizeBlockData(data: Record<string, any> = {}) {
+    if (typeof data.image !== 'string') return data;
+
+    const normalizedImage = LEGACY_IMAGE_PATHS[data.image] || data.image;
+    return normalizedImage === data.image
+      ? data
+      : { ...data, image: normalizedImage };
+  }
+
   private normalizeBlocks(blocks: UpsertStaticPageDto['blocks']) {
     if (blocks.length > 100) {
       throw new HttpException('Too many page blocks', HttpStatus.BAD_REQUEST);
@@ -52,9 +66,18 @@ export class StaticPageBuilderService {
       return {
         type: block.type,
         version: block.version || 1,
-        data: block.data || {},
+        data: this.normalizeBlockData(block.data || {}),
       };
     });
+  }
+
+  private normalizeStoredBlocks(blocks: unknown) {
+    if (!Array.isArray(blocks)) return [];
+
+    return blocks.map((block: any) => ({
+      ...block,
+      data: this.normalizeBlockData(block?.data || {}),
+    }));
   }
 
   async listAdminPages() {
@@ -82,7 +105,7 @@ export class StaticPageBuilderService {
         seoDescription: seo?.seoDescription || null,
         seoH1: seo?.seoH1 || null,
         isActive: seo?.isActive ?? true,
-        blocks: Array.isArray(content?.blocks) ? content.blocks : [],
+        blocks: this.normalizeStoredBlocks(content?.blocks),
         updatedAt: content?.updatedAt || seo?.updatedAt || null,
       };
     });
@@ -106,7 +129,7 @@ export class StaticPageBuilderService {
       seoDescription: seo?.seoDescription || null,
       seoH1: seo?.seoH1 || null,
       isActive: seo?.isActive ?? true,
-      blocks: Array.isArray(content.blocks) ? content.blocks : [],
+      blocks: this.normalizeStoredBlocks(content.blocks),
       updatedAt: content.updatedAt,
     };
   }

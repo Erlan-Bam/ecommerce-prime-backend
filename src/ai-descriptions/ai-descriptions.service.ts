@@ -2,12 +2,15 @@ import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectQueue } from '@nestjs/bull';
 import { Queue } from 'bull';
+import { Prisma } from '@prisma/client';
 import axios from 'axios';
 import { createCipheriv, createDecipheriv, createHash, randomBytes, randomUUID } from 'crypto';
 import { PrismaService } from '../shared/services/prisma.service';
 
 const SETTINGS_ID = 'default';
 const GEN_API_URL = 'https://proxy.gen-api.ru/v1/chat/completions';
+const BATCH_PRODUCT_STATUSES = ['ACTIVE', 'INACTIVE', 'COMING_SOON'] as const;
+type BatchProductStatus = (typeof BATCH_PRODUCT_STATUSES)[number];
 
 type SettingsRow = {
   id: string;
@@ -316,7 +319,7 @@ export class AiDescriptionsService {
     return { applied };
   }
 
-  async startBatch() {
+  async startBatch(statuses: BatchProductStatus[] = ['ACTIVE']) {
     await this.getProviderConfig();
     const running = await this.prisma.$queryRawUnsafe<Array<{ id: string }>>(
       `SELECT "id" FROM "AiDescriptionBatch" WHERE "status" = 'PROCESSING' ORDER BY "createdAt" DESC LIMIT 1`,
@@ -324,8 +327,34 @@ export class AiDescriptionsService {
     if (running[0]) {
       throw new HttpException('AI generation batch is already running', HttpStatus.CONFLICT);
     }
+
+    const normalizedStatuses = Array.from(
+      new Set(
+        statuses.filter((status): status is BatchProductStatus =>
+          BATCH_PRODUCT_STATUSES.includes(status as BatchProductStatus),
+        ),
+      ),
+    );
+    if (normalizedStatuses.length === 0) {
+      throw new HttpException('Select at least one product status', HttpStatus.BAD_REQUEST);
+    }
+
+    const statusFilters: Prisma.ProductWhereInput[] = [];
+    if (normalizedStatuses.includes('ACTIVE')) {
+      statusFilters.push({ isActive: true, comingSoon: false });
+    }
+    if (normalizedStatuses.includes('INACTIVE')) {
+      statusFilters.push({ isActive: false, comingSoon: false });
+    }
+    if (normalizedStatuses.includes('COMING_SOON')) {
+      statusFilters.push({ comingSoon: true });
+    }
+
     const products = await this.prisma.product.findMany({
-      where: { isDeleted: false },
+      where: {
+        isDeleted: false,
+        OR: statusFilters,
+      },
       select: { id: true },
       orderBy: { createdAt: 'asc' },
     });
