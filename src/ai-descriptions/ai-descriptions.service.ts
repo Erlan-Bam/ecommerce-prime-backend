@@ -140,29 +140,104 @@ export class AiDescriptionsService {
     return length >= 450 && length <= 1100 && paragraphs >= 2 && !hasMarkdown;
   }
 
+  private extractGenApiText(data: unknown): string | null {
+    const payload = data as any;
+    const message = payload?.choices?.[0]?.message;
+    const content = message?.content;
+
+    if (typeof content === 'string' && content.trim()) {
+      return content;
+    }
+
+    if (Array.isArray(content)) {
+      const text = content
+        .map((part: any) => {
+          if (typeof part === 'string') return part;
+          if (typeof part?.text === 'string') return part.text;
+          if (typeof part?.content === 'string') return part.content;
+          return '';
+        })
+        .filter(Boolean)
+        .join('\n')
+        .trim();
+      if (text) return text;
+    }
+
+    const directTextCandidates = [
+      payload?.output_text,
+      payload?.text,
+      payload?.output?.text,
+      payload?.output,
+    ];
+    for (const candidate of directTextCandidates) {
+      if (typeof candidate === 'string' && candidate.trim()) {
+        return candidate;
+      }
+    }
+
+    return null;
+  }
+
+  private providerErrorMessage(error: unknown) {
+    if (axios.isAxiosError(error)) {
+      const status = error.response?.status;
+      const providerMessage =
+        error.response?.data?.error?.message ||
+        error.response?.data?.message ||
+        error.response?.data?.error ||
+        error.message;
+      return status ? `GEN API ${status}: ${providerMessage}` : `GEN API: ${providerMessage}`;
+    }
+    return error instanceof Error ? error.message : String(error);
+  }
+
   private async callGenApi(messages: Array<{ role: 'system' | 'user'; content: string }>) {
     const { apiKey, model } = await this.getProviderConfig();
-    const response = await axios.post(
-      GEN_API_URL,
-      {
-        model,
-        messages,
-        temperature: 0.55,
-        max_tokens: 900,
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
+
+    try {
+      const response = await axios.post(
+        GEN_API_URL,
+        {
+          model,
+          messages,
+          temperature: 0.55,
+          max_tokens: 1200,
+          reasoning_effort: 'none',
+          response_format: { type: 'text' },
+          stream: false,
         },
-        timeout: 120000,
-      },
-    );
-    const content = response.data?.choices?.[0]?.message?.content;
-    if (!content || typeof content !== 'string') {
-      throw new Error('GEN API returned empty text');
+        {
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+          },
+          timeout: 120000,
+        },
+      );
+
+      const content = this.extractGenApiText(response.data);
+      if (!content) {
+        const choice = response.data?.choices?.[0];
+        const finishReason = choice?.finish_reason || 'unknown';
+        const hasReasoning = Boolean(choice?.message?.reasoning_content);
+        this.logger.error(
+          `GEN API returned no final text (model=${model}, finish_reason=${finishReason}, reasoning_content=${hasReasoning ? 'present' : 'absent'})`,
+        );
+        throw new Error(`GEN API returned no final text (finish_reason: ${finishReason})`);
+      }
+
+      return this.cleanText(content);
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        throw new HttpException(
+          this.providerErrorMessage(error),
+          error.response?.status && error.response.status >= 400 && error.response.status < 500
+            ? HttpStatus.BAD_GATEWAY
+            : HttpStatus.INTERNAL_SERVER_ERROR,
+        );
+      }
+      throw error;
     }
-    return this.cleanText(content);
   }
 
   private async getProductContext(productId: string) {
@@ -199,47 +274,50 @@ export class AiDescriptionsService {
 
     const user = `Название: ${product.name}\nБренд: ${product.brand?.name || 'не указан'}\nКатегории: ${categoryNames || 'не указаны'}\nХарактеристики:\n${attributes || 'не указаны'}\n\nТекущее описание:\n${product.description || 'отсутствует'}`;
 
-    let text = await this.callGenApi([
-      { role: 'system', content: system },
-      { role: 'user', content: user },
-    ]);
-
-    if (!this.isAcceptable(text)) {
-      text = await this.callGenApi([
+    try {
+      const text = await this.callGenApi([
         { role: 'system', content: system },
         { role: 'user', content: user },
-        { role: 'user', content: `Исправь предыдущий вариант. Нужны 2 абзаца, 500–1000 символов, без Markdown. Предыдущий текст:\n${text}` },
       ]);
+
+      const status = this.isAcceptable(text) ? 'READY' : 'NEEDS_REVIEW';
+      const id = randomUUID();
+      await this.prisma.$executeRawUnsafe(
+        `INSERT INTO "AiDescriptionDraft" ("id", "productId", "batchId", "text", "status", "error", "createdAt", "updatedAt")
+         VALUES ($1, $2, $3, $4, $5, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+         ON CONFLICT ("productId") DO UPDATE SET
+           "batchId" = EXCLUDED."batchId",
+           "text" = EXCLUDED."text",
+           "status" = EXCLUDED."status",
+           "error" = NULL,
+           "updatedAt" = CURRENT_TIMESTAMP,
+           "appliedAt" = NULL`,
+        id,
+        productId,
+        batchId || null,
+        text,
+        status,
+      );
+
+      return this.getDraft(productId);
+    } catch (error) {
+      await this.markDraftError(productId, batchId || null, error);
+      throw error;
     }
-
-    const status = this.isAcceptable(text) ? 'READY' : 'NEEDS_REVIEW';
-    const id = randomUUID();
-    await this.prisma.$executeRawUnsafe(
-      `INSERT INTO "AiDescriptionDraft" ("id", "productId", "batchId", "text", "status", "error", "createdAt", "updatedAt")
-       VALUES ($1, $2, $3, $4, $5, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-       ON CONFLICT ("productId") DO UPDATE SET
-         "batchId" = EXCLUDED."batchId",
-         "text" = EXCLUDED."text",
-         "status" = EXCLUDED."status",
-         "error" = NULL,
-         "updatedAt" = CURRENT_TIMESTAMP,
-         "appliedAt" = NULL`,
-      id,
-      productId,
-      batchId || null,
-      text,
-      status,
-    );
-
-    return this.getDraft(productId);
   }
 
   async markDraftError(productId: string, batchId: string | null, error: unknown) {
-    const message = error instanceof Error ? error.message : String(error);
+    const message = this.providerErrorMessage(error);
     await this.prisma.$executeRawUnsafe(
       `INSERT INTO "AiDescriptionDraft" ("id", "productId", "batchId", "status", "error", "createdAt", "updatedAt")
        VALUES ($1, $2, $3, 'ERROR', $4, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-       ON CONFLICT ("productId") DO UPDATE SET "batchId" = EXCLUDED."batchId", "status" = 'ERROR', "error" = EXCLUDED."error", "updatedAt" = CURRENT_TIMESTAMP`,
+       ON CONFLICT ("productId") DO UPDATE SET
+         "batchId" = EXCLUDED."batchId",
+         "text" = NULL,
+         "status" = 'ERROR',
+         "error" = EXCLUDED."error",
+         "updatedAt" = CURRENT_TIMESTAMP,
+         "appliedAt" = NULL`,
       randomUUID(),
       productId,
       batchId,
@@ -356,49 +434,62 @@ export class AiDescriptionsService {
         OR: statusFilters,
       },
       select: { id: true },
-      orderBy: { createdAt: 'asc' },
     });
+
     const batchId = randomUUID();
     await this.prisma.$executeRawUnsafe(
-      `INSERT INTO "AiDescriptionBatch" ("id", "status", "total", "processed", "success", "failed", "createdAt", "updatedAt") VALUES ($1, 'PROCESSING', $2, 0, 0, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+      `INSERT INTO "AiDescriptionBatch" ("id", "status", "total", "processed", "success", "failed", "createdAt", "updatedAt")
+       VALUES ($1, 'PROCESSING', $2, 0, 0, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
       batchId,
       products.length,
     );
-    await this.queue.addBulk(
-      products.map((product) => ({
-        name: 'generate-product',
-        data: { productId: product.id, batchId },
-        opts: { attempts: 2, backoff: 3000, removeOnComplete: 2000, removeOnFail: 2000 },
-      })),
-    );
+
+    for (const product of products) {
+      await this.queue.add('generate-product', { productId: product.id, batchId });
+    }
+
+    if (products.length === 0) {
+      await this.prisma.$executeRawUnsafe(
+        `UPDATE "AiDescriptionBatch" SET "status" = 'COMPLETED', "completedAt" = CURRENT_TIMESTAMP, "updatedAt" = CURRENT_TIMESTAMP WHERE "id" = $1`,
+        batchId,
+      );
+    }
+
     return this.getBatch(batchId);
   }
 
+  async getLatestBatch() {
+    const rows = await this.prisma.$queryRawUnsafe<Array<any>>(
+      `SELECT * FROM "AiDescriptionBatch" ORDER BY "createdAt" DESC LIMIT 1`,
+    );
+    return rows[0] || null;
+  }
+
   async getBatch(id: string) {
-    const rows = await this.prisma.$queryRawUnsafe<any[]>(
+    const rows = await this.prisma.$queryRawUnsafe<Array<any>>(
       `SELECT * FROM "AiDescriptionBatch" WHERE "id" = $1 LIMIT 1`,
       id,
     );
     return rows[0] || null;
   }
 
-  async getLatestBatch() {
-    const rows = await this.prisma.$queryRawUnsafe<any[]>(
-      `SELECT * FROM "AiDescriptionBatch" ORDER BY "createdAt" DESC LIMIT 1`,
-    );
-    return rows[0] || null;
-  }
-
-  async finishBatchItem(batchId: string, success: boolean) {
-    const field = success ? 'success' : 'failed';
+  async markBatchProductDone(batchId: string, success: boolean) {
     await this.prisma.$executeRawUnsafe(
-      `UPDATE "AiDescriptionBatch" SET
-       "processed" = "processed" + 1,
-       "${field}" = "${field}" + 1,
-       "updatedAt" = CURRENT_TIMESTAMP,
-       "status" = CASE WHEN "processed" + 1 >= "total" THEN 'COMPLETED' ELSE "status" END,
-       "completedAt" = CASE WHEN "processed" + 1 >= "total" THEN CURRENT_TIMESTAMP ELSE "completedAt" END
+      `UPDATE "AiDescriptionBatch"
+       SET "processed" = "processed" + 1,
+           "success" = "success" + $2,
+           "failed" = "failed" + $3,
+           "updatedAt" = CURRENT_TIMESTAMP
        WHERE "id" = $1`,
+      batchId,
+      success ? 1 : 0,
+      success ? 0 : 1,
+    );
+
+    await this.prisma.$executeRawUnsafe(
+      `UPDATE "AiDescriptionBatch"
+       SET "status" = 'COMPLETED', "completedAt" = CURRENT_TIMESTAMP, "updatedAt" = CURRENT_TIMESTAMP
+       WHERE "id" = $1 AND "processed" >= "total"`,
       batchId,
     );
   }
