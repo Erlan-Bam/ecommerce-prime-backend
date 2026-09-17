@@ -473,6 +473,10 @@ export class AiDescriptionsService {
     return rows[0] || null;
   }
 
+  async finishBatchItem(batchId: string, success: boolean) {
+    return this.markBatchProductDone(batchId, success);
+  }
+
   async markBatchProductDone(batchId: string, success: boolean) {
     await this.prisma.$executeRawUnsafe(
       `UPDATE "AiDescriptionBatch"
