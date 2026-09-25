@@ -8,6 +8,7 @@ import {
   Delete,
   Query,
   UseGuards,
+  ParseArrayPipe,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -30,6 +31,7 @@ import {
 import { AdminGuard } from '../shared/guards/admin.guard';
 import { Public } from '../shared/decorator/public.decorator';
 import { Roles } from '../shared/decorator/roles.decorator';
+import { UpdateProductPriceDto } from './dto/bulk-update-prices.dto';
 
 @ApiTags('Products')
 @Controller('products')
@@ -168,7 +170,9 @@ export class ProductController {
     description: 'Catalog cleanup suggestions retrieved successfully',
   })
   getCatalogCleanupSuggestions(@Query('limit') limit?: string) {
-    return this.productService.getCatalogCleanupSuggestions(Number(limit) || 200);
+    return this.productService.getCatalogCleanupSuggestions(
+      Number(limit) || 200,
+    );
   }
 
   @Post('catalog-cleanup/apply')
@@ -194,6 +198,21 @@ export class ProductController {
   @ApiResponse({ status: 404, description: 'Product not found' })
   findOne(@Param('id') id: string) {
     return this.productService.findOne(id);
+  }
+
+  @Patch('prices')
+  @UseGuards(AdminGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Bulk update products prices (Admin)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Products prices were updated successfully',
+  })
+  bulkUpdatePrices(
+    @Body(new ParseArrayPipe({ items: UpdateProductPriceDto, whitelist: true }))
+    updateProductsPricesDto: UpdateProductPriceDto[],
+  ) {
+    return this.productService.bulkUpdatePrices(updateProductsPricesDto);
   }
 
   @Patch(':id')

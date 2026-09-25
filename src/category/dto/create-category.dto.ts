@@ -15,7 +15,9 @@ export class CreateCategoryDto {
   @IsString()
   title: string;
 
-  @ApiPropertyOptional({ description: 'Category slug (auto-generated if not provided)' })
+  @ApiPropertyOptional({
+    description: 'Category slug (auto-generated if not provided)',
+  })
   @IsOptional()
   @IsString()
   slug?: string;
@@ -79,10 +81,18 @@ export class CreateCategoryDto {
   @IsBoolean()
   isMain?: boolean;
 
-  @ApiPropertyOptional({ description: 'Main category display priority', default: 0 })
+  @ApiPropertyOptional({
+    description: 'Main category display priority',
+    default: 0,
+  })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(0)
   mainSortOrder?: number;
+
+  @ApiPropertyOptional({ description: 'Category name in supplier files' })
+  @IsOptional()
+  @IsString()
+  techName?: string;
 }

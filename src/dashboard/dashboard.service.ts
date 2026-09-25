@@ -19,6 +19,18 @@ import {
 } from './product-xlsx-variants';
 import { CategoryCacheService } from '../category/services/cache.service';
 import { ProductCacheService } from '../product/services/cache.service';
+import { read } from 'xlsx';
+import {
+  addMissingPrefix,
+  extractColor,
+  extractConfigurations,
+  extractMemory,
+  findTechName,
+  includesAll,
+  memoryToGb,
+  normalizeProductName,
+  normalizeSim,
+} from '../shared/lib/extract-product-prices';
 
 type ImportRow = Record<string, unknown>;
 type PrismaTx = any;
@@ -1006,6 +1018,157 @@ export class DashboardService {
       importBatchId: importBatch.id,
       undoAvailable: summary.processedRows > 0,
     };
+  }
+
+  async importProductsPricesXlsx(fileBuffer: Buffer) {
+    const products = await this.prisma.product.findMany({
+      select: {
+        id: true,
+        name: true,
+        price: true,
+        variantColor: true,
+        variantMemory: true,
+        categories: {
+          select: {
+            category: {
+              select: {
+                title: true,
+                techName: true,
+                parent: { select: { title: true, techName: true } },
+              },
+            },
+          },
+        },
+        attributes: {
+          select: {
+            name: true,
+            value: true,
+          },
+          where: {
+            name: { equals: 'Конфигурации' },
+          },
+        },
+      },
+    });
+
+    const catalog = products.map((product) => ({
+      id: product.id,
+      name: normalizeProductName(product.name),
+      price: product.price,
+      color: normalizeProductName(
+        extractColor(product.name) ?? product.variantColor ?? '',
+      ),
+      memoryGb: memoryToGb(product.name),
+      techNames: product.categories
+        .flatMap((category) => [
+          category.category.techName?.toLowerCase(),
+          category.category.title.toLowerCase(),
+          category.category.parent?.techName?.toLowerCase(),
+          category.category.parent?.title?.toLowerCase(),
+        ])
+        .filter(Boolean),
+      configurations: extractConfigurations(product.attributes[0]?.value || ''),
+    }));
+
+    const categoriesTechNames = await this.prisma.category.findMany({
+      distinct: ['techName'],
+      select: { techName: true },
+    });
+    const techNames = categoriesTechNames
+      .map((category) => category.techName)
+      .filter(Boolean);
+
+    const categoriesTitles = await this.prisma.category.findMany({
+      distinct: ['title'],
+      select: { title: true },
+    });
+    const titles = categoriesTitles
+      .map((category) => category.title)
+      .filter(Boolean);
+
+    const allTechNames = [...techNames, ...titles];
+    const workbook = read(fileBuffer);
+    const data = [];
+    const usedProductIds: string[] = [];
+
+    for (const sheet of Object.values(workbook.Sheets)) {
+      const rows: (string | number)[][] = XLSX.utils.sheet_to_json(sheet, {
+        header: 1,
+        blankrows: false,
+      });
+
+      let currentBrand;
+      for (const row of rows) {
+        const title = String(row[0] ?? '');
+        if (!title || title.toLowerCase().includes('модель')) continue;
+
+        if (
+          row.length === 1 &&
+          !title.includes('GB') &&
+          !title.includes('TB')
+        ) {
+          currentBrand = title;
+          continue;
+        }
+
+        const colorRaw = extractColor(title);
+        const color = colorRaw && normalizeProductName(colorRaw);
+        const memoryRaw = extractMemory(title);
+        const memoryGb = memoryToGb(memoryRaw);
+        const sim = row[4] ? normalizeSim(String(row[4])) : undefined;
+
+        let model = currentBrand
+          ? addMissingPrefix(currentBrand, title)
+          : title;
+        if (colorRaw) model = model.replace(colorRaw, '');
+        if (memoryRaw) model = model.replace(memoryRaw, '');
+        model = normalizeProductName(model);
+
+        const newPrice = Math.round(parseFloat(String(row[1])) * 1000);
+        if (!Number.isFinite(newPrice)) continue;
+
+        const techName = findTechName(allTechNames, model);
+        if (!techName) {
+          data.push({ techName: title, newPrice });
+          continue;
+        }
+
+        model = model.replace(techName, '');
+        const product = catalog.find(
+          (product) =>
+            product.techNames.includes(techName) &&
+            includesAll(product.name, model) &&
+            (!color || product.color === color || product.name.includes(color)) &&
+            (memoryGb === undefined || product.memoryGb === memoryGb) &&
+            !usedProductIds.includes(product.id)
+        );
+
+        let currentPrice = product?.price.toNumber();
+        if (sim) {
+          currentPrice = product?.configurations?.find(
+            (conf) => conf.sim === sim,
+          )?.price;
+          if (!currentPrice) {
+            continue;
+          }
+        }
+
+        if (product) {
+          usedProductIds.push(product.id);
+        }
+        data.push({
+          id: product?.id,
+          name: product?.name,
+          techName: title,
+          currentPrice,
+          newPrice,
+          sim,
+        });
+      }
+    }
+
+    // sort matched products first, then remaining (unmatched)
+    return data.sort((a, b) => (a.id && b.id ? 0 : a.id ? -1 : 1));
   }
 
   async getProductsXlsxUndoStatus() {

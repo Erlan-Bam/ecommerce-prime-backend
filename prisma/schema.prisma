@@ -99,6 +99,8 @@ model Category {
   sortOrder Int       @default(0)
   isMain    Boolean   @default(false)
   mainSortOrder Int   @default(0)
+  // category name in the client's excel files
+  techName String?
   isDeleted Boolean   @default(false)
   deletedAt DateTime?
   createdAt DateTime  @default(now())

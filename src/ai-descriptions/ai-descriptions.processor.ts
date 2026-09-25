@@ -11,14 +11,14 @@ export class AiDescriptionsProcessor {
     const { productId, batchId } = job.data;
     try {
       await this.service.generateProductDraft(productId, batchId);
-      await this.service.finishBatchItem(batchId, true);
+      // await this.service.finishBatchItem(batchId, true);
       return { success: true };
     } catch (error) {
       const maxAttempts = Number(job.opts.attempts || 1);
       const isFinalAttempt = job.attemptsMade + 1 >= maxAttempts;
       if (isFinalAttempt) {
         await this.service.markDraftError(productId, batchId, error);
-        await this.service.finishBatchItem(batchId, false);
+        // await this.service.finishBatchItem(batchId, false);
       }
       throw error;
     }

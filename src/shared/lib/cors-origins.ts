@@ -13,9 +13,7 @@ function normalizeOrigin(value: string): string {
   return value.trim().replace(/\/+$/, '');
 }
 
-export function getCorsOrigins(
-  env: Partial<Record<'FRONTEND_URL' | 'CORS_ORIGINS', string>> = process.env,
-): string[] {
+export function getCorsOrigins(env: any = process.env): string[] {
   const configuredOrigins = (env.CORS_ORIGINS || '')
     .split(',')
     .map(normalizeOrigin)

@@ -15,6 +15,8 @@ import {
   BulkUpdateProductCategoriesDto,
   ApplyCatalogCleanupDto,
 } from './dto';
+import { UpdateProductPriceDto } from './dto/bulk-update-prices.dto';
+import { extractPriceFromConfigurations } from '../shared/lib/extract-product-prices';
 
 const TECHNICAL_ATTRIBUTE_NAMES = new Set([
   'id оффера',
@@ -113,21 +115,24 @@ const EXCLUDED_DESCENDANT_SLUGS_BY_ROOT_SLUG: Record<string, Set<string>> = {
   ]),
 };
 
-const DEFAULT_IMPORTANT_ATTRIBUTES = ['бренд', 'модель', 'цвет']
+const DEFAULT_IMPORTANT_ATTRIBUTES = ['бренд', 'модель', 'цвет'];
 
 const DEFAULT_MEMORY_ATTRIBUTES = [
   ['объём оперативной памяти', 'оперативная память'],
   ['встроенная память', 'память', 'объём памяти'],
-]
+];
 
 const DEFAULT_PHONE_IMPORTANT_ATTRIBUTES = [
   ...DEFAULT_MEMORY_ATTRIBUTES,
   'диагональ экрана',
-  'процессор'
-]
+  'процессор',
+];
 
 // We show these attributes in ProductCard
-const IMPORTANT_ATTRIBUTES: { keywords: string[]; attributes: Array<string | string[]> }[] = [
+const IMPORTANT_ATTRIBUTES: {
+  keywords: string[];
+  attributes: Array<string | string[]>;
+}[] = [
   {
     keywords: ['смартфон', 'телефон'],
     attributes: DEFAULT_PHONE_IMPORTANT_ATTRIBUTES,
@@ -141,14 +146,11 @@ const IMPORTANT_ATTRIBUTES: { keywords: string[]; attributes: Array<string | str
     attributes: DEFAULT_PHONE_IMPORTANT_ATTRIBUTES,
   },
   {
-    keywords: ["mac mini", "mac studio"],
-    attributes: [
-      ...DEFAULT_MEMORY_ATTRIBUTES,
-      'процессор',
-    ],
+    keywords: ['mac mini', 'mac studio'],
+    attributes: [...DEFAULT_MEMORY_ATTRIBUTES, 'процессор'],
   },
   {
-    keywords: ["наушники"],
+    keywords: ['наушники'],
     attributes: [
       'вес устройства',
       'количество микрофонов',
@@ -157,28 +159,20 @@ const IMPORTANT_ATTRIBUTES: { keywords: string[]; attributes: Array<string | str
     ],
   },
   {
-    keywords: ["часы", "watch", "garmin"],
-    attributes: [
-      ...DEFAULT_MEMORY_ATTRIBUTES,
-      'вес устройства',
-    ],
+    keywords: ['часы', 'watch', 'garmin'],
+    attributes: [...DEFAULT_MEMORY_ATTRIBUTES, 'вес устройства'],
   },
   {
-    keywords: ["пылесос"],
-    attributes: [
-      'бренд',
-      'страна',
-      'категория',
-    ],
+    keywords: ['пылесос'],
+    attributes: ['бренд', 'страна', 'категория'],
   },
 ];
 
 function findImportantAttributes(productName: string) {
-  const importantAttrs = IMPORTANT_ATTRIBUTES
-    .find((elem) =>
-      elem.keywords.findIndex(kw => productName.includes(kw)) !== -1,
-    );
-  return importantAttrs?.attributes || DEFAULT_IMPORTANT_ATTRIBUTES
+  const importantAttrs = IMPORTANT_ATTRIBUTES.find(
+    (elem) => elem.keywords.findIndex((kw) => productName.includes(kw)) !== -1,
+  );
+  return importantAttrs?.attributes || DEFAULT_IMPORTANT_ATTRIBUTES;
 }
 
 type ProductListCandidate = {
@@ -682,10 +676,14 @@ export class ProductService {
 
       if (productName) {
         const searchName = name.toLowerCase();
-        const importantAttrs = findImportantAttributes(productName.toLowerCase())
-        const matchedAttr = importantAttrs.find(importantAttr =>
-          Array.isArray(importantAttr) ? importantAttr.includes(searchName) : importantAttr === searchName
-        )
+        const importantAttrs = findImportantAttributes(
+          productName.toLowerCase(),
+        );
+        const matchedAttr = importantAttrs.find((importantAttr) =>
+          Array.isArray(importantAttr)
+            ? importantAttr.includes(searchName)
+            : importantAttr === searchName,
+        );
         if (!matchedAttr) {
           continue;
         }
@@ -2066,6 +2064,63 @@ export class ProductService {
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
+  }
+
+  async bulkUpdatePrices(dto: UpdateProductPriceDto[]) {
+    const updates = dto.map((elem) =>
+      elem.sim
+        ? this.prisma.$executeRaw`
+              UPDATE "ProductAttribute"
+              SET value = (
+                SELECT jsonb_agg(
+                  CASE
+                    WHEN lower(regexp_replace(item->>'sim', '\\s+', '', 'g')) = ${elem.sim}
+                    THEN jsonb_set(item, '{price}', to_jsonb(${elem.price}::numeric))
+                    ELSE item
+                  END
+                )
+                FROM jsonb_array_elements(value::jsonb) AS item
+              )
+              WHERE "productId" = ${elem.productId}
+              AND name = 'Конфигурации'
+            `
+        : this.prisma.product.update({
+            where: { id: elem.productId },
+            data: { price: elem.price },
+          }),
+    );
+    await this.prisma.$transaction(updates);
+
+    const products = await this.prisma.product.findMany({
+      select: {
+        id: true,
+        name: true,
+        price: true,
+        attributes: {
+          select: {
+            name: true,
+            value: true,
+          },
+          where: {
+            name: { equals: 'Конфигурации' },
+          },
+        },
+      },
+      where: { id: { in: dto.map((elem) => elem.productId) } },
+    });
+
+    const simByProduct = Object.fromEntries(
+      dto.map((elem) => [elem.productId, elem.sim]),
+    );
+    return products.map((product) => ({
+      ...product,
+      price: simByProduct[product.id]
+        ? extractPriceFromConfigurations(
+            product.attributes[0]?.value,
+            simByProduct[product.id],
+          )
+        : product.price.toNumber(),
+    }));
   }
 
   async bulkUpdateCategories(dto: BulkUpdateProductCategoriesDto) {

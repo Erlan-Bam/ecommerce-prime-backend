@@ -26,6 +26,36 @@ import { Response } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import * as path from 'path';
+import { Public } from '../shared/decorator/public.decorator';
+import { ProductFilterDto } from '../product/dto';
+
+const XlsxFileInterceptor = FileInterceptor('file', {
+  storage: memoryStorage(),
+  limits: {
+    fileSize: 15 * 1024 * 1024,
+  },
+  fileFilter: (_req, file, callback) => {
+    const allowedMimeTypes = [
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/vnd.ms-excel',
+    ];
+    const ext = path.extname(file.originalname || '').toLowerCase();
+    const isExcelExt = ext === '.xlsx' || ext === '.xls';
+
+    if (isExcelExt || allowedMimeTypes.includes(file.mimetype)) {
+      callback(null, true);
+      return;
+    }
+
+    callback(
+      new HttpException(
+        'Invalid file type. Only .xlsx files are supported',
+        HttpStatus.BAD_REQUEST,
+      ),
+      false,
+    );
+  },
+});
 
 @ApiTags('Dashboard')
 @Controller('admin/dashboard')
@@ -157,35 +187,7 @@ export class DashboardController {
   @ApiResponse({ status: 400, description: 'Invalid file' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden - Admin only' })
-  @UseInterceptors(
-    FileInterceptor('file', {
-      storage: memoryStorage(),
-      limits: {
-        fileSize: 15 * 1024 * 1024,
-      },
-      fileFilter: (_req, file, callback) => {
-        const allowedMimeTypes = [
-          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-          'application/vnd.ms-excel',
-        ];
-        const ext = path.extname(file.originalname || '').toLowerCase();
-        const isExcelExt = ext === '.xlsx' || ext === '.xls';
-
-        if (isExcelExt || allowedMimeTypes.includes(file.mimetype)) {
-          callback(null, true);
-          return;
-        }
-
-        callback(
-          new HttpException(
-            'Invalid file type. Only .xlsx files are supported',
-            HttpStatus.BAD_REQUEST,
-          ),
-          false,
-        );
-      },
-    }),
-  )
+  @UseInterceptors(XlsxFileInterceptor)
   async importProductsXlsx(@UploadedFile() file: Express.Multer.File) {
     if (!file) {
       throw new HttpException('No file uploaded', HttpStatus.BAD_REQUEST);
@@ -195,6 +197,32 @@ export class DashboardController {
       file.buffer,
       file.originalname,
     );
+  }
+
+  @Post('import/prices-xlsx')
+  @ApiOperation({ summary: 'Import new product prices from file (Admin)' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        file: {
+          type: 'string',
+          format: 'binary',
+        },
+      },
+      required: ['file'],
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Product prices imported successfully',
+  })
+  @ApiResponse({ status: 400, description: 'Invalid file' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden - Admin only' })
+  @UseInterceptors(XlsxFileInterceptor)
+  importProductsPricesXlsx(@UploadedFile() file: Express.Multer.File) {
+    return this.dashboardService.importProductsPricesXlsx(file.buffer);
   }
 
   @Get('import/products-xlsx/undo-status')
