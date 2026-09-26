@@ -27,6 +27,7 @@ import { LoyaltyModule } from './loyalty/loyalty.module';
 import { AmoCrmModule } from './amocrm';
 import { SeoModule } from './seo';
 import { AiDescriptionsModule } from './ai-descriptions/ai-descriptions.module';
+import { StyleSheetModule } from './styleheet/stylesheet.module';
 
 @Module({
   imports: [
@@ -74,6 +75,7 @@ import { AiDescriptionsModule } from './ai-descriptions/ai-descriptions.module';
     LoyaltyModule,
     SeoModule,
     AiDescriptionsModule,
+    StyleSheetModule,
   ],
   controllers: [AppController],
   providers: [],
